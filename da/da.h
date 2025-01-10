@@ -4,6 +4,7 @@
 #include <stddef.h>
 
 #define DA_PUSH_BACK_INT(da, val) { int __tmp = val; da_push_back(da, &__tmp); }
+#define DA_AT(da, index, type) (*(type *)da_at(da, index))
 
 struct da_t {
     size_t size;
