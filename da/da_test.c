@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <assert.h>
 
 #include "da.h"
 
@@ -30,6 +31,8 @@ int main() {
     printf("Index of 3: %zu\n", da_indexof(&da, &__tmp));
     __tmp = 69;
     printf("Index of 69: %zu\n", da_indexof(&da, &__tmp));
+
+    assert(da_indexof(&da, &__tmp) == -1);
 
     da_deinit(&da);
     return 0;

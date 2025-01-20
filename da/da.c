@@ -29,7 +29,7 @@ void  da_reserve(struct da_t* da, size_t capacity) {
     }
 
     void* new_buffer = malloc(da->elem_size * capacity);
-    memcpy(new_buffer, da->buffer, da->elem_size * capacity);
+    memcpy(new_buffer, da->buffer, da->elem_size * da->capacity);
 
     free(da->buffer);
     da->buffer = new_buffer;
