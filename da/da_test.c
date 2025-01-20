@@ -26,6 +26,10 @@ int main() {
 
     printf("%zu\n", da.capacity);
 
+    int __tmp = 3;
+    printf("Index of 3: %zu\n", da_indexof(&da, &__tmp));
+    __tmp = 69;
+    printf("Index of 69: %zu\n", da_indexof(&da, &__tmp));
 
     da_deinit(&da);
     return 0;

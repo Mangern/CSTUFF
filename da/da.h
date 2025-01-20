@@ -20,5 +20,6 @@ void  da_reserve(struct da_t* da, size_t capacity);
 void* da_at(struct da_t* da, size_t index);
 void  da_push_back(struct da_t* da, void* data);
 void  da_pop_back(struct da_t* da);
+size_t da_indexof(struct da_t* da, void* element);
 
 #endif

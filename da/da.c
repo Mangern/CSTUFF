@@ -65,3 +65,10 @@ void da_pop_back(struct da_t* da) {
 
     da->size -= 1;
 }
+
+size_t da_indexof(struct da_t* da, void* element) {
+    for (int i = 0; i < da->size; ++i) {
+        if (memcmp(da_at(da, i), element, da->elem_size) == 0)return i;
+    }
+    return -1;
+}
