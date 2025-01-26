@@ -1,7 +1,6 @@
 #ifndef DFA_H
 #define DFA_H
 
-#include "da.h"
 #include "nfa.h"
 #include <stddef.h>
 

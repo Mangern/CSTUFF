@@ -4,6 +4,9 @@
 build:
 	cmake -B build && cmake --build build
 
+preprocess-test: build
+	./build/preprocess_test
+
 nfa-test: build
 	./build/nfa_test
 

@@ -6,12 +6,12 @@
 #define DA_PUSH_BACK_INT(da, val) { int __tmp = val; da_push_back(da, &__tmp); }
 #define DA_AT(da, index, type) (*(type *)da_at(da, index))
 
-struct da_t {
+typedef struct da_t {
     size_t size;
     size_t capacity;
     size_t elem_size;
     void* buffer;
-};
+} da_t;
 
 void  da_init(struct da_t* da, size_t elem_size);
 void  da_deinit(struct da_t* da);

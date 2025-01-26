@@ -148,6 +148,53 @@ void dfa_union_test() {
     printf("\n\n\n");
 }
 
+void dfa_dot_test() {
+    char* regex = "ab..e";
+
+    printf("===== %s =====\n", regex);
+    dfa_t* dfa = dfa_from_regex(regex, strlen(regex));
+
+    DFA_PRINT_TEST(dfa, "abcde", 1);
+    DFA_PRINT_TEST(dfa, "abcce", 1);
+    DFA_PRINT_TEST(dfa, "abcze", 1);
+    DFA_PRINT_TEST(dfa, "ab()e", 1);
+    DFA_PRINT_TEST(dfa, "ab()", 0);
+    DFA_PRINT_TEST(dfa, "ababa", 0);
+    DFA_PRINT_TEST(dfa, "ababaaaaa", 0);
+    DFA_PRINT_TEST(dfa, "ababaaaae", 0);
+    DFA_PRINT_TEST(dfa, "....e", 0);
+    DFA_PRINT_TEST(dfa, "a...e", 0);
+
+    dfa_deinit(dfa);
+    free(dfa);
+
+    printf("\n\n\n");
+
+}
+
+void dfa_dot2_test() {
+    char* regex = ".*f(a|o)o.+";
+
+    printf("===== %s =====\n", regex);
+    dfa_t* dfa = dfa_from_regex(regex, strlen(regex));
+
+    DFA_PRINT_TEST(dfa, "fooz", 1);
+    DFA_PRINT_TEST(dfa, "foo", 0);
+    DFA_PRINT_TEST(dfa, "afooz", 1);
+    DFA_PRINT_TEST(dfa, "afoooooooooooooz", 1);
+    DFA_PRINT_TEST(dfa, "brofooy", 1);
+    DFA_PRINT_TEST(dfa, "brofoo", 0);
+    DFA_PRINT_TEST(dfa, "feapokfeapk", 0);
+    DFA_PRINT_TEST(dfa, "fao", 0);
+    DFA_PRINT_TEST(dfa, "faoo", 1);
+    DFA_PRINT_TEST(dfa, "afooooo", 1);
+
+    dfa_deinit(dfa);
+    free(dfa);
+
+    printf("\n\n\n");
+}
+
 void dfa_tdt4205_test() {
     char* regex = "(((ab)*a?)|((ba)*b?))cc*";
     printf("===== %s =====\n", regex);
@@ -204,6 +251,52 @@ void dfa_example_test() {
     DFA_PRINT_TEST(dfa, "0000", 0);
     DFA_PRINT_TEST(dfa, "abbbccbbccbcccccc", 1);
     DFA_PRINT_TEST(dfa, "abbbccbbccbcccccca", 0);
+
+    dfa_deinit(dfa);
+    free(dfa);
+
+    printf("\n\n\n");
+}
+
+void dfa_digit_test() {
+    char* regex = "(-|\\+)*\\d+";
+
+    printf("===== %s =====\n", regex);
+    dfa_t* dfa = dfa_from_regex(regex, strlen(regex));
+    printf("Num nodes: %d\n\n", dfa->num_nodes);
+
+    DFA_PRINT_TEST(dfa, "-1234", 1);
+    DFA_PRINT_TEST(dfa, "+4321", 1);
+    DFA_PRINT_TEST(dfa, "4321", 1);
+    DFA_PRINT_TEST(dfa, "01230004321", 1);
+    DFA_PRINT_TEST(dfa, "a1023901", 0);
+    DFA_PRINT_TEST(dfa, "--", 0);
+    DFA_PRINT_TEST(dfa, "123124a", 0);
+    DFA_PRINT_TEST(dfa, "--12345", 1);
+
+    dfa_deinit(dfa);
+    free(dfa);
+
+    printf("\n\n\n");
+}
+
+void dfa_word_test() {
+    char* regex = "\\w+";
+
+    printf("===== %s =====\n", regex);
+    dfa_t* dfa = dfa_from_regex(regex, strlen(regex));
+    printf("Num nodes: %d\n\n", dfa->num_nodes);
+
+    DFA_PRINT_TEST(dfa, "-1234", 0);
+    DFA_PRINT_TEST(dfa, "_my_variable_name", 1);
+    DFA_PRINT_TEST(dfa, "_my_variable_name123", 1);
+    DFA_PRINT_TEST(dfa, "_MY_CONSTANT_NAME123", 1);
+    DFA_PRINT_TEST(dfa, "!bool", 0);
+    DFA_PRINT_TEST(dfa, "0000000", 1);
+    DFA_PRINT_TEST(dfa, "__hidden", 1);
+    DFA_PRINT_TEST(dfa, "hidden-nonaccepting-string", 0);
+    DFA_PRINT_TEST(dfa, "Foo123()", 0);
+    DFA_PRINT_TEST(dfa, "", 0);
 
     dfa_deinit(dfa);
     free(dfa);
@@ -274,8 +367,12 @@ int main(int argc, char** argv) {
     dfa_kleene_test();
     dfa_plus_test();
     dfa_union_test();
+    dfa_dot_test();
+    dfa_dot2_test();
     dfa_tdt4205_test();
     dfa_example_test();
-    dfa_fat_test();
-    dfa_linear_test();
+    dfa_digit_test();
+    dfa_word_test();
+    //dfa_fat_test();
+    //dfa_linear_test();
 }
