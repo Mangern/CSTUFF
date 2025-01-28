@@ -36,6 +36,8 @@ regex_symbol_t regex_symbol_at(regex_t* regex, size_t index);
 // Add char to class
 void class_set_char(regex_symbol_t* class_symbol, unsigned char c);
 
+void class_set_range(regex_symbol_t* class_symbol, unsigned char lo, unsigned char hi);
+
 // Check if char is in class
 int class_has_char(regex_symbol_t* class_symbol, unsigned char c);
 

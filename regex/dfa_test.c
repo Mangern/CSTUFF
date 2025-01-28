@@ -294,9 +294,55 @@ void dfa_word_test() {
     DFA_PRINT_TEST(dfa, "!bool", 0);
     DFA_PRINT_TEST(dfa, "0000000", 1);
     DFA_PRINT_TEST(dfa, "__hidden", 1);
-    DFA_PRINT_TEST(dfa, "hidden-nonaccepting-string", 0);
+    DFA_PRINT_TEST(dfa, "bad-nonaccepting-string", 0);
     DFA_PRINT_TEST(dfa, "Foo123()", 0);
     DFA_PRINT_TEST(dfa, "", 0);
+
+    dfa_deinit(dfa);
+    free(dfa);
+
+    printf("\n\n\n");
+}
+
+void dfa_class_test() {
+    char* regex = "[abcd][0-9][a-z][a-zA-Z]+[xyz]?";
+
+    printf("===== %s =====\n", regex);
+    dfa_t* dfa = dfa_from_regex(regex, strlen(regex));
+    printf("Num nodes: %d\n\n", dfa->num_nodes);
+
+    DFA_PRINT_TEST(dfa, "a1aa", 1);
+    DFA_PRINT_TEST(dfa, "b4zAAx", 1);
+    DFA_PRINT_TEST(dfa, "b9zaAAy", 1);
+    DFA_PRINT_TEST(dfa, "f8taAAy", 0);
+    DFA_PRINT_TEST(dfa, "0aAax", 0);
+    DFA_PRINT_TEST(dfa, "d1aAAAAxx", 1);
+    DFA_PRINT_TEST(dfa, "d1aAzAsAzx", 1);
+    DFA_PRINT_TEST(dfa, "d1aAzAsAzxyzzz_", 0);
+    DFA_PRINT_TEST(dfa, " d1aAzAs", 0);
+
+    dfa_deinit(dfa);
+    free(dfa);
+
+    printf("\n\n\n");
+}
+
+void dfa_class2_test() {
+    char* regex = "[--e]*"; // characters in the range '-' (45) to 'e' (101)
+
+    printf("===== %s =====\n", regex);
+    dfa_t* dfa = dfa_from_regex(regex, strlen(regex));
+    printf("Num nodes: %d\n\n", dfa->num_nodes);
+
+    DFA_PRINT_TEST(dfa, "aeeea", 1);
+    DFA_PRINT_TEST(dfa, "afaa", 0);
+    DFA_PRINT_TEST(dfa, "aa+aa", 0);
+    DFA_PRINT_TEST(dfa, "-AZa021445a", 1);
+    DFA_PRINT_TEST(dfa, "a-a-a---ezz", 0);
+    DFA_PRINT_TEST(dfa, "eaeaeea----aaaa[]", 1);
+    DFA_PRINT_TEST(dfa, "aa()aaa", 0);
+    DFA_PRINT_TEST(dfa, "X<=Y?X-2:Y-2;", 1);
+    DFA_PRINT_TEST(dfa, "true==true?1:0", 0);
 
     dfa_deinit(dfa);
     free(dfa);
@@ -373,6 +419,8 @@ int main(int argc, char** argv) {
     dfa_example_test();
     dfa_digit_test();
     dfa_word_test();
-    //dfa_fat_test();
-    //dfa_linear_test();
+    dfa_class_test();
+    dfa_class2_test();
+    dfa_fat_test();
+    dfa_linear_test();
 }

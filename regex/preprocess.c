@@ -9,6 +9,17 @@
 
 #define FAIL(s) {fprintf(stderr, "%s\n", s); exit(-1);}
 
+regex_symbol_t empty_class_symbol() {
+    regex_symbol_t symbol = {
+        .symbol_type = CLASS,
+        .value_0 = 0,
+        .value_1 = 0,
+        .value_2 = 0,
+        .value_3 = 0
+    };
+    return symbol;
+}
+
 void regex_preprocess(char* string, size_t length, regex_t* regex) {
     regex->symbols = malloc(sizeof(da_t));
     da_init(regex->symbols, sizeof(regex_symbol_t));
@@ -27,45 +38,19 @@ void regex_preprocess(char* string, size_t length, regex_t* regex) {
                 ++i;
                 char next = string[i];
                 if (next == 'd') {
-                    regex_symbol_t symbol = {
-                        .symbol_type = CLASS,
-                        .value_0 = 0,
-                        .value_1 = 0,
-                        .value_2 = 0,
-                        .value_3 = 0
-                    };
-                    for (char c = '0'; c <= '9'; ++c) {
-                        class_set_char(&symbol, c);
-                    }
+                    regex_symbol_t symbol = empty_class_symbol();
+                    class_set_range(&symbol, '0', '9');
                     da_push_back(regex->symbols, &symbol);
                 } else if (next == 'w') {
-                    regex_symbol_t symbol = {
-                        .symbol_type = CLASS,
-                        .value_0 = 0,
-                        .value_1 = 0,
-                        .value_2 = 0,
-                        .value_3 = 0
-                    };
-                    for (char c = 'A'; c <= 'Z'; ++c) {
-                        class_set_char(&symbol, c);
-                    }
-                    for (char c = 'a'; c <= 'z'; ++c) {
-                        class_set_char(&symbol, c);
-                    }
-                    for (char c = '0'; c <= '9'; ++c) {
-                        class_set_char(&symbol, c);
-                    }
+                    regex_symbol_t symbol = empty_class_symbol();
+                    class_set_range(&symbol, 'A', 'Z');
+                    class_set_range(&symbol, 'a', 'z');
+                    class_set_range(&symbol, '0', '9');
                     class_set_char(&symbol, '_');
                     da_push_back(regex->symbols, &symbol);
                 } else {
                     // Escaped character: always character
-                    regex_symbol_t symbol = {
-                        .symbol_type = CLASS,
-                        .value_0 = 0,
-                        .value_1 = 0,
-                        .value_2 = 0,
-                        .value_3 = 0
-                    };
+                    regex_symbol_t symbol = empty_class_symbol();
                     class_set_char(&symbol, next);
                     da_push_back(regex->symbols, &symbol);
                 }
@@ -83,17 +68,8 @@ void regex_preprocess(char* string, size_t length, regex_t* regex) {
                 ++i;
             } break;
             case '.': {
-                regex_symbol_t symbol = {
-                    .symbol_type = CLASS,
-                    .value_0 = 0,
-                    .value_1 = 0,
-                    .value_2 = 0,
-                    .value_3 = 0
-                };
-                for (int j = 0; j < 256; ++j) {
-                    if ((char)j == NFA_TRANS_EPS) continue;
-                    class_set_char(&symbol, j);
-                }
+                regex_symbol_t symbol = empty_class_symbol();
+                class_set_range(&symbol, 0, 255);
                 da_push_back(regex->symbols, &symbol);
                 ++i;
             } break;
@@ -124,14 +100,36 @@ void regex_preprocess(char* string, size_t length, regex_t* regex) {
                 da_push_back(regex->symbols, &symbol);
                 ++i;
             } break;
+            case '[': {
+                int end_index = i+1;
+                while (end_index < length && string[end_index] != ']')++end_index;
+                if (end_index == length) {
+                    FAIL("Unmatched '['");
+                }
+                if (end_index == i + 1) {
+                    FAIL("Empty class [] not allowed.");
+                }
+                ++i;
+                regex_symbol_t symbol = empty_class_symbol();
+                // TODO: handle ] in class
+                while (i < end_index) {
+                    // e.g. a-z
+                    if (string[i+1] == '-' && i + 2 < end_index) {
+                        class_set_range(&symbol, string[i], string[i+2]);
+                        i += 3;
+                    } else {
+                        class_set_char(&symbol, string[i]);
+                        ++i;
+                    }
+                }
+                da_push_back(regex->symbols, &symbol);
+                i = end_index + 1;
+            } break;
+            case ']': {
+                FAIL("Unmatched ']'");
+            } break;
             default: {
-                regex_symbol_t symbol = {
-                    .symbol_type = CLASS,
-                    .value_0 = 0,
-                    .value_1 = 0,
-                    .value_2 = 0,
-                    .value_3 = 0
-                };
+                regex_symbol_t symbol = empty_class_symbol();
                 class_set_char(&symbol, string[i]);
                 da_push_back(regex->symbols, &symbol);
                 ++i;
@@ -162,6 +160,17 @@ void class_set_char(regex_symbol_t* class_symbol, unsigned char c) {
     if (group == 2)val = &(class_symbol->value_2);
     if (group == 3)val = &(class_symbol->value_3);
     (*val) |= (1ULL<<offset);
+}
+
+void class_set_range(regex_symbol_t *class_symbol, unsigned char lo, unsigned char hi) {
+    if (lo > hi) {
+        fprintf(stderr, "Invalid range %c-%c\n", lo, hi);
+        exit(-1);
+    }
+    for (int c = lo; c <= hi; ++c) {
+        if ((unsigned char)c == (unsigned char)NFA_TRANS_EPS) continue;
+        class_set_char(class_symbol, c);
+    }
 }
 
 int class_has_char(regex_symbol_t* class_symbol, unsigned char c) {
