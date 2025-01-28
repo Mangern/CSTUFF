@@ -78,16 +78,16 @@ void subset_epsilon_closure(node_subset_t* subset) {
     }
 }
 
+// Subset construction algorithm
+//  - The subset of nodes in the same epsilon closure (reachable by only traversing epsilon transitions)
+//    form a separate node in the dfa
+//      - Epsilon closure needs to be computed on this subset as well
+//  - The new subset of nodes reachable by a character from one subset defines the transition in the dfa
+//  - All nodes must have an exhaustive set of transitions. Error state on most of them (empty subset)
+//      - The algorithm terminates when all reachable subsets have been checked
+//      - Worst case should be 2^n possible subsets, but typically terminates way faster
+//  - If a subset contains the accepting state of the nfa, that node is accepting in the resulting dfa.
 dfa_t* dfa_from_nfa(nfa_t* nfa) {
-    // Subset construction algorithm
-    //  - The subset of nodes in the same epsilon closure (reachable by only traversing epsilon transitions)
-    //    form a separate node in the dfa
-    //      - Epsilon closure needs to be computed on this subset as well
-    //  - The new subset of nodes reachable by a character from one subset defines the transition in the dfa
-    //  - All nodes must have an exhaustive set of transitions. Error state on most of them (empty subset)
-    //      - The algorithm terminates when all reachable subsets have been checked
-    //      - Worst case should be 2^n possible subsets, but typically terminates way faster
-    //  - If a subset contains the accepting state of the nfa, that node is accepting in the resulting dfa.
 
     node_subset_t* node_empty = make_subset();
     for (int i = 0; i < 256; ++i) {
@@ -211,15 +211,14 @@ void dfa_swap_nodes(dfa_t* dfa, int node_a, int node_b) {
 
 }
 
+// Myhill-Nerode "Table-filling" algorithm
+// Mark pairs of nodes as equivalent: two nodes are equivalent iff they are not distinguishable
+// A pair of nodes (q_a, q_b) are distinguishable if:
+// - One is final (accepting) and the other one is not (base case)
+// - (trans[q_a][c], trans[q_b][c]) are distinguishable for some c in the alphabet
+//
+// Not a very effective implementation, but a simple one
 void dfa_minimize(dfa_t* dfa) {
-    // Myhill-Nerode "Table-filling" algorithm
-    // Mark pairs of nodes as equivalent: two nodes are equivalent iff they are not distinguishable
-    // A pair of nodes (q_a, q_b) are distinguishable if:
-    // - One is final (accepting) and the other one is not (base case)
-    // - (trans[q_a][c], trans[q_b][c]) are distinguishable for some c in the alphabet
-    //
-    // Not a very effective implementation, but a simple one
-
     int distinguishable[dfa->num_nodes][dfa->num_nodes];
 
     for (int i = 0; i < dfa->num_nodes; ++i) {
@@ -309,12 +308,14 @@ void dfa_minimize(dfa_t* dfa) {
 }
 
 dfa_t* dfa_from_regex(char* regex_string, size_t size) {
-    nfa_t* nfa = nfa_from_regex(regex_string, size);
-    dfa_t* dfa = dfa_from_nfa(nfa);
+    nfa_t nfa;
+    nfa_init(&nfa);
+    nfa_from_regex(regex_string, size, &nfa);
+
+    dfa_t* dfa = dfa_from_nfa(&nfa);
     dfa_minimize(dfa);
-    nfa_free_nodes(nfa);
-    nfa_deinit(nfa);
-    free(nfa);
+    nfa_free_nodes(&nfa);
+    nfa_deinit(&nfa);
     return dfa;
 }
 

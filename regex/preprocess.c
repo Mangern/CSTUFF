@@ -20,10 +20,12 @@ regex_symbol_t empty_class_symbol() {
     return symbol;
 }
 
-void regex_preprocess(char* string, size_t length, regex_t* regex) {
+void regex_init(regex_t* regex) {
     regex->symbols = malloc(sizeof(da_t));
     da_init(regex->symbols, sizeof(regex_symbol_t));
+}
 
+void regex_preprocess(char* string, size_t length, regex_t* regex) {
     da_t paren_stack;
     da_init(&paren_stack, sizeof(size_t));
 
@@ -188,4 +190,5 @@ int class_has_char(regex_symbol_t* class_symbol, unsigned char c) {
 
 void regex_deinit(regex_t* regex) {
     da_deinit(regex->symbols);
+    free(regex->symbols);
 }

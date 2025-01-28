@@ -29,6 +29,8 @@ struct regex_t {
     da_t* symbols;
 };
 
+void regex_init(regex_t* regex);
+
 void regex_preprocess(char* string, size_t length, regex_t* regex);
 
 regex_symbol_t regex_symbol_at(regex_t* regex, size_t index);

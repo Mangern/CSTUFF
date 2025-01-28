@@ -28,6 +28,7 @@ int main() {
     regex_t regex;
     char* regex_str = "(-|\\+)*\\d+";
 
+    regex_init(&regex);
     regex_preprocess(regex_str, strlen(regex_str), &regex);
 
     for (int i = 0; i < regex.symbols->size; ++i) {

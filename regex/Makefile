@@ -14,4 +14,4 @@ dfa-test: build
 	./build/dfa_test
 
 .PHONY: test
-test: nfa-test dfa-test
+test: preprocess-test nfa-test dfa-test

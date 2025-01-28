@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 void nfa_init(nfa_t *nfa) {
     nfa->nodes = malloc(sizeof(da_t));
@@ -18,7 +19,6 @@ void nfa_deinit(nfa_t *nfa) {
     free(nfa->nodes);
 }
 
-#include <stdio.h>
 void nfa_free_nodes(nfa_t *nfa) {
     // Separate from deinit, because sometimes nodes need to live longer
     // mindfuck lifetime business
@@ -193,7 +193,7 @@ void nfa_from_regex_handle_regop(regex_symbol_t* symbol, da_t* union_list, da_t*
     }
 }
 
-nfa_t* nfa_from_regex_impl(regex_t regex, size_t start, size_t end) {
+void nfa_from_regex_impl(regex_t regex, size_t start, size_t end, nfa_t* nfa) {
     // Trying to implement the Mc-Naughton–Yamada–Thompson algorithm
     // a.k.a. a pretty obvious method of going from regex to nfa.
 
@@ -234,7 +234,9 @@ nfa_t* nfa_from_regex_impl(regex_t regex, size_t start, size_t end) {
                 {
                     // TODO: handle stuff like (), empty nfa?
                     int loc = symbol.value_0;
-                    nfa_t* sub_nfa = nfa_from_regex_impl(regex, i + 1, loc);
+                    nfa_t* sub_nfa = malloc(sizeof(nfa_t));
+                    nfa_init(sub_nfa);
+                    nfa_from_regex_impl(regex, i + 1, loc, sub_nfa);
                     da_push_back(&concat_list, &sub_nfa);
                     i = loc + 1;
                 }
@@ -268,6 +270,10 @@ nfa_t* nfa_from_regex_impl(regex_t regex, size_t start, size_t end) {
         nfa_node_t* union_exit = malloc(sizeof(nfa_node_t));
         nfa_node_init(union_exit);
 
+        // A | B: Two eps going to each path, joining with eps
+        //   INIT---EPS-->NFA_A---EPS-->FINAL
+        //     \                        /
+        //      ----EPS-->NFA_B---EPS---
         nfa_node_add_transition(union_enter, NFA_TRANS_EPS, ret->initial_state);
         nfa_node_add_transition(union_enter, NFA_TRANS_EPS, cur->initial_state);
         nfa_node_add_transition(ret->accepting_state, NFA_TRANS_EPS, union_exit);
@@ -289,13 +295,21 @@ nfa_t* nfa_from_regex_impl(regex_t regex, size_t start, size_t end) {
     da_deinit(&concat_list);
     da_deinit(&union_list);
 
-    return ret;
+    // Move ret into nfa
+    // TODO: how to make the interface the same while avoiding this weird a.f. stuff
+    nfa_deinit(nfa);
+
+    nfa->initial_state   = ret->initial_state;
+    nfa->accepting_state = ret->accepting_state;
+    nfa->nodes           = ret->nodes;
+
+    free(ret);
 }
 
-nfa_t* nfa_from_regex(char* regex_string, size_t size) {
+void nfa_from_regex(char* regex_string, size_t size, nfa_t* nfa) {
     regex_t regex;
+    regex_init(&regex);
     regex_preprocess(regex_string, size, &regex);
-    nfa_t* result = nfa_from_regex_impl(regex, 0, regex.symbols->size);
+    nfa_from_regex_impl(regex, 0, regex.symbols->size, nfa);
     regex_deinit(&regex);
-    return result;
 }

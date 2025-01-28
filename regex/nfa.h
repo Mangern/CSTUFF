@@ -34,6 +34,6 @@ void nfa_node_free(nfa_node_t* node);
 int nfa_accepts(nfa_t* nfa, char* string, size_t size);
 void nfa_node_transition(nfa_node_t* node, char c, da_t* result);
 
-nfa_t* nfa_from_regex(char* regex_string, size_t size);
+void nfa_from_regex(char* regex_string, size_t size, nfa_t* nfa);
 
 #endif // NFA_H
