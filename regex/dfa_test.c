@@ -350,6 +350,21 @@ void dfa_class2_test() {
     printf("\n\n\n");
 }
 
+void dfa_var_test() {
+    char* regex = "(int|float|double) +[a-zA-Z_]\\w* *= *(-|\\+)*\\d+(\\.\\d*f?)?;";
+    dfa_t* dfa = dfa_from_regex(regex, strlen(regex));
+    DFA_PRINT_TEST(dfa, "int x = 3;", 1);
+    DFA_PRINT_TEST(dfa, "float    f =3.0f;", 1);
+    DFA_PRINT_TEST(dfa, "int x = 3.0.0;", 0);
+    DFA_PRINT_TEST(dfa, "double x3 = 3.0;", 1);
+    DFA_PRINT_TEST(dfa, "double 3x = 3.0;", 0);
+
+    dfa_deinit(dfa);
+    free(dfa);
+
+    printf("\n\n\n");
+}
+
 float time_dfa_init(char* regex) {
     size_t size = strlen(regex);
     struct timeval t_start, t_end;
@@ -421,6 +436,7 @@ int main(int argc, char** argv) {
     dfa_word_test();
     dfa_class_test();
     dfa_class2_test();
+    dfa_var_test();
     dfa_fat_test();
     dfa_linear_test();
 }
