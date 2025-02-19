@@ -1,0 +1,12 @@
+Terminals:
+x, y, +, (, )
+
+Prods (augmented):
+E' -> E
+E -> E + T
+E -> E - T
+E -> T
+T -> ( E )
+T -> Z
+Z -> x
+Z -> y
