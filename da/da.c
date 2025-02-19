@@ -3,18 +3,18 @@
 #include <string.h>
 #include <assert.h>
 
-void  da_init(struct da_t* da, size_t elem_size) {
+void  da_init(da_t* da, size_t elem_size) {
     da->size      = 0;
     da->capacity  = 1;
     da->elem_size = elem_size;
     da->buffer    = malloc(elem_size);
 }
 
-void  da_deinit(struct da_t* da) {
+void  da_deinit(da_t* da) {
     free(da->buffer);
 }
 
-void  da_resize(struct da_t* da, size_t size) {
+void  da_resize(da_t* da, size_t size) {
     if (da->capacity < size) {
         da_reserve(da, size);
     }
@@ -22,7 +22,7 @@ void  da_resize(struct da_t* da, size_t size) {
     da->size = size;
 }
 
-void  da_reserve(struct da_t* da, size_t capacity) {
+void  da_reserve(da_t* da, size_t capacity) {
     if (capacity <= da->capacity) {
         // TODO: is it bad?
         return;
@@ -37,13 +37,13 @@ void  da_reserve(struct da_t* da, size_t capacity) {
     da->capacity = capacity;
 }
 
-void* da_at(struct da_t* da, size_t index) {
+void* da_at(da_t* da, size_t index) {
     char* buffer = da->buffer;
     size_t offset_bytes = index * da->elem_size;
     return &buffer[offset_bytes];
 }
 
-void  da_push_back(struct da_t* da, void* data) {
+void  da_push_back(da_t* da, void* data) {
     if (da->size == da->capacity) {
         // TODO: is 2 optimal?
         da_reserve(da, 2 * da->capacity);
@@ -58,7 +58,7 @@ void  da_push_back(struct da_t* da, void* data) {
     da->size += 1;
 }
 
-void da_pop_back(struct da_t* da) {
+void da_pop_back(da_t* da) {
     assert(da->size > 0);
 
     // TODO: should we free at some point?
@@ -66,7 +66,18 @@ void da_pop_back(struct da_t* da) {
     da->size -= 1;
 }
 
-size_t da_indexof(struct da_t* da, void* element) {
+void  da_clear(da_t* da) {
+    da->size = 0;
+}
+
+/*
+ * Wrapper for qsort.
+ */
+void  da_sort(da_t* da, __compar_fn_t compar) {
+    qsort(da->buffer, da->size, da->elem_size, compar);
+}
+
+size_t da_indexof(da_t* da, void* element) {
     for (int i = 0; i < da->size; ++i) {
         if (memcmp(da_at(da, i), element, da->elem_size) == 0)return i;
     }
