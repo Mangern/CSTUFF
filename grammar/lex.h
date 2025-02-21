@@ -8,6 +8,7 @@ typedef enum {
     MINUS,
     X,
     Y,
+    STAR,
     LPAREN,
     RPAREN,
     EOF_T,

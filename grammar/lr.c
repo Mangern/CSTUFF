@@ -4,10 +4,14 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+#include <assert.h>
 
 void grammar_init(grammar_t* grammar) {
     da_init(&(grammar->rules), sizeof(rule_t));
     da_init(&grammar->itemsets, sizeof(grammar_itemset_t));
+    // To be populated later
+    grammar->table_action = NULL;
+    grammar->table_goto = NULL;
 }
 
 void grammar_itemset_init(grammar_itemset_t* itemset) {
@@ -77,6 +81,20 @@ void grammar_deinit(grammar_t* grammar) {
         grammar_itemset_deinit(da_at(&grammar->itemsets, i));
     }
     da_deinit(&(grammar->itemsets));
+
+    if (grammar->table_goto != NULL) {
+        for (size_t i = 0; i < grammar->itemsets.size; ++i) {
+            free(grammar->table_goto[i]);
+        }
+        free(grammar->table_goto);
+    }
+
+    if (grammar->table_action != NULL) {
+        for (size_t i = 0; i < grammar->itemsets.size; ++i) {
+            free(grammar->table_action[i]);
+        }
+        free(grammar->table_action);
+    }
 }
 
 void grammar_itemset_deinit(grammar_itemset_t *itemset) {
@@ -97,6 +115,8 @@ char* grammar_symbol_str(symbol_t symbol) {
             return "E";
         case T:
             return "T";
+        case F:
+            return "F";
         case Z:
             return "Z";
         case NUM_NONTERMINAL:
@@ -189,6 +209,18 @@ grammar_itemset_t itemset_goto(grammar_t* grammar, grammar_itemset_t* itemset, s
     return result;
 }
 
+// Maybe grow the goto table
+void grammar_make_goto_rows(grammar_t* grammar, size_t goal_rows) {
+    if (goal_rows <= grammar->ngoto) return;
+
+    grammar->table_goto = realloc(grammar->table_goto, goal_rows * sizeof(int*));
+    for (size_t i = grammar->ngoto; i < goal_rows; ++i) {
+        grammar->table_goto[i] = malloc(NUM_SYMBOLS * sizeof(int));
+        memset(grammar->table_goto[i], -1, NUM_SYMBOLS * sizeof(int));
+    }
+    grammar->ngoto = goal_rows;
+}
+
 void grammar_construct_itemsets(grammar_t* grammar) {
     grammar_itemset_t initial_set;
     grammar_itemset_init(&initial_set);
@@ -206,6 +238,10 @@ void grammar_construct_itemsets(grammar_t* grammar) {
 
     bool added_this_round = true;
 
+    grammar->table_goto = malloc(0);
+    grammar->ngoto = 0;
+    grammar_make_goto_rows(grammar, 1);
+
     while (added_this_round) {
         added_this_round = false;
         for (size_t i = 0; i < grammar->itemsets.size; ++i) {
@@ -214,34 +250,43 @@ void grammar_construct_itemsets(grammar_t* grammar) {
                 grammar_itemset_t itemset_derived = itemset_goto(grammar, itemset_curr, symbol_idx);
 
                 // Check if derived exists already
-                bool exists = false;
+                int exists = -1;
                 for (size_t j = 0; j < grammar->itemsets.size; ++j) {
                     grammar_itemset_t* itemset_existing = da_at(&grammar->itemsets, j);
                     if (grammar_itemsets_equal(&itemset_derived, itemset_existing)) {
-                        exists = true;
+                        exists = j;
                         break;
                     }
                 }
 
-                if (exists || itemset_derived.items->size == 0) {
+                if (exists != -1) {
+                    grammar_make_goto_rows(grammar, i + 1);
+                    grammar->table_goto[i][symbol_idx] = exists;
+                }
+
+                if (exists != -1 || itemset_derived.items->size == 0) {
                     // This itemset will not be remembered
                     grammar_itemset_deinit(&itemset_derived);
                     continue;
                 }
 
+                grammar_make_goto_rows(grammar, grammar->itemsets.size + 1);
+                grammar->table_goto[i][symbol_idx] = grammar->itemsets.size;
                 da_push_back(&grammar->itemsets, &itemset_derived);
                 added_this_round = true;
             }
         }
     }
+
+    assert(grammar->ngoto >= grammar->itemsets.size);
 }
 
 /*
  * set_first: allocated NUM_SYMBOLS x NUM_SYMBOLS array of bool.
  */
-void grammar_compute_first(grammar_t* grammar, bool** set_first) {
+void grammar_compute_first(grammar_t* grammar, bool set_first[NUM_SYMBOLS][NUM_SYMBOLS]) {
     for (int i = 0; i < NUM_SYMBOLS; ++i) {
-        memset(set_first, 0, NUM_SYMBOLS * sizeof(bool));
+        memset(set_first[i], 0, NUM_SYMBOLS * sizeof(bool));
     }
     for (int i = 0; i < NUM_TOKENS; ++i) {
         size_t symbol_idx = grammar_symbol_index(SYMBOL_TERM(i));
@@ -294,36 +339,145 @@ void grammar_compute_first(grammar_t* grammar, bool** set_first) {
  *
  * prod_seq: da_t<symbol_t>
  */
-void grammar_sequence_first(da_t* prod_seq, size_t start_idx, bool** set_first, bool* result_first) {
+void grammar_sequence_first(da_t* prod_seq, size_t start_idx, bool set_first[NUM_SYMBOLS][NUM_SYMBOLS], bool result_first[NUM_SYMBOLS]) {
     bool to_add[NUM_SYMBOLS];
     size_t i;
     size_t symbol_eps_idx = grammar_symbol_index(SYMBOL_NONTERM(EPS));
     memset(result_first, 0, NUM_SYMBOLS * sizeof(bool));
-    memset(to_add, 0, NUM_SYMBOLS * sizeof(bool));
 
     for (i = start_idx; i < prod_seq->size; ++i) {
+        size_t result_symbol_idx = grammar_symbol_index(*(symbol_t*)da_at(prod_seq, i));
+        for (size_t p = 0; p < NUM_SYMBOLS; ++p) {
+            if (p == symbol_eps_idx) continue;
+            result_first[p] |= set_first[result_symbol_idx][p];
+        }
+        if (!set_first[result_symbol_idx][symbol_eps_idx]) break;
+    }
 
+    if (i == prod_seq->size) {
+        // EPS was in all result rules.
+        result_first[symbol_eps_idx] = true;
     }
 }
 
-void grammar_compute_follow(grammar_t *grammar, bool** set_follow) {
+void grammar_compute_follow(grammar_t *grammar, bool set_first[NUM_SYMBOLS][NUM_SYMBOLS], bool set_follow[NUM_SYMBOLS][NUM_SYMBOLS]) {
     for (int i = 0; i < NUM_SYMBOLS; ++i) {
-        memset(set_follow, 0, NUM_SYMBOLS * sizeof(bool));
+        memset(set_follow[i], 0, NUM_SYMBOLS * sizeof(bool));
     }
 
     // EOF always follows start symbol
     set_follow[grammar_symbol_index(SYMBOL_NONTERM(E_PRIME))][grammar_symbol_index(SYMBOL_TERM(EOF_T))] = true;
+    size_t symbol_eps_idx = grammar_symbol_index(SYMBOL_NONTERM(EPS));
 
     bool added_this_round = true;
 
     while (added_this_round) {
         added_this_round = false;
+
+        for (size_t rule_idx = 0; rule_idx < grammar->rules.size; ++rule_idx) {
+            rule_t rule = grammar_rule_at(grammar, rule_idx);
+
+            size_t start_symbol_idx = grammar_symbol_index(rule.start_symbol);
+
+            // A -> alpha B beta
+            for (size_t i = 0; i < rule.result_symbols.size; ++i) {
+                size_t result_symbol_idx = grammar_symbol_index(*(symbol_t*)da_at(&rule.result_symbols, i));
+                bool add_start_symbol_follow = (i == rule.result_symbols.size - 1);
+                if (i < rule.result_symbols.size - 1) {
+                    bool first_rest[NUM_SYMBOLS];
+                    // Compute FIRST(beta)
+                    grammar_sequence_first(&rule.result_symbols, i + 1, set_first, first_rest);
+
+                    // everything in FIRST(beta) except eps should be in FOLLOW(B)
+                    for (size_t p = 0; p < NUM_SYMBOLS; ++p) {
+                        if (p == symbol_eps_idx) continue;
+                        if (set_follow[result_symbol_idx][p] == false && first_rest[p] == true)
+                            added_this_round = true;
+                        set_follow[result_symbol_idx][p] |= first_rest[p];
+                    }
+
+                    // if FIRST(beta) contains EPS, everything in FOLLOW(A) is in FOLLOW(B)
+                    if (first_rest[symbol_eps_idx]) {
+                        add_start_symbol_follow = true;
+                    }
+                }
+
+                if (add_start_symbol_follow) {
+                    for (size_t p = 0; p < NUM_SYMBOLS; ++p) {
+                        if (set_follow[result_symbol_idx][p] == false && set_follow[start_symbol_idx][p] == true)
+                            added_this_round = true;
+                        set_follow[result_symbol_idx][p] |= set_follow[start_symbol_idx][p];
+                    }
+                }
+            }
+        }
     }
 }
 
 void grammar_construct_slr(grammar_t *grammar) {
     bool set_first[NUM_SYMBOLS][NUM_SYMBOLS];
     bool set_follow[NUM_SYMBOLS][NUM_SYMBOLS];
+
+    grammar_compute_first(grammar, set_first);
+    grammar_compute_follow(grammar, set_first, set_follow);
+
+    size_t num_states = grammar->itemsets.size;
+    grammar->table_action = malloc(num_states * sizeof(action_t*));
+
+    for (size_t i = 0; i < num_states; ++i) {
+        grammar->table_action[i] = malloc(NUM_SYMBOLS * sizeof(action_t));
+        for (size_t j = 0; j < NUM_SYMBOLS; ++j) {
+            grammar->table_action[i][j].type = UNDEFINED;
+        }
+    }
+
+    // Fill ACTION table
+    for (size_t i = 0; i < num_states; ++i) {
+        grammar_itemset_t itemset = itemset_closure(grammar, (grammar_itemset_t*)da_at(&grammar->itemsets, i));
+
+        for (size_t item_idx = 0; item_idx < itemset.items->size; ++item_idx) {
+            grammar_item_t *item = da_at(itemset.items, item_idx);
+            rule_t rule = grammar_rule_at(grammar, item->rule_idx);
+            size_t start_idx = grammar_symbol_index(rule.start_symbol);
+            if (item->dot_pos >= rule.result_symbols.size) {
+                // Ends with dot
+                if (start_idx == grammar_symbol_index(SYMBOL_NONTERM(SYMBOL_START))) {
+                    grammar->table_action[i][grammar_symbol_index(SYMBOL_TERM(EOF_T))].type = ACCEPT;
+                } else {
+                    for (size_t p = 0; p < NUM_SYMBOLS; ++p) {
+                        if (!set_follow[start_idx][p]) continue;
+                        if (grammar->table_action[i][p].type == SHIFT) {
+                            // Conflict
+                            fprintf(stderr, "Shift/reduce conflict. ACTION[%zu, %s].", i, grammar_symbol_str(grammar_symbol_from_index(p)));
+                            exit(1);
+                        }
+                        grammar->table_action[i][p].type = REDUCE;
+                        grammar->table_action[i][p].argument = item->rule_idx;
+                    }
+                }
+                continue;
+            } 
+
+            symbol_t symbol_after_dot = *(symbol_t *)da_at(&rule.result_symbols, item->dot_pos);
+            if (!symbol_after_dot.is_terminal) continue;
+            size_t symbol_idx_after_dot = grammar_symbol_index(symbol_after_dot);
+            int next_state = grammar->table_goto[i][symbol_idx_after_dot];
+            if (next_state == -1) {
+                fprintf(stderr, "Failed to create action for state %zu. Has no GOTO on symbol %s", i, grammar_symbol_str(symbol_after_dot));
+                exit(1);
+            }
+
+            if (grammar->table_action[i][symbol_idx_after_dot].type == REDUCE) {
+                fprintf(stderr, "Shift/reduce conflict. ACTION[%zu, %s]", i, grammar_symbol_str(symbol_after_dot));
+                exit(1);
+            }
+
+            grammar->table_action[i][symbol_idx_after_dot].type = SHIFT;
+            grammar->table_action[i][symbol_idx_after_dot].argument = next_state;
+        }
+
+        grammar_itemset_deinit(&itemset);
+    }
 }
 
 size_t grammar_symbol_index(symbol_t symbol) {
@@ -338,18 +492,22 @@ symbol_t grammar_symbol_from_index(size_t index) {
     return SYMBOL_TERM(index - NUM_NONTERMINAL);
 }
 
+void grammar_print_rule(FILE* out, grammar_t* grammar, size_t rule_idx) {
+    rule_t* rule = da_at(&grammar->rules, rule_idx);
+    fprintf(out, "%s ->", grammar_symbol_str(rule->start_symbol));
+
+    for (size_t j = 0; j < rule->result_symbols.size; ++j) {
+        symbol_t* sym = da_at(&rule->result_symbols, j);
+        fprintf(out, " %s", grammar_symbol_str(*sym));
+    }
+}
+
 void grammar_debug_print(FILE* out, grammar_t* grammar) {
     fprintf(out, "===== RULES =====\n");
     fprintf(out, "Number of rules: %zu\n", grammar->rules.size);
 
     for (size_t i = 0; i < grammar->rules.size; ++i) {
-        rule_t* rule = da_at(&grammar->rules, i);
-        fprintf(out, "%s ->", grammar_symbol_str(rule->start_symbol));
-
-        for (size_t j = 0; j < rule->result_symbols.size; ++j) {
-            symbol_t* sym = da_at(&rule->result_symbols, j);
-            fprintf(out, " %s", grammar_symbol_str(*sym));
-        }
+        grammar_print_rule(out, grammar, i);
         fprintf(out, "\n");
     }
     fprintf(out, "\n");
@@ -377,4 +535,125 @@ void grammar_debug_print(FILE* out, grammar_t* grammar) {
         }
         grammar_itemset_deinit(&itemset);
     }
+
+
+    bool set_first[NUM_SYMBOLS][NUM_SYMBOLS];
+    bool set_follow[NUM_SYMBOLS][NUM_SYMBOLS];
+
+    grammar_compute_first(grammar, set_first);
+
+    fprintf(out, "\n");
+    fprintf(out, "===== FIRST =====\n");
+
+    for (int i = 0; i < NUM_SYMBOLS; ++i) {
+        fprintf(out, "%s:", grammar_symbol_str(grammar_symbol_from_index(i)));
+        for (int j = 0; j < NUM_SYMBOLS; ++j) {
+            if (set_first[i][j]) {
+                fprintf(out, " %s", grammar_symbol_str(grammar_symbol_from_index(j)));
+            }
+        }
+        fprintf(out, "\n");
+    }
+
+    grammar_compute_follow(grammar, set_first, set_follow);
+
+    fprintf(out, "\n");
+    fprintf(out, "===== FOLLOW =====\n");
+    for (int i = 0; i < NUM_SYMBOLS; ++i) {
+        fprintf(out, "%s:", grammar_symbol_str(grammar_symbol_from_index(i)));
+        for (int j = 0; j < NUM_SYMBOLS; ++j) {
+            if (set_follow[i][j]) {
+                fprintf(out, " %s", grammar_symbol_str(grammar_symbol_from_index(j)));
+            }
+        }
+        fprintf(out, "\n");
+    }
+
+    fprintf(out, "\n");
+
+    if (grammar->table_action != NULL) {
+        for (size_t i = 0; i < grammar->itemsets.size; ++i) {
+            for (int j = 0; j < NUM_SYMBOLS; ++j) {
+                ActionType type = grammar->table_action[i][j].type;
+                size_t arg = grammar->table_action[i][j].argument;
+                if (type == UNDEFINED) continue;
+                fprintf(out, "ACTION[%zu, %s] = ", i, grammar_symbol_str(grammar_symbol_from_index(j)));
+                if (type == SHIFT) {
+                    fprintf(out, "shift %zu\n", arg);
+                } else if (type == REDUCE) {
+                    fprintf(out, "reduce ");
+                    grammar_print_rule(out, grammar, arg);
+                    fprintf(out, "\n");
+                } else {
+                    fprintf(out, "accept\n");
+                }
+            }
+        }
+    }
+}
+
+void grammar_parse(grammar_t *grammar, char *str, size_t length) {
+    lexer_t lexer;
+    lexer_init(&lexer, str, length);
+
+    size_t state = 0;
+    da_t stack;
+    da_init(&stack, sizeof(size_t));
+    da_push_back(&stack, &state);
+
+    Token curr_symbol = lexer_advance(&lexer);
+    printf("Input: %s\nRules:\n", str);
+    for (;;) {
+        assert(stack.size > 0);
+        size_t stack_top = *(size_t*)da_at(&stack, stack.size - 1);
+        size_t curr_symbol_idx = grammar_symbol_index(SYMBOL_TERM(curr_symbol));
+
+        action_t action = grammar->table_action[stack_top][curr_symbol_idx];
+
+        switch (action.type) {
+            case UNDEFINED:
+            {
+                printf("REJECT\n");
+                return;
+            }
+            break;
+            case SHIFT:
+            {
+                size_t next_state = grammar->table_action[stack_top][curr_symbol_idx].argument;
+                da_push_back(&stack, &next_state);
+                // Only advance on shift
+                curr_symbol = lexer_advance(&lexer);
+            }
+            break;
+            case REDUCE:
+            {
+                size_t rule_idx = grammar->table_action[stack_top][curr_symbol_idx].argument;
+                rule_t rule = grammar_rule_at(grammar, rule_idx);
+                assert(stack.size > rule.result_symbols.size);
+                // Pop the prod symbols
+                da_resize(&stack, stack.size - rule.result_symbols.size);
+                stack_top = *(size_t*)da_at(&stack, stack.size - 1);
+                int next_state = grammar->table_goto[stack_top][grammar_symbol_index(rule.start_symbol)];
+                grammar_print_rule(stdout, grammar, rule_idx);
+                puts("");
+                if (next_state == -1) {
+                    printf("REJECT\n");
+                    return;
+                }
+
+                size_t next_state_ss = next_state;
+                da_push_back(&stack, &next_state_ss);
+                // do not advance input
+            }
+            break;
+            case ACCEPT:
+            {
+                printf("ACCEPT\n");
+                return;
+            }
+            break;
+        }
+    }
+
+    da_deinit(&stack);
 }

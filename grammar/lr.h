@@ -10,6 +10,7 @@ typedef enum {
     E_PRIME,
     E,
     T,
+    F,
     Z,
     EPS,
     NUM_NONTERMINAL // technically terminal or idk
@@ -41,11 +42,24 @@ typedef struct {
     da_t* items;
 } grammar_itemset_t;
 
+typedef enum {
+    UNDEFINED,
+    SHIFT,
+    REDUCE,
+    ACCEPT
+} ActionType;
+
+typedef struct {
+    ActionType type;
+    size_t argument;
+} action_t;
+
 typedef struct {
     da_t rules;
     da_t itemsets;
-    size_t** table_goto;
-    size_t** table_action;
+    int** table_goto;
+    size_t ngoto;
+    action_t** table_action;
 } grammar_t;
 
 void grammar_init(grammar_t* grammar);
@@ -73,6 +87,8 @@ void grammar_deinit(grammar_t* grammar);
 void grammar_itemset_deinit(grammar_itemset_t* itemset);
 
 char* grammar_symbol_str(symbol_t symbol);
+
+void grammar_parse(grammar_t* grammar, char* str, size_t length);
 
 void grammar_debug_print(FILE* out, grammar_t* grammar);
 

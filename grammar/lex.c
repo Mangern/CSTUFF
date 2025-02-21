@@ -27,6 +27,9 @@ Token lexer_advance(lexer_t* lexer) {
         case '-':
             ret = MINUS;
             break;
+        case '*':
+            ret = STAR;
+            break;
         case 'x':
             ret = X;
             break;
@@ -53,6 +56,8 @@ char* token_str(Token token) {
         return "+";
     case MINUS:
         return "-";
+    case STAR:
+        return "*";
     case LPAREN:
         return "(";
     case RPAREN:

@@ -6,7 +6,9 @@ E' -> E
 E -> E + T
 E -> E - T
 E -> T
-T -> ( E )
-T -> Z
+T -> F
+F -> ( E )
+F -> F * F
+F -> Z
 Z -> x
 Z -> y

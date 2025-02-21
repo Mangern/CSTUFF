@@ -1,9 +1,9 @@
 #include "lex.h"
 #include "lr.h"
 
-int main() {
-    char* text = "x + y";
+#include <string.h>
 
+int main() {
     grammar_t grammar;
     grammar_init(&grammar);
 
@@ -39,19 +39,35 @@ int main() {
         SYMBOL_NONTERM(T)
     );
 
-    // T -> ( E )
+    //T -> F
     grammar_add_rule(&grammar, 
         SYMBOL_NONTERM(T),
-        3, 
+        1,
+        SYMBOL_NONTERM(F)
+    );
+
+    //F -> ( E )
+    grammar_add_rule(&grammar, 
+        SYMBOL_NONTERM(F),
+        3,
         SYMBOL_TERM(LPAREN),
         SYMBOL_NONTERM(E),
         SYMBOL_TERM(RPAREN)
     );
 
-    // T -> Z
+    //F -> Z * F
     grammar_add_rule(&grammar, 
-        SYMBOL_NONTERM(T),
-        1, 
+        SYMBOL_NONTERM(F),
+        3,
+        SYMBOL_NONTERM(Z),
+        SYMBOL_TERM(STAR),
+        SYMBOL_NONTERM(F)
+    );
+
+    //F -> Z
+    grammar_add_rule(&grammar, 
+        SYMBOL_NONTERM(F),
+        1,
         SYMBOL_NONTERM(Z)
     );
 
@@ -71,8 +87,13 @@ int main() {
 
 
     grammar_construct_itemsets(&grammar);
+    grammar_construct_slr(&grammar);
 
     grammar_debug_print(stdout, &grammar);
+
+    char* str_to_parse = "x + y * (x + y)";
+    grammar_parse(&grammar, str_to_parse, strlen(str_to_parse));
+
 
     grammar_deinit(&grammar);
 
