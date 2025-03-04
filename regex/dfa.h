@@ -1,7 +1,6 @@
 #ifndef DFA_H
 #define DFA_H
 
-#include "da.h"
 #include "nfa.h"
 #include <stddef.h>
 
@@ -22,6 +21,8 @@ struct dfa_t {
 dfa_t* dfa_from_nfa(nfa_t* nfa);
 dfa_t* dfa_from_regex(char* regex_string, size_t size);
 int    dfa_accepts(dfa_t* dfa, char* string, size_t size);
+// Match maximal prefix of string. Return the length of the match.
+size_t dfa_match(dfa_t* dfa, char* string, size_t max_len);
 void   dfa_deinit(dfa_t* dfa);
 
 #endif // DFA_H

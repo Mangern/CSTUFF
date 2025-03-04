@@ -5,7 +5,6 @@
 
 typedef struct nfa_node_t nfa_node_t;
 typedef struct nfa_t nfa_t;
-typedef struct da_t da_t;
 typedef struct transition_t transition_t;
 
 #define NFA_TRANS_EPS '\xff'
@@ -34,6 +33,6 @@ void nfa_node_free(nfa_node_t* node);
 int nfa_accepts(nfa_t* nfa, char* string, size_t size);
 void nfa_node_transition(nfa_node_t* node, char c, da_t* result);
 
-nfa_t* nfa_from_regex(char* regex_string, size_t size);
+void nfa_from_regex(char* regex_string, size_t size, nfa_t* nfa);
 
 #endif // NFA_H

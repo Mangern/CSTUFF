@@ -4,7 +4,7 @@
 #include "da.h"
 
 int main() {
-    struct da_t da;
+    da_t da;
     da_init(&da, sizeof(int));
 
     DA_PUSH_BACK_INT(&da, 1);

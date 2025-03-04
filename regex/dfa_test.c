@@ -4,8 +4,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/time.h>
+#include <assert.h>
 
 #define DFA_PRINT_TEST(dfa, str, result) { int ret = dfa_accepts(dfa, str, strlen(str)); printf("\"%s\" %s match %s %s \x1b[0m\n", str, result == 0 ? "should not" : "should", ret == result ? "and it\x1b[1;32m" : "but it\x1b[1;31m" , ret == 0 ? "doesn't" : "does"); }
+
+#define DFA_MATCH_TEST(dfa, str, result) { size_t ret = dfa_match(dfa, str, strlen(str)); printf("\"%s\" should match %zu characters %s \x1b[0m(matched %zu)\n", str, result, (ret == result ? "and it\x1b[1;32m does" : "but it\x1b[1;31m doesn't"), ret); }
 
 #define WALLTIME(t) ((double)(t).tv_sec + 1e-6 * (double)(t).tv_usec)
 
@@ -148,6 +151,53 @@ void dfa_union_test() {
     printf("\n\n\n");
 }
 
+void dfa_dot_test() {
+    char* regex = "ab..e";
+
+    printf("===== %s =====\n", regex);
+    dfa_t* dfa = dfa_from_regex(regex, strlen(regex));
+
+    DFA_PRINT_TEST(dfa, "abcde", 1);
+    DFA_PRINT_TEST(dfa, "abcce", 1);
+    DFA_PRINT_TEST(dfa, "abcze", 1);
+    DFA_PRINT_TEST(dfa, "ab()e", 1);
+    DFA_PRINT_TEST(dfa, "ab()", 0);
+    DFA_PRINT_TEST(dfa, "ababa", 0);
+    DFA_PRINT_TEST(dfa, "ababaaaaa", 0);
+    DFA_PRINT_TEST(dfa, "ababaaaae", 0);
+    DFA_PRINT_TEST(dfa, "....e", 0);
+    DFA_PRINT_TEST(dfa, "a...e", 0);
+
+    dfa_deinit(dfa);
+    free(dfa);
+
+    printf("\n\n\n");
+
+}
+
+void dfa_dot2_test() {
+    char* regex = ".*f(a|o)o.+";
+
+    printf("===== %s =====\n", regex);
+    dfa_t* dfa = dfa_from_regex(regex, strlen(regex));
+
+    DFA_PRINT_TEST(dfa, "fooz", 1);
+    DFA_PRINT_TEST(dfa, "foo", 0);
+    DFA_PRINT_TEST(dfa, "afooz", 1);
+    DFA_PRINT_TEST(dfa, "afoooooooooooooz", 1);
+    DFA_PRINT_TEST(dfa, "brofooy", 1);
+    DFA_PRINT_TEST(dfa, "brofoo", 0);
+    DFA_PRINT_TEST(dfa, "feapokfeapk", 0);
+    DFA_PRINT_TEST(dfa, "fao", 0);
+    DFA_PRINT_TEST(dfa, "faoo", 1);
+    DFA_PRINT_TEST(dfa, "afooooo", 1);
+
+    dfa_deinit(dfa);
+    free(dfa);
+
+    printf("\n\n\n");
+}
+
 void dfa_tdt4205_test() {
     char* regex = "(((ab)*a?)|((ba)*b?))cc*";
     printf("===== %s =====\n", regex);
@@ -204,6 +254,113 @@ void dfa_example_test() {
     DFA_PRINT_TEST(dfa, "0000", 0);
     DFA_PRINT_TEST(dfa, "abbbccbbccbcccccc", 1);
     DFA_PRINT_TEST(dfa, "abbbccbbccbcccccca", 0);
+
+    dfa_deinit(dfa);
+    free(dfa);
+
+    printf("\n\n\n");
+}
+
+void dfa_digit_test() {
+    char* regex = "(-|\\+)*\\d+";
+
+    printf("===== %s =====\n", regex);
+    dfa_t* dfa = dfa_from_regex(regex, strlen(regex));
+    printf("Num nodes: %d\n\n", dfa->num_nodes);
+
+    DFA_PRINT_TEST(dfa, "-1234", 1);
+    DFA_PRINT_TEST(dfa, "+4321", 1);
+    DFA_PRINT_TEST(dfa, "4321", 1);
+    DFA_PRINT_TEST(dfa, "01230004321", 1);
+    DFA_PRINT_TEST(dfa, "a1023901", 0);
+    DFA_PRINT_TEST(dfa, "--", 0);
+    DFA_PRINT_TEST(dfa, "123124a", 0);
+    DFA_PRINT_TEST(dfa, "--12345", 1);
+
+    dfa_deinit(dfa);
+    free(dfa);
+
+    printf("\n\n\n");
+}
+
+void dfa_word_test() {
+    char* regex = "\\w+";
+
+    printf("===== %s =====\n", regex);
+    dfa_t* dfa = dfa_from_regex(regex, strlen(regex));
+    printf("Num nodes: %d\n\n", dfa->num_nodes);
+
+    DFA_PRINT_TEST(dfa, "-1234", 0);
+    DFA_PRINT_TEST(dfa, "_my_variable_name", 1);
+    DFA_PRINT_TEST(dfa, "_my_variable_name123", 1);
+    DFA_PRINT_TEST(dfa, "_MY_CONSTANT_NAME123", 1);
+    DFA_PRINT_TEST(dfa, "!bool", 0);
+    DFA_PRINT_TEST(dfa, "0000000", 1);
+    DFA_PRINT_TEST(dfa, "__hidden", 1);
+    DFA_PRINT_TEST(dfa, "bad-nonaccepting-string", 0);
+    DFA_PRINT_TEST(dfa, "Foo123()", 0);
+    DFA_PRINT_TEST(dfa, "", 0);
+
+    dfa_deinit(dfa);
+    free(dfa);
+
+    printf("\n\n\n");
+}
+
+void dfa_class_test() {
+    char* regex = "[abcd][0-9][a-z][a-zA-Z]+[xyz]?";
+
+    printf("===== %s =====\n", regex);
+    dfa_t* dfa = dfa_from_regex(regex, strlen(regex));
+    printf("Num nodes: %d\n\n", dfa->num_nodes);
+
+    DFA_PRINT_TEST(dfa, "a1aa", 1);
+    DFA_PRINT_TEST(dfa, "b4zAAx", 1);
+    DFA_PRINT_TEST(dfa, "b9zaAAy", 1);
+    DFA_PRINT_TEST(dfa, "f8taAAy", 0);
+    DFA_PRINT_TEST(dfa, "0aAax", 0);
+    DFA_PRINT_TEST(dfa, "d1aAAAAxx", 1);
+    DFA_PRINT_TEST(dfa, "d1aAzAsAzx", 1);
+    DFA_PRINT_TEST(dfa, "d1aAzAsAzxyzzz_", 0);
+    DFA_PRINT_TEST(dfa, " d1aAzAs", 0);
+
+    dfa_deinit(dfa);
+    free(dfa);
+
+    printf("\n\n\n");
+}
+
+void dfa_class2_test() {
+    char* regex = "[--e]*"; // characters in the range '-' (45) to 'e' (101)
+
+    printf("===== %s =====\n", regex);
+    dfa_t* dfa = dfa_from_regex(regex, strlen(regex));
+    printf("Num nodes: %d\n\n", dfa->num_nodes);
+
+    DFA_PRINT_TEST(dfa, "aeeea", 1);
+    DFA_PRINT_TEST(dfa, "afaa", 0);
+    DFA_PRINT_TEST(dfa, "aa+aa", 0);
+    DFA_PRINT_TEST(dfa, "-AZa021445a", 1);
+    DFA_PRINT_TEST(dfa, "a-a-a---ezz", 0);
+    DFA_PRINT_TEST(dfa, "eaeaeea----aaaa[]", 1);
+    DFA_PRINT_TEST(dfa, "aa()aaa", 0);
+    DFA_PRINT_TEST(dfa, "X<=Y?X-2:Y-2;", 1);
+    DFA_PRINT_TEST(dfa, "true==true?1:0", 0);
+
+    dfa_deinit(dfa);
+    free(dfa);
+
+    printf("\n\n\n");
+}
+
+void dfa_var_test() {
+    char* regex = "(int|float|double) +[a-zA-Z_]\\w* *= *(-|\\+)*\\d+(\\.\\d*f?)?;";
+    dfa_t* dfa = dfa_from_regex(regex, strlen(regex));
+    DFA_PRINT_TEST(dfa, "int x = 3;", 1);
+    DFA_PRINT_TEST(dfa, "float    f =3.0f;", 1);
+    DFA_PRINT_TEST(dfa, "int x = 3.0.0;", 0);
+    DFA_PRINT_TEST(dfa, "double x3 = 3.0;", 1);
+    DFA_PRINT_TEST(dfa, "double 3x = 3.0;", 0);
 
     dfa_deinit(dfa);
     free(dfa);
@@ -268,14 +425,34 @@ void dfa_linear_test() {
     }
 }
 
+void dfa_match_test() {
+    dfa_t* dfa = dfa_from_regex("[a-zA-Z_][0-9a-zA-Z]*", strlen("[a-zA-Z_][0-9a-zA-Z]*"));
+    DFA_MATCH_TEST(dfa, "aaa0099", (size_t)7);
+    DFA_MATCH_TEST(dfa, "aaa00+99", (size_t)5);
+    DFA_MATCH_TEST(dfa, "99abc", (size_t)0);
+    DFA_MATCH_TEST(dfa, "a_abc_", (size_t)1);
+    DFA_MATCH_TEST(dfa, "_aabcb9ABCD0123_", (size_t)15);
+
+    dfa_deinit(dfa);
+    free(dfa);
+}
+
 int main(int argc, char** argv) {
     dfa_concat_test();
     dfa_paren_test();
     dfa_kleene_test();
     dfa_plus_test();
     dfa_union_test();
+    dfa_dot_test();
+    dfa_dot2_test();
     dfa_tdt4205_test();
     dfa_example_test();
-    dfa_fat_test();
-    dfa_linear_test();
+    dfa_digit_test();
+    dfa_word_test();
+    dfa_class_test();
+    dfa_class2_test();
+    dfa_var_test();
+    //dfa_fat_test();
+    //dfa_linear_test();
+    dfa_match_test();
 }
