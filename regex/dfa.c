@@ -331,6 +331,24 @@ int dfa_accepts(dfa_t* dfa, char* string, size_t size) {
     return (dfa->node_flag[cur_state] & DFA_FLAG_ACCEPT) > 0;
 }
 
+size_t dfa_match(dfa_t *dfa, char *string, size_t max_len) {
+    int cur_state = 1;
+
+    size_t last_match = 0;
+    for (size_t i = 0; i < max_len; ++i) {
+        char c = string[i];
+        cur_state = dfa->trans[cur_state][c];
+
+        if (cur_state == 0) return last_match;
+
+        if (dfa->node_flag[cur_state] & DFA_FLAG_ACCEPT) {
+            last_match = i + 1;
+        }
+    }
+
+    return last_match;
+}
+
 void dfa_deinit(dfa_t *dfa) {
     for (int i = 0; i < dfa->num_nodes; ++i) {
         free(dfa->trans[i]);

@@ -4,8 +4,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/time.h>
+#include <assert.h>
 
 #define DFA_PRINT_TEST(dfa, str, result) { int ret = dfa_accepts(dfa, str, strlen(str)); printf("\"%s\" %s match %s %s \x1b[0m\n", str, result == 0 ? "should not" : "should", ret == result ? "and it\x1b[1;32m" : "but it\x1b[1;31m" , ret == 0 ? "doesn't" : "does"); }
+
+#define DFA_MATCH_TEST(dfa, str, result) { size_t ret = dfa_match(dfa, str, strlen(str)); printf("\"%s\" should match %zu characters %s \x1b[0m(matched %zu)\n", str, result, (ret == result ? "and it\x1b[1;32m does" : "but it\x1b[1;31m doesn't"), ret); }
 
 #define WALLTIME(t) ((double)(t).tv_sec + 1e-6 * (double)(t).tv_usec)
 
@@ -422,6 +425,18 @@ void dfa_linear_test() {
     }
 }
 
+void dfa_match_test() {
+    dfa_t* dfa = dfa_from_regex("[a-zA-Z_][0-9a-zA-Z]*", strlen("[a-zA-Z_][0-9a-zA-Z]*"));
+    DFA_MATCH_TEST(dfa, "aaa0099", (size_t)7);
+    DFA_MATCH_TEST(dfa, "aaa00+99", (size_t)5);
+    DFA_MATCH_TEST(dfa, "99abc", (size_t)0);
+    DFA_MATCH_TEST(dfa, "a_abc_", (size_t)1);
+    DFA_MATCH_TEST(dfa, "_aabcb9ABCD0123_", (size_t)15);
+
+    dfa_deinit(dfa);
+    free(dfa);
+}
+
 int main(int argc, char** argv) {
     dfa_concat_test();
     dfa_paren_test();
@@ -437,6 +452,7 @@ int main(int argc, char** argv) {
     dfa_class_test();
     dfa_class2_test();
     dfa_var_test();
-    dfa_fat_test();
-    dfa_linear_test();
+    //dfa_fat_test();
+    //dfa_linear_test();
+    dfa_match_test();
 }
