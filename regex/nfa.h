@@ -5,7 +5,6 @@
 
 typedef struct nfa_node_t nfa_node_t;
 typedef struct nfa_t nfa_t;
-typedef struct da_t da_t;
 typedef struct transition_t transition_t;
 
 #define NFA_TRANS_EPS '\xff'
