@@ -1,5 +1,6 @@
 #include "dfa.h"
 #include "nfa.h"
+#include "da.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,14 +14,14 @@
 #define WALLTIME(t) ((double)(t).tv_sec + 1e-6 * (double)(t).tv_usec)
 
 void debug_nfa(nfa_t* nfa) {
-    printf("# Nodes: %zu\n", nfa->nodes->size);
+    printf("# Nodes: %zu\n", da_size(nfa->nodes));
 
     printf("Initial: %p\n", nfa->initial_state);
     printf("Final  : %p\n", nfa->accepting_state);
-    for (int i = 0; i < nfa->nodes->size; ++i) {
-        nfa_node_t* cur = *(nfa_node_t**)da_at(nfa->nodes, i);
-        for (int j = 0; j < cur->transitions->size; ++j) {
-            transition_t trans = *(transition_t*)da_at(cur->transitions, j);
+    for (int i = 0; i < da_size(nfa->nodes); ++i) {
+        nfa_node_t* cur = nfa->nodes[i];
+        for (int j = 0; j < da_size(cur->transitions); ++j) {
+            transition_t trans = cur->transitions[j];
             if (trans.c == NFA_TRANS_EPS) {
                 printf("%p ->EPS %p\n", cur, trans.next_node);
             } else {

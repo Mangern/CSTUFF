@@ -8,7 +8,7 @@
 
 typedef struct node_subset_t node_subset_t;
 struct node_subset_t {
-    da_t* nodes;
+    nfa_node_t** nodes;
     node_subset_t* trans[256];
 };
 
@@ -23,38 +23,37 @@ int node_ptr_cmp(const void* node_ptr_a, const void* node_ptr_b) {
 
 node_subset_t* make_subset() {
     node_subset_t* subset = malloc(sizeof(node_subset_t));
-    subset->nodes = malloc(sizeof(da_t));
-    da_init(subset->nodes, sizeof(nfa_node_t*));
+    subset->nodes = da_init(nfa_node_t*);
     return subset;
 }
 
 void subset_deinit(node_subset_t* subset) {
-    da_deinit(subset->nodes);
-    free(subset->nodes);
+    da_deinit(&subset->nodes);
+    free(subset);
 }
 
 int node_subset_contains(node_subset_t* subset, nfa_node_t* node) {
     // Could binary search but...
-    for (int i = 0; i < subset->nodes->size; ++i) {
-        nfa_node_t* cur = *(nfa_node_t**)da_at(subset->nodes, i);
+    for (int i = 0; i < da_size(subset->nodes); ++i) {
+        nfa_node_t* cur = subset->nodes[i];
         if (cur == node) return 1;
     }
     return 0;
 }
 
 void node_subset_add(node_subset_t* subset, nfa_node_t* node) {
-    da_push_back(subset->nodes, &node);
+    da_append(&subset->nodes, node);
     // Stay sorted
-    qsort(subset->nodes->buffer, subset->nodes->size, sizeof(nfa_node_t*), node_ptr_cmp);
+    qsort(subset->nodes, da_size(subset->nodes), sizeof(nfa_node_t*), node_ptr_cmp);
 }
 
 int node_subset_equals(node_subset_t* subset_a, node_subset_t* subset_b) {
-    if (subset_a->nodes->size != subset_b->nodes->size) return 0;
+    if (da_size(subset_a->nodes) != da_size(subset_b->nodes)) return 0;
 
     // Assume sorted
-    for (int i = 0; i < subset_a->nodes->size; ++i) {
-        nfa_node_t* node_a = *(nfa_node_t**)da_at(subset_a->nodes, i);
-        nfa_node_t* node_b = *(nfa_node_t**)da_at(subset_b->nodes, i);
+    for (int i = 0; i < da_size(subset_a->nodes); ++i) {
+        nfa_node_t* node_a = subset_a->nodes[i];
+        nfa_node_t* node_b = subset_b->nodes[i];
         if (node_a != node_b) return 0;
     }
     return 1;
@@ -64,16 +63,16 @@ void epsilon_closure(nfa_node_t* node, node_subset_t* subset) {
     if (node_subset_contains(subset, node)) return;
     node_subset_add(subset, node);
 
-    for (int i = 0; i < node->transitions->size; ++i) {
-        transition_t trans = *(transition_t*)da_at(node->transitions, i);
+    for (int i = 0; i < da_size(node->transitions); ++i) {
+        transition_t trans = node->transitions[i];
         if (trans.c != NFA_TRANS_EPS) continue;
         epsilon_closure(trans.next_node, subset);
     }
 }
 
 void subset_epsilon_closure(node_subset_t* subset) {
-    for (int i = 0; i < subset->nodes->size; ++i) {
-        nfa_node_t* node = *(nfa_node_t**)da_at(subset->nodes, i);
+    for (int i = 0; i < da_size(subset->nodes); ++i) {
+        nfa_node_t* node = subset->nodes[i];
         epsilon_closure(node, subset);
     }
 }
@@ -95,24 +94,22 @@ dfa_t* dfa_from_nfa(nfa_t* nfa) {
         node_empty->trans[i] = node_empty;
     }
 
-    da_t subset_nodes;
-    da_init(&subset_nodes, sizeof(node_subset_t*));
-    da_push_back(&subset_nodes, &node_empty);
+    node_subset_t** subset_nodes = da_init(node_subset_t*);
+    da_append(&subset_nodes, node_empty);
 
     node_subset_t* node_init = make_subset();
     // Default is to go to empty
     for (int i = 0; i < 256; ++i) {
         node_init->trans[i] = node_empty;
     }
-    da_push_back(&subset_nodes, &node_init);
+    da_append(&subset_nodes, node_init);
 
     epsilon_closure(nfa->initial_state, node_init);
 
-    da_t next_set;
-    da_init(&next_set, sizeof(nfa_node_t*));
+    nfa_node_t** next_set = da_init(nfa_node_t*);
 
-    for (int i = 1; i < subset_nodes.size; ++i) {
-        node_subset_t* cur_subset = *(node_subset_t**)da_at(&subset_nodes, i);
+    for (int i = 1; i < da_size(subset_nodes); ++i) {
+        node_subset_t* cur_subset = subset_nodes[i];
         for (int c = 0; c < 256; ++c) {
             // Special case: c == EPS would cause wrongful transitions
             if ((char)c == (char)NFA_TRANS_EPS) {
@@ -120,34 +117,33 @@ dfa_t* dfa_from_nfa(nfa_t* nfa) {
                 continue;
             }
             // Transition all nodes in current subset on character c
-            da_resize(&next_set, 0);
-            for (int j = 0; j < cur_subset->nodes->size; ++j) {
-                nfa_node_t* cur_node = *(nfa_node_t**)da_at(cur_subset->nodes, j);
+            da_clear(&next_set);
+            for (int j = 0; j < da_size(cur_subset->nodes); ++j) {
+                nfa_node_t* cur_node = cur_subset->nodes[j];
                 nfa_node_transition(cur_node, c, &next_set);
             }
 
             // Get the epsilon closure of the new set
             node_subset_t* next_subset_cand = make_subset();
-            for (int j = 0; j < next_set.size; ++j) {
-                nfa_node_t* node = *(nfa_node_t**)da_at(&next_set, j);
+            for (int j = 0; j < da_size(next_set); ++j) {
+                nfa_node_t* node = next_set[j];
                 epsilon_closure(node, next_subset_cand);
             }
 
             node_subset_t* next_subset = NULL;
             // Check if the resulting subset already exists
-            for (int j = 0; j < subset_nodes.size; ++j) {
-                node_subset_t* existing = *(node_subset_t**)da_at(&subset_nodes, j);
+            for (int j = 0; j < da_size(subset_nodes); ++j) {
+                node_subset_t* existing = subset_nodes[j];
                 if (node_subset_equals(next_subset_cand, existing)) {
                     next_subset = existing;
                     break;
                 }
             }
             if (next_subset == NULL) {
-                da_push_back(&subset_nodes, &next_subset_cand);
+                da_append(&subset_nodes, next_subset_cand);
                 next_subset = next_subset_cand;
             } else {
                 subset_deinit(next_subset_cand);
-                free(next_subset_cand);
             }
 
             cur_subset->trans[c] = next_subset;
@@ -156,7 +152,7 @@ dfa_t* dfa_from_nfa(nfa_t* nfa) {
     da_deinit(&next_set);
 
     dfa_t* dfa = malloc(sizeof(dfa_t));
-    dfa->num_nodes = subset_nodes.size;
+    dfa->num_nodes = da_size(subset_nodes);
     assert(dfa->num_nodes >= 2);
     dfa->trans = malloc(dfa->num_nodes * sizeof(int*));
     dfa->node_flag = malloc(dfa->num_nodes * sizeof(int));
@@ -168,7 +164,7 @@ dfa_t* dfa_from_nfa(nfa_t* nfa) {
     for (int i = 0; i < dfa->num_nodes; ++i) {
         dfa->trans[i] = malloc(256 * sizeof(int));
 
-        node_subset_t* cur_subset = *(node_subset_t**)da_at(&subset_nodes, i);
+        node_subset_t* cur_subset = subset_nodes[i];
         if (node_subset_contains(cur_subset, nfa->accepting_state)) {
             assert(i > 0);
             dfa->node_flag[i] |= DFA_FLAG_ACCEPT;
@@ -176,13 +172,12 @@ dfa_t* dfa_from_nfa(nfa_t* nfa) {
 
         for (int c = 0; c < 256; ++c) {
             node_subset_t* next = cur_subset->trans[c];
-            size_t index = da_indexof(&subset_nodes, &next);
+            size_t index = da_indexof(subset_nodes, &next);
             assert(index != -1);
             dfa->trans[i][c] = index;
         }
 
         subset_deinit(cur_subset);
-        free(cur_subset);
     }
 
     da_deinit(&subset_nodes);

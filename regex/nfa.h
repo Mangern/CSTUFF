@@ -1,7 +1,7 @@
 #ifndef NFA_H
 #define NFA_H
 
-#include "da.h"
+#include <stddef.h>
 
 typedef struct nfa_node_t nfa_node_t;
 typedef struct nfa_t nfa_t;
