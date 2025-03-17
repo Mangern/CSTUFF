@@ -453,7 +453,7 @@ int main(int argc, char** argv) {
     dfa_class_test();
     dfa_class2_test();
     dfa_var_test();
-    //dfa_fat_test();
-    //dfa_linear_test();
+    dfa_fat_test();
+    dfa_linear_test();
     dfa_match_test();
 }

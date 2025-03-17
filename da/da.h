@@ -48,4 +48,7 @@ void da_clear(void* arr_ptr);
 
 void da_deinit(void* arr_ptr);
 
+// Elem: pointer to element to find
+int64_t da_indexof(void* arr, void* elem);
+
 #endif

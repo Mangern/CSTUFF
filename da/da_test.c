@@ -47,8 +47,24 @@ void da_string_test() {
     da_deinit(&arr);
 }
 
+void da_indexof_test() {
+    double* arr = da_init(double);
+
+    double x = 0.2;
+    double y = 69.0;
+    double z = 420.0;
+
+    da_append(&arr, x);
+    da_append(&arr, y);
+
+    printf("Index of x: %ld\n", da_indexof(arr, &x));
+    printf("Index of y: %ld\n", da_indexof(arr, &y));
+    printf("Index of z: %ld\n", da_indexof(arr, &z));
+}
+
 int main() {
     da_int_test();
     da_string_test();
+    da_indexof_test();
     return 0;
 }
