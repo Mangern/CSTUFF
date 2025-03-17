@@ -18,17 +18,17 @@ size_t da_size(void* arr) {
     return meta[DA_IDX_SIZE];
 }
 
-void da_pop(void* arr) {
-    size_t* meta = (size_t*)arr;
+void da_pop(void* arr_ptr) {
+    size_t* meta = *(size_t**)arr_ptr;
     --meta[DA_IDX_SIZE];
 }
 
-void da_clear(void* arr) {
-    size_t* meta = (size_t*)arr;
+void da_clear(void* arr_ptr) {
+    size_t* meta = *(size_t**)arr_ptr;
     meta[DA_IDX_SIZE] = 0;
 }
 
-void da_deinit(void* arr) {
-    size_t* meta = (size_t*)arr;
+void da_deinit(void* arr_ptr) {
+    size_t* meta = *(size_t**)arr_ptr;
     free(&meta[-DA_META_SIZE]);
 }
