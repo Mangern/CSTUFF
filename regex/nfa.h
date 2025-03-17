@@ -15,13 +15,13 @@ struct transition_t {
 };
 
 struct nfa_node_t {
-    da_t* transitions;
+    transition_t* transitions;
 };
 
 struct nfa_t {
     nfa_node_t* initial_state;
     nfa_node_t* accepting_state;
-    da_t* nodes;
+    nfa_node_t** nodes;
 };
 
 void nfa_init(nfa_t* nfa);
@@ -31,7 +31,7 @@ void nfa_node_init(nfa_node_t* node);
 void nfa_node_add_transition(nfa_node_t* node, char c, nfa_node_t* next);
 void nfa_node_free(nfa_node_t* node);
 int nfa_accepts(nfa_t* nfa, char* string, size_t size);
-void nfa_node_transition(nfa_node_t* node, char c, da_t* result);
+void nfa_node_transition(nfa_node_t* node, char c, nfa_node_t*** result);
 
 void nfa_from_regex(char* regex_string, size_t size, nfa_t* nfa);
 

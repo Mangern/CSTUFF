@@ -26,7 +26,7 @@ struct regex_symbol_t {
 };
 
 struct regex_t {
-    da_t* symbols;
+    regex_symbol_t* symbols;
 };
 
 void regex_init(regex_t* regex);

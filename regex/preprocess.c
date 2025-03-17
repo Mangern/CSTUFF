@@ -21,13 +21,11 @@ regex_symbol_t empty_class_symbol() {
 }
 
 void regex_init(regex_t* regex) {
-    regex->symbols = malloc(sizeof(da_t));
-    da_init(regex->symbols, sizeof(regex_symbol_t));
+    regex->symbols = da_init(regex_symbol_t);
 }
 
 void regex_preprocess(char* string, size_t length, regex_t* regex) {
-    da_t paren_stack;
-    da_init(&paren_stack, sizeof(size_t));
+    size_t* paren_stack = da_init(size_t);
 
     for (int i = 0; i < length;) {
         char c = string[i];
@@ -42,19 +40,19 @@ void regex_preprocess(char* string, size_t length, regex_t* regex) {
                 if (next == 'd') {
                     regex_symbol_t symbol = empty_class_symbol();
                     class_set_range(&symbol, '0', '9');
-                    da_push_back(regex->symbols, &symbol);
+                    da_append(&regex->symbols, symbol);
                 } else if (next == 'w') {
                     regex_symbol_t symbol = empty_class_symbol();
                     class_set_range(&symbol, 'A', 'Z');
                     class_set_range(&symbol, 'a', 'z');
                     class_set_range(&symbol, '0', '9');
                     class_set_char(&symbol, '_');
-                    da_push_back(regex->symbols, &symbol);
+                    da_append(&regex->symbols, symbol);
                 } else {
                     // Escaped character: always character
                     regex_symbol_t symbol = empty_class_symbol();
                     class_set_char(&symbol, next);
-                    da_push_back(regex->symbols, &symbol);
+                    da_append(&regex->symbols, symbol);
                 }
                 ++i;
             } break;
@@ -66,13 +64,13 @@ void regex_preprocess(char* string, size_t length, regex_t* regex) {
                     .symbol_type = REGOP,
                     .value_0 = string[i]
                 };
-                da_push_back(regex->symbols,&symbol);
+                da_append(&regex->symbols, symbol);
                 ++i;
             } break;
             case '.': {
                 regex_symbol_t symbol = empty_class_symbol();
                 class_set_range(&symbol, 0, 255);
-                da_push_back(regex->symbols, &symbol);
+                da_append(&regex->symbols, symbol);
                 ++i;
             } break;
             case '(': {
@@ -80,26 +78,26 @@ void regex_preprocess(char* string, size_t length, regex_t* regex) {
                     .symbol_type = LPAREN,
                     .value_0 = 0
                 };
-                da_push_back(&paren_stack, &(regex->symbols->size));
-                da_push_back(regex->symbols, &symbol);
+                da_append(&paren_stack, da_size(regex->symbols));
+                da_append(&regex->symbols, symbol);
                 ++i;
             } break;
             case ')': {
-                if (paren_stack.size == 0) {
+                if (da_size(paren_stack) == 0) {
                     FAIL("Unmatched ')'");
                 }
-                size_t matching_index = *(size_t*)da_at(&paren_stack, paren_stack.size - 1);
-                da_pop_back(&paren_stack);
+                size_t matching_index = paren_stack[da_size(paren_stack) - 1];
+                da_pop(&paren_stack);
 
                 regex_symbol_t symbol = {
                     .symbol_type = RPAREN,
                     .value_0 = matching_index
                 };
 
-                regex_symbol_t* matching_lparen = da_at(regex->symbols, matching_index);
-                matching_lparen->value_0 = regex->symbols->size;
+                regex_symbol_t* matching_lparen = &regex->symbols[matching_index];
+                matching_lparen->value_0 = da_size(regex->symbols);
 
-                da_push_back(regex->symbols, &symbol);
+                da_append(&regex->symbols, symbol);
                 ++i;
             } break;
             case '[': {
@@ -124,7 +122,7 @@ void regex_preprocess(char* string, size_t length, regex_t* regex) {
                         ++i;
                     }
                 }
-                da_push_back(regex->symbols, &symbol);
+                da_append(&regex->symbols, symbol);
                 i = end_index + 1;
             } break;
             case ']': {
@@ -133,13 +131,13 @@ void regex_preprocess(char* string, size_t length, regex_t* regex) {
             default: {
                 regex_symbol_t symbol = empty_class_symbol();
                 class_set_char(&symbol, string[i]);
-                da_push_back(regex->symbols, &symbol);
+                da_append(&regex->symbols, symbol);
                 ++i;
             } break;
         }
     }
 
-    if (paren_stack.size > 0) {
+    if (da_size(paren_stack) > 0) {
         FAIL("Unmatched '('");
     }
 
@@ -147,7 +145,7 @@ void regex_preprocess(char* string, size_t length, regex_t* regex) {
 }
 
 regex_symbol_t regex_symbol_at(regex_t* regex, size_t index) {
-    return *(regex_symbol_t*)da_at(regex->symbols, index);
+    return regex->symbols[index];
 }
 
 void class_set_char(regex_symbol_t* class_symbol, unsigned char c) {
@@ -189,6 +187,5 @@ int class_has_char(regex_symbol_t* class_symbol, unsigned char c) {
 }
 
 void regex_deinit(regex_t* regex) {
-    da_deinit(regex->symbols);
-    free(regex->symbols);
+    da_deinit(&regex->symbols);
 }

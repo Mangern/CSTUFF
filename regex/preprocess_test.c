@@ -31,10 +31,10 @@ int main() {
     regex_init(&regex);
     regex_preprocess(regex_str, strlen(regex_str), &regex);
 
-    for (int i = 0; i < regex.symbols->size; ++i) {
-        regex_symbol_t* symbol = da_at(regex.symbols, i);
+    for (int i = 0; i < da_size(regex.symbols); ++i) {
+        regex_symbol_t symbol = regex.symbols[i];
         printf("%3d ", i);
-        debug_regex_symbol(*symbol);
+        debug_regex_symbol(symbol);
     }
 
     regex_deinit(&regex);
