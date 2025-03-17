@@ -1,39 +1,54 @@
 #include <stdio.h>
-#include <assert.h>
-
 #include "da.h"
 
+void da_int_test() {
+    int* arr = da_init(int);
+
+    da_append(arr, 2);
+    da_append(arr, 3);
+    da_append(arr, 4);
+
+    for (size_t i = 0; i < da_size(arr); ++i) {
+        printf("%d\n", arr[i]);
+    }
+
+    da_pop(arr);
+    printf("Size after pop: %zu\n", da_size(arr));
+
+    da_clear(arr);
+    printf("Size after clear: %zu\n", da_size(arr));
+
+    da_deinit(arr);
+}
+
+void da_string_test() {
+    char** arr = da_init(char*);
+
+    da_append(arr, "Hello!");
+    da_append(arr, "World!");
+    da_append(arr, "foo");
+    da_append(arr, "bar");
+    da_append(arr, "baz");
+
+    puts("Contents:");
+    for (size_t i = 0; i < da_size(arr); ++i) {
+        printf("%s ", arr[i]);
+    }
+    puts("");
+    puts("Removing garbage. Remaining items:");
+    da_pop(arr);
+    da_pop(arr);
+    da_pop(arr);
+    for (size_t i = 0; i < da_size(arr); ++i) {
+        printf("%s ", arr[i]);
+    }
+    puts("");
+    printf("Size: %zu\n", da_size(arr));
+    da_deinit(arr);
+}
+
 int main() {
-    da_t da;
-    da_init(&da, sizeof(int));
-
-    DA_PUSH_BACK_INT(&da, 1);
-    DA_PUSH_BACK_INT(&da, 2);
-    DA_PUSH_BACK_INT(&da, 3);
-    DA_PUSH_BACK_INT(&da, 4);
-    DA_PUSH_BACK_INT(&da, 5);
-
-    for (int i = 0; i < da.size; ++i) {
-        printf("%d ", *(int*)da_at(&da, i));
-    }
-    printf("\n");
-
-    da_pop_back(&da);
-
-    for (int i = 0; i < da.size; ++i) {
-        printf("%d ", *(int*)da_at(&da, i));
-    }
-    printf("\n");
-
-    printf("%zu\n", da.capacity);
-
-    int __tmp = 3;
-    printf("Index of 3: %zu\n", da_indexof(&da, &__tmp));
-    __tmp = 69;
-    printf("Index of 69: %zu\n", da_indexof(&da, &__tmp));
-
-    assert(da_indexof(&da, &__tmp) == -1);
-
-    da_deinit(&da);
+    da_int_test();
+    da_string_test();
     return 0;
 }
