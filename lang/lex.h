@@ -17,6 +17,7 @@ typedef enum {
     LEX_COMMA,
     LEX_RETURN,
     LEX_INTEGER,
+    LEX_REAL,
     LEX_OPERATOR,
     LEX_STRING,
     LEX_END

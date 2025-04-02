@@ -12,12 +12,6 @@
 #include "symbol.h"
 #include "symbol_table.h"
 
-typedef enum {
-    TYPE_INT,
-    TYPE_REAL,
-    TYPE_STRING
-} type_t;
-
 static char* TYPE_NAMES[] = {
     "int",
     "real",
@@ -26,7 +20,6 @@ static char* TYPE_NAMES[] = {
 
 typedef struct {
     symbol_t* symbol_definition;
-    type_t type;
     union {
         long int_value;
         double real_value;
@@ -80,17 +73,17 @@ static void* interpret_function(symbol_t* function_declaration, arg_bind_t* bind
 
         // TODO: better typechecking framework
         if (strcmp(typename_str, "int") == 0) {
-            if (arg.type != TYPE_INT)
-                fail("Argument '%s' has the wrong type (should be int)", symbol->name);
+            //if (arg.type != TYPE_INT)
+            //    fail("Argument '%s' has the wrong type (should be int)", symbol->name);
             symbol->data.int_value = arg.value.int_value;
         } else if (strcmp(typename_str, "real") == 0) {
-            if (arg.type != TYPE_REAL)
-                fail("Argument '%s' has the wrong type (should be real)", symbol->name);
+            //if (arg.type != TYPE_REAL)
+            //    fail("Argument '%s' has the wrong type (should be real)", symbol->name);
 
             symbol->data.real_value = arg.value.real_value;
         } else if (strcmp(typename_str, "string") == 0) {
-            if (arg.type != TYPE_STRING)
-                fail("Argument '%s' has the wrong type (should be real)", symbol->name);
+            //if (arg.type != TYPE_STRING)
+            //    fail("Argument '%s' has the wrong type (should be real)", symbol->name);
 
             symbol->data.string_value = arg.value.string_value;
         } else {
@@ -118,15 +111,15 @@ static void interpret_print(node_t* print_node, arg_bind_t* args) {
     for (size_t i = 0; i < da_size(args); ++i) {
         if (i > 0)printf(" ");
         arg_bind_t arg = args[i];
-        if (arg.type == TYPE_STRING) {
-            printf("%s", arg.value.string_value);
-        } else if (arg.type == TYPE_REAL) {
-            printf("%f", arg.value.real_value);
-        } else if (arg.type == TYPE_INT) {
-            printf("%ld", arg.value.int_value);
-        } else {
-            assert(false && "Invalid type in print");
-        }
+        //if (arg.type == TYPE_STRING) {
+        //    printf("%s", arg.value.string_value);
+        //} else if (arg.type == TYPE_REAL) {
+        //    printf("%f", arg.value.real_value);
+        //} else if (arg.type == TYPE_INT) {
+        //    printf("%ld", arg.value.int_value);
+        //} else {
+        //    assert(false && "Invalid type in print");
+        //}
     }
     puts("");
 }
@@ -159,7 +152,6 @@ static arg_bind_t interpret_expression(node_t* expression_node) {
         case STRING_LITERAL:
             {
                 return (arg_bind_t){
-                    .type = TYPE_STRING,
                     .value.string_value = expression_node->data.string_literal_value,
                     .symbol_definition = NULL
                 };
@@ -167,7 +159,6 @@ static arg_bind_t interpret_expression(node_t* expression_node) {
         case INTEGER_LITERAL:
             {
                 return (arg_bind_t){
-                    .type = TYPE_INT,
                     .value.int_value = expression_node->data.int_literal_value,
                     .symbol_definition = NULL
                 };
@@ -177,24 +168,24 @@ static arg_bind_t interpret_expression(node_t* expression_node) {
                 if (da_size(expression_node->children) == 2) {
                     arg_bind_t lhs = interpret_expression(expression_node->children[0]);
                     arg_bind_t rhs = interpret_expression(expression_node->children[1]);
-                    if (strcmp(expression_node->data.operator_str, "+") == 0) {
-                        if (lhs.type == TYPE_STRING && rhs.type == TYPE_STRING) {
-                            assert(false && "Not implemented: string concatenation");
-                        }
+                    //if (strcmp(expression_node->data.operator_str, "+") == 0) {
+                        //if (lhs.type == TYPE_STRING && rhs.type == TYPE_STRING) {
+                        //    assert(false && "Not implemented: string concatenation");
+                        //}
 
-                        if (lhs.type == TYPE_STRING || rhs.type == TYPE_STRING) {
-                            fail("Cannot concatenate %s and %s", TYPE_NAMES[lhs.type], TYPE_NAMES[rhs.type]);
-                        }
+                        //if (lhs.type == TYPE_STRING || rhs.type == TYPE_STRING) {
+                        //    fail("Cannot concatenate %s and %s", TYPE_NAMES[lhs.type], TYPE_NAMES[rhs.type]);
+                        //}
 
-                        if (lhs.type == TYPE_INT && rhs.type == TYPE_INT) {
-                            return (arg_bind_t){
-                                .type = TYPE_INT,
-                                .value.int_value = lhs.value.int_value + rhs.value.int_value,
-                                .symbol_definition = NULL
-                            };
-                        }
-                        assert(false && "Type handling");
-                    }
+                        //if (lhs.type == TYPE_INT && rhs.type == TYPE_INT) {
+                        //    return (arg_bind_t){
+                        //        .type = TYPE_INT,
+                        //        .value.int_value = lhs.value.int_value + rhs.value.int_value,
+                        //        .symbol_definition = NULL
+                        //    };
+                        //}
+                        //assert(false && "Type handling");
+                    //}
                 } else {
                 }
             }

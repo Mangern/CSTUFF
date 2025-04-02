@@ -15,10 +15,22 @@ char* NODE_TYPE_NAMES[] = {
     "BLOCK",
     "OPERATOR",
     "INTEGER_LITERAL",
+    "REAL_LITERAL",
     "STRING_LITERAL",
     "PARENTHESIZED_EXPRESSION",
     "FUNCTION_CALL",
     "RETURN_STATEMENT"
+};
+
+char* OPERATOR_TYPE_NAMES[] = {
+    "binary_add",
+    "binary_sub",
+    "binary_mul",
+    "binary_div",
+    "binary_gt",
+    "binary_lt",
+    "unary_sub",
+    "unary_neg"
 };
 
 node_t* node_create(node_type_t type) {
@@ -26,6 +38,7 @@ node_t* node_create(node_type_t type) {
     node->type = type;
     node->children = da_init(node_t*);
     node->symbol = NULL;
+    node->type_info = NULL;
     return node;
 }
 
@@ -37,7 +50,7 @@ static void print_tree_impl(node_t* node, int indent) {
     if (node->type == IDENTIFIER) {
         printf(" (%s)", node->data.identifier_str);
     } else if (node->type == OPERATOR) {
-        printf(" (%s)", node->data.operator_str);
+        printf(" (%s)", OPERATOR_TYPE_NAMES[node->data.operator]);
     } else if (node->type == INTEGER_LITERAL) {
         printf(" (%ld)", node->data.int_literal_value);
     } else if (node->type == STRING_LITERAL) {

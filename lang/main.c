@@ -8,6 +8,7 @@
 #include "tree.h"
 #include "da.h"
 #include "symbol.h"
+#include "type.h"
 
 #define BUFSIZE 1024
 
@@ -69,6 +70,9 @@ int main(int argc, char** argv) {
     parse();
 
     create_symbol_tables();
+
+    register_types();
+
 
     if (opt_print_tree) {
         print_tree(root);

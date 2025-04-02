@@ -18,6 +18,7 @@ static node_t* parse_arg_list();
 static node_t* parse_block();
 static node_t* parse_expression();
 static node_t* parse_function_call(node_t*);
+static operator_t parse_operator_str(char* operator_str, bool);
 
 void parse() {
     // program : global global global global
@@ -139,13 +140,14 @@ static node_t* parse_block() {
         if (token.type == LEX_RBRACE) break;
 
         if (token.type == LEX_RETURN) {
-            // <RETURN> <EXPRESSION> ';' -> RETURN_STATEMENT[expression]
+            // <RETURN> <EXPRESSION>? ';' -> RETURN_STATEMENT[expression]
             lexer_advance();
             node_t* return_node = node_create(RETURN_STATEMENT);
-            da_append(&return_node->children, parse_expression());
+            if (lexer_peek().type != LEX_SEMICOLON) {
+                da_append(&return_node->children, parse_expression());
+            }
             da_append(&block_node->children, return_node);
             peek_expect_advance(LEX_SEMICOLON);
-
         } else if (token.type == LEX_TYPENAME) {
             // <TYPENAME> <DECLARATION> ';' -> VARIABLE_DECLARATION
             da_append(&block_node->children, parse_variable_declaration());
@@ -179,14 +181,9 @@ static node_t* parse_block() {
     return block_node;
 }
 
-static bool has_precedence(char* operator_str_1, char* operator_str_2) {
-    if (strncmp(operator_str_1, "**", 2) == 0) {
-        return strncmp(operator_str_2, "**", 2) != 0;
-    }
-    if (strncmp(operator_str_2, "**", 2) == 0) return false;
-
-    if (strncmp(operator_str_1, "*", 1) == 0 || strncmp(operator_str_1, "/", 1) == 0) {
-        return (strncmp(operator_str_2, "*", 1) != 0) && (strncmp(operator_str_2, "/", 1) != 0);
+static bool has_precedence(operator_t operator_1, operator_t operator_2) {
+    if (operator_1 == BINARY_MUL || operator_1 == BINARY_DIV) {
+        return operator_2 != BINARY_MUL && operator_2 != BINARY_DIV;
     }
     return false;
 }
@@ -194,31 +191,61 @@ static bool has_precedence(char* operator_str_1, char* operator_str_2) {
 // Find the correct place in `rhs` to insert `lhs`, preserving operator precedence.
 static node_t* merge_subtrees(token_t operator_token, node_t* lhs, node_t* rhs) {
     char* lhs_operator_str = lexer_substring(operator_token.begin_offset, operator_token.end_offset);
-    if (rhs->type != OPERATOR || da_size(rhs->children) != 2 || has_precedence(rhs->data.operator_str, lhs_operator_str)) {
+    operator_t lhs_operator = parse_operator_str(lhs_operator_str, true);
+    free(lhs_operator_str);
+
+    if (rhs->type != OPERATOR || da_size(rhs->children) != 2 || has_precedence(rhs->data.operator, lhs_operator)) {
         node_t* operator_node = node_create(OPERATOR);
-        operator_node->data.operator_str = lhs_operator_str;
+        operator_node->data.operator = lhs_operator;
         da_append(&operator_node->children, lhs);
         da_append(&operator_node->children, rhs);
         return operator_node;
     }
 
-    free(lhs_operator_str);
 
     rhs->children[0] = merge_subtrees(operator_token, lhs, rhs->children[0]);
     return rhs;
 }
 
+static operator_t parse_operator_str(char* operator_str, bool binary) {
+    if (binary) {
+        if (strcmp(operator_str, "+") == 0) {
+            return BINARY_ADD;
+        } else if (strcmp(operator_str, "-") == 0) {
+            return BINARY_SUB;
+        } else if (strcmp(operator_str, "*") == 0) {
+            return BINARY_MUL;
+        } else if (strcmp(operator_str, "/") == 0) {
+            return BINARY_DIV;
+        } else if (strcmp(operator_str, ">") == 0) {
+            return BINARY_GT;
+        } else if (strcmp(operator_str, "<") == 0) {
+            return BINARY_LT;
+        }
+    } else {
+        if (strcmp(operator_str, "-") == 0) {
+            return UNARY_SUB;
+        } else if (strcmp(operator_str, "!") == 0) {
+            return UNARY_NEG;
+        }
+    }
+    fprintf(stderr, "Parse operator str unhandled: %s, %d\n", operator_str, binary);
+    exit(1);
+    assert(false);
+}
+
 static node_t* merge_unary_op(token_t operator_token, node_t* rhs) {
     char* operator_str = lexer_substring(operator_token.begin_offset, operator_token.end_offset);
+    operator_t operator = parse_operator_str(operator_str, false);
+    free(operator_str);
 
-    if (rhs->type != OPERATOR || da_size(rhs->children) != 2 || has_precedence(rhs->data.operator_str, operator_str)) {
+    if (rhs->type != OPERATOR || da_size(rhs->children) != 2 || has_precedence(rhs->data.operator, operator)) {
         node_t* operator_node = node_create(OPERATOR);
-        operator_node->data.operator_str = operator_str;
+        operator_node->data.operator = operator;
         da_append(&operator_node->children, rhs);
+
         return operator_node;
     }
-
-    free(operator_str);
 
     rhs->children[0] = merge_unary_op(operator_token, rhs->children[0]);
     return rhs;
@@ -256,7 +283,7 @@ static node_t* parse_expression() {
         } else {
             fail(token);
         }
-    } else if (token.type == LEX_INTEGER || token.type == LEX_STRING) {
+    } else if (token.type == LEX_INTEGER || token.type == LEX_REAL || token.type == LEX_STRING) {
         node_t* node = node_create(INTEGER_LITERAL);
         // TODO: unnecessary malloc
         if (token.type == LEX_INTEGER) {
@@ -266,6 +293,11 @@ static node_t* parse_expression() {
         } else if (token.type == LEX_STRING) {
             node->type = STRING_LITERAL;
             node->data.string_literal_value = lexer_substring(token.begin_offset+1, token.end_offset-1);
+        } else if (token.type == LEX_REAL) {
+            node->type = REAL_LITERAL;
+            char* literal_str = lexer_substring(token.begin_offset, token.end_offset);
+            node->data.real_literal_value = atof(literal_str);
+            free(literal_str);
         } else {
             assert(false && "Not implemented");
         }

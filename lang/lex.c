@@ -20,6 +20,7 @@ char* TOKEN_TYPE_NAMES[] = {
     ",",
     "return",
     "integer literal",
+    "real literal",
     "operator",
     "string literal",
     "EOF"
@@ -35,8 +36,10 @@ int* line_start;
 static void skip_whitespace();
 static bool isidentifierchar(char c);
 static bool matches_prefix_word(char* pref);
+static size_t matches_typename();
 static size_t matches_identifier();
 static size_t matches_integer();
+static size_t matches_real();
 static size_t matches_string();
 static size_t matches_operator();
 static void catchup_lines(size_t);
@@ -65,21 +68,12 @@ token_t lexer_peek() {
     if (content_ptr >= content_size) {
         current_token.type = LEX_END;
         current_token.end_offset = content_size;
-    } else if (matches_prefix_word("int")) {
-        current_token.type = LEX_TYPENAME;
-        current_token.end_offset = content_ptr + 3;
-    } else if (matches_prefix_word("real")) {
-        current_token.type = LEX_TYPENAME;
-        current_token.end_offset = content_ptr + 4;
-    } else if (matches_prefix_word("void")) {
-        current_token.type = LEX_TYPENAME;
-        current_token.end_offset = content_ptr + 4;
-    } else if (matches_prefix_word("string")) {
-        current_token.type = LEX_TYPENAME;
-        current_token.end_offset = content_ptr + 6;
     } else if (matches_prefix_word("return")) {
         current_token.type = LEX_RETURN;
         current_token.end_offset = content_ptr + 6;
+    } else if ((match_len = matches_typename())) {
+        current_token.type = LEX_TYPENAME;
+        current_token.end_offset = content_ptr + match_len;
     } else if ((match_len = matches_identifier())) {
         current_token.type = LEX_IDENTIFIER;
         current_token.end_offset = content_ptr + match_len;
@@ -109,6 +103,9 @@ token_t lexer_peek() {
         current_token.end_offset = content_ptr + 1;
     } else if ((match_len = matches_integer())) {
         current_token.type = LEX_INTEGER;
+        current_token.end_offset = content_ptr + match_len;
+    } else if ((match_len = matches_real())) {
+        current_token.type = LEX_REAL;
         current_token.end_offset = content_ptr + match_len;
     } else if ((match_len = matches_string())) {
         current_token.type = LEX_STRING;
@@ -163,6 +160,15 @@ static bool matches_prefix_word(char* pref) {
     return content_ptr+len >= content_size || !isidentifierchar(content[content_ptr+len]);
 }
 
+static size_t matches_typename() {
+    if (matches_prefix_word("int")) return 3;
+    if (matches_prefix_word("real")) return 4;
+    if (matches_prefix_word("void")) return 4;
+    if (matches_prefix_word("bool")) return 4;
+    if (matches_prefix_word("string")) return 6;
+    return 0;
+}
+
 static size_t matches_identifier() {
     if (!isalpha(content[content_ptr])) return 0;
     int ptr = content_ptr;
@@ -174,6 +180,22 @@ static size_t matches_identifier() {
 static size_t matches_integer() {
     if (!isdigit(content[content_ptr])) return 0;
     int ptr = content_ptr;
+    while (ptr < content_size && isdigit(content[ptr]))
+        ++ptr;
+    // Real
+    if (ptr < content_size && content[ptr] == '.')
+        return 0;
+    return ptr - content_ptr;
+}
+
+static size_t matches_real() {
+    if (!isdigit(content[content_ptr])) return 0;
+    int ptr = content_ptr;
+    while (ptr < content_size && isdigit(content[ptr]))
+        ++ptr;
+    if (ptr < content_size && content[ptr] != '.')
+        return 0;
+    ++ptr;
     while (ptr < content_size && isdigit(content[ptr]))
         ++ptr;
     return ptr - content_ptr;
@@ -197,16 +219,17 @@ static size_t matches_string() {
 }
 
 static size_t matches_operator() {
+    // TODO: *=, **
     char c = content[content_ptr];
     switch (c) {
         // 1 char operators that also makes sense if followed by '='
         case '/':
         case '!':
-        case '~':
-        case '^':
+        //case '~':
+        //case '^':
             {
                 if (content_ptr + 1 >= content_size) return 1;
-                if (content[content_ptr + 1] == '=') return 2;
+                //if (content[content_ptr + 1] == '=') return 2;
                 return 1;
             }
             return 1;
@@ -214,13 +237,11 @@ static size_t matches_operator() {
         case '+':
         case '-':
         case '*':
-        case '&':
-        case '|':
         case '<':
         case '>':
             {
                 if (content_ptr + 1 >= content_size) return 1;
-                if (content[content_ptr+1] == c || content[content_ptr+1] == '=') return 2;
+                //if (content[content_ptr+1] == c || content[content_ptr+1] == '=') return 2;
                 return 1;
             }
         default:

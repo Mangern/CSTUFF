@@ -1,7 +1,10 @@
 int x := 5;
 real y;
+int z := 6;
 
-string s := "foo\"bar\"";
+mul1 := (int x) -> int {
+    return x * z;
+}
 
 mul := (int x, int y) -> int {
     int y;
@@ -20,7 +23,7 @@ subs := (int x) -> int {
 }
 
 prec := (int x) -> int {
-    return 2 - 3 * 4 - 5 + x ** 2;
+    return 2 - 3 * 4 - 5 + x * 2;
 }
 
 prec2 := () -> int {
@@ -30,10 +33,17 @@ prec2 := () -> int {
 negate := (int x := 3) -> int {
     int y;
     {
-        int z := 3;
+        string z := "foo";
         print(z);
     }
     return x + -x + prec2(2, 3 + 3, x - 4 - 1);
+}
+
+test := (int x) -> int {
+    return 3 + test(3);
+}
+
+countChars := (string s) -> int {
 }
 
 main := () -> void {
