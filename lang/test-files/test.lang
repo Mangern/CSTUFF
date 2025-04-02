@@ -1,0 +1,40 @@
+int x := 5;
+real y;
+
+string s := "foo\"bar\"";
+
+mul := (int x, int y) -> int {
+    int y;
+    {
+        int y;
+    }
+    return x * y;
+}
+
+increment := (int x) -> int {
+    return 1 + x;
+}
+
+subs := (int x) -> int {
+    return 2 - 3 - 4 - 5;
+}
+
+prec := (int x) -> int {
+    return 2 - 3 * 4 - 5 + x ** 2;
+}
+
+prec2 := () -> int {
+    return 2 - 3 * (1 + 2 - 3);
+}
+
+negate := (int x := 3) -> int {
+    int y;
+    {
+        int z := 3;
+        print(z);
+    }
+    return x + -x + prec2(2, 3 + 3, x - 4 - 1);
+}
+
+main := () -> void {
+}

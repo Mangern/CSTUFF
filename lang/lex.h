@@ -1,0 +1,49 @@
+#ifndef LEX_H
+#define LEX_H
+
+#include <stddef.h>
+
+typedef enum {
+    LEX_TYPENAME,
+    LEX_IDENTIFIER,
+    LEX_SEMICOLON,
+    LEX_COLON,
+    LEX_WALRUS,
+    LEX_ARROW,
+    LEX_LBRACE,
+    LEX_RBRACE,
+    LEX_LPAREN,
+    LEX_RPAREN,
+    LEX_COMMA,
+    LEX_RETURN,
+    LEX_INTEGER,
+    LEX_OPERATOR,
+    LEX_STRING,
+    LEX_END
+} token_type_t;
+
+extern char* TOKEN_TYPE_NAMES[];
+typedef struct {
+    token_type_t type;
+    int begin_offset;
+    int end_offset;
+} token_t;
+
+typedef struct {
+    int line;
+    int character;
+} location_t;
+
+extern char* CURRENT_FILE_NAME;
+
+void lexer_init(char* file_name, char* file_content);
+
+// Return a heap allocated substring of the file content.
+char* lexer_substring(int begin_offset, int end_offset);
+
+token_t lexer_peek();
+void lexer_advance();
+
+location_t lexer_offset_location(int offset);
+
+#endif // LEX_H
