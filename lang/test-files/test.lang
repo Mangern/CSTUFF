@@ -1,6 +1,9 @@
 int x := 5;
 real y;
 int z := 6;
+int global := 10;
+
+int[10][11] arr;
 
 mul1 := (int x) -> int {
     return x * z;
@@ -47,4 +50,7 @@ countChars := (string s) -> int {
 }
 
 main := () -> void {
+    print(global);
+    global := cast(char, 123.0);
+    print(global);
 }

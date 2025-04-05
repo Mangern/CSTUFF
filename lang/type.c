@@ -1,3 +1,4 @@
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
@@ -22,10 +23,12 @@ static char* BASIC_TYPE_NAMES[] = {
 };
 
 static void register_type_node(node_t*);
-static void register_builtin_function_type(symbol_t*);
+static type_info_t* get_builtin_function_type(symbol_t*);
 static bool types_equivalent(type_info_t* type_a, type_info_t* type_b);
+static bool can_cast(type_info_t* type_dst, type_info_t* type_src);
 static type_info_t* create_basic(basic_type_t basic_type);
 static type_info_t* create_type_function();
+static type_info_t* create_type_array(type_info_t*, size_t);
 static type_tuple_t* create_tuple();
 static void type_print(FILE*, type_info_t*);
 
@@ -74,17 +77,38 @@ static void register_type_node(node_t* node) {
                     node->type_info = create_basic(TYPE_VOID);
                 } else if (strcmp(type_str, "bool") == 0) {
                     node->type_info = create_basic(TYPE_BOOL);
+                } else if (strcmp(type_str, "char") == 0) {
+                    node->type_info = create_basic(TYPE_CHAR);
                 } else if (strcmp(type_str, "string") == 0) {
                     node->type_info = create_basic(TYPE_STRING);
                 } else {
                     fail("Unhandled type name %s", type_str);
                 }
+
+                // Could be array type
+                type_info_t* result_type = node->type_info;
+                for (int i = (int)da_size(node->children) - 1; i >= 0; --i) {
+                    node_t* count_node = node->children[i];
+                    assert(count_node->type == INTEGER_LITERAL && "Unexpected type child");
+
+                    size_t count = count_node->data.int_literal_value;
+
+                    result_type = create_type_array(result_type, count);
+                }
+                node->type_info = result_type;
+
                 return;
             }
             break;
         case INTEGER_LITERAL:
             {
                 node->type_info = create_basic(TYPE_INT);
+                return;
+            }
+            break;
+        case REAL_LITERAL:
+            {
+                node->type_info = create_basic(TYPE_REAL);
                 return;
             }
             break;
@@ -237,7 +261,6 @@ static void register_type_node(node_t* node) {
                 node_t* symbol_definition_node = node->symbol->node;
                 assert(symbol_definition_node->type_info != NULL);
                 node->type_info = symbol_definition_node->type_info;
-                return;
             }
             break;
         case FUNCTION_CALL:
@@ -246,24 +269,60 @@ static void register_type_node(node_t* node) {
                 assert(node->children[0]->symbol != NULL);
                 symbol_t *function_symbol = node->children[0]->symbol;
                 node_t *symbol_definition_node = function_symbol->node;
-                if (symbol_definition_node->type_info != NULL) {
-                    if (function_symbol->is_builtin) {
-                        register_builtin_function_type(function_symbol);
-                    } else {
-                        register_type_node(symbol_definition_node);
-                    }
+
+                if (function_symbol->is_builtin) {
+                    node->type_info = get_builtin_function_type(function_symbol);
+                    return;
+                } 
+
+                if (symbol_definition_node->type_info == NULL) {
+                    register_type_node(symbol_definition_node);
                 }
                 assert(symbol_definition_node->type_info != NULL);
                 assert(symbol_definition_node->type_info->type_class == TC_FUNCTION);
                 node->type_info = symbol_definition_node->type_info->info.info_function->return_type;
-                return;
             }
             break;
         case PARENTHESIZED_EXPRESSION:
             {
                 register_type_node(node->children[0]);
                 node->type_info = node->children[0]->type_info;
-                return;
+            }
+            break;
+        case ASSIGNMENT_STATEMENT:
+            {
+                // lhs := rhs
+                register_type_node(node->children[0]);
+                register_type_node(node->children[1]);
+
+                if (!types_equivalent(node->children[0]->type_info, node->children[1]->type_info)) {
+                    fprintf(stderr, "Cannot assign expression of type '");
+                    type_print(stderr, node->children[1]->type_info);
+                    fprintf(stderr, "' to '%s', which has type '", node->children[0]->data.identifier_str);
+                    type_print(stderr, node->children[0]->type_info);
+                    fprintf(stderr, "'\n");
+                    exit(EXIT_FAILURE);
+                }
+
+                // Should it be void or type of assignment?
+                node->type_info = create_basic(TYPE_VOID);
+            }
+            break;
+        case CAST_EXPRESSION:
+            {
+                register_type_node(node->children[0]);
+                register_type_node(node->children[1]);
+
+                if (!can_cast(node->children[1]->type_info, node->children[0]->type_info)) {
+                    fprintf(stderr, "Cannot cast '");
+                    type_print(stderr, node->children[1]->type_info);
+                    fprintf(stderr, "' to '");
+                    type_print(stderr, node->children[0]->type_info);
+                    fprintf(stderr, "'\n");
+                    exit(EXIT_FAILURE);
+                }
+
+                node->type_info = node->children[0]->type_info;
             }
             break;
         default:
@@ -271,27 +330,50 @@ static void register_type_node(node_t* node) {
     }
 }
 
-static void register_builtin_function_type(symbol_t* function_symbol) {
-    node_t* declaration_node = function_symbol->node;
+static type_info_t* get_builtin_function_type(symbol_t* function_symbol) {
     if (strcmp(function_symbol->name, "print") == 0) {
-        declaration_node->type_info = create_type_function();
-        declaration_node->type_info->info.info_function->return_type = create_basic(TYPE_VOID);
+        type_info_t* type_info = create_type_function();
+        type_info->info.info_function->return_type = create_basic(TYPE_VOID);
+        return type_info;
     } else {
         fail("Not implemented builtin function type: %s", function_symbol->name);
     }
+    assert(false);
 }
 
 static bool types_equivalent(type_info_t* type_a, type_info_t* type_b) {
-    if (type_a->type_class == TC_BASIC && type_b->type_class == TC_BASIC) {
+    if (type_a->type_class != type_b->type_class) return false;
+
+    type_class_t type_class = type_a->type_class;
+    if (type_class == TC_BASIC) {
         return type_a->info.info_basic == type_b->info.info_basic;
+    } else if (type_class == TC_ARRAY) {
+        type_array_t* array_a = type_a->info.info_array;
+        type_array_t* array_b = type_b->info.info_array;
+
+        if (array_a->count != array_b->count) return false;
+        return types_equivalent(array_a->subtype, array_b->subtype);
     } else {
-        fprintf(stderr, "Not implemented type class combination:\n");
+        fprintf(stderr, "Not implemented type class equivalency:\n");
         type_print(stderr, type_a);
-        fprintf(stderr, "\n");
-        type_print(stderr, type_b);
         fprintf(stderr, "\n");
         exit(EXIT_FAILURE);
     }
+}
+
+static bool can_cast(type_info_t* type_dst, type_info_t* type_src) {
+    if (types_equivalent(type_dst, type_src))
+        return true;
+    if (type_dst->type_class != TC_BASIC)
+        return false;
+    if (type_src->type_class != TC_BASIC)
+        return false;
+
+    if (type_dst->info.info_basic == TYPE_STRING || type_src->info.info_basic == TYPE_STRING)
+        return false;
+
+    // TODO: Actual casting logic.
+    return true;
 }
 
 static type_info_t* create_basic(basic_type_t basic_type) {
@@ -310,6 +392,15 @@ static type_info_t* create_type_function() {
     return type_info;
 }
 
+static type_info_t* create_type_array(type_info_t* subtype, size_t count) {
+    type_info_t *type_info = malloc(sizeof(type_info_t));
+    type_info->type_class = TC_ARRAY;
+    type_info->info.info_array = malloc(sizeof(type_array_t));
+    type_info->info.info_array->count = count;
+    type_info->info.info_array->subtype = subtype;
+    return type_info;
+}
+
 static type_tuple_t* create_tuple() {
     type_tuple_t* tuple = malloc(sizeof(type_tuple_t));
     tuple->elems = da_init(type_info_t*);
@@ -323,8 +414,9 @@ static void type_print(FILE* stream, type_info_t* type) {
             break;
         case TC_ARRAY:
             {
+                fprintf(stream, "array(%zu, ", type->info.info_array->count);
                 type_print(stream, type->info.info_array->subtype);
-                fprintf(stream, "[%zu]", type->info.info_array->count);
+                fprintf(stream, ")");
             }
             break;
         case TC_STRUCT:

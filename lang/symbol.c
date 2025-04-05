@@ -120,7 +120,11 @@ static void bind_references(symbol_table_t* local_symbols, node_t* node) {
         case OPERATOR:
         case INTEGER_LITERAL:
         case STRING_LITERAL:
+        case REAL_LITERAL:
         case PARENTHESIZED_EXPRESSION:
+        case ASSIGNMENT_STATEMENT:
+        case CAST_EXPRESSION:
+        case TYPENAME:
             {
                 for (size_t i = 0; i < da_size(node->children); ++i) {
                     bind_references(local_symbols, node->children[i]);

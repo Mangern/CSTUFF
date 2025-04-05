@@ -18,7 +18,9 @@ typedef enum {
     STRING_LITERAL,
     PARENTHESIZED_EXPRESSION, // children: [expression | parenthesized_expression]
     FUNCTION_CALL,            // children: [identifier, list[expression]]
-    RETURN_STATEMENT      // children: [expression]
+    RETURN_STATEMENT,      // children: [expression]
+    ASSIGNMENT_STATEMENT,  // children: [identifier, expression]
+    CAST_EXPRESSION,       // children: [typename, expression]
 } node_type_t;
 
 enum operator_t {

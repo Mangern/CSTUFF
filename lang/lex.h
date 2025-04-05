@@ -14,12 +14,15 @@ typedef enum {
     LEX_RBRACE,
     LEX_LPAREN,
     LEX_RPAREN,
+    LEX_LBRACKET,
+    LEX_RBRACKET,
     LEX_COMMA,
     LEX_RETURN,
     LEX_INTEGER,
     LEX_REAL,
     LEX_OPERATOR,
     LEX_STRING,
+    LEX_CAST,
     LEX_END
 } token_type_t;
 

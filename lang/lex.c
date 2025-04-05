@@ -17,12 +17,15 @@ char* TOKEN_TYPE_NAMES[] = {
     "}",
     "(",
     ")",
+    "[",
+    "]",
     ",",
     "return",
     "integer literal",
     "real literal",
     "operator",
     "string literal",
+    "cast",
     "EOF"
 };
 
@@ -71,6 +74,9 @@ token_t lexer_peek() {
     } else if (matches_prefix_word("return")) {
         current_token.type = LEX_RETURN;
         current_token.end_offset = content_ptr + 6;
+    } else if (matches_prefix_word("cast")) {
+        current_token.type = LEX_CAST;
+        current_token.end_offset = content_ptr + 4;
     } else if ((match_len = matches_typename())) {
         current_token.type = LEX_TYPENAME;
         current_token.end_offset = content_ptr + match_len;
@@ -97,6 +103,12 @@ token_t lexer_peek() {
         current_token.end_offset = content_ptr + 1;
     } else if (content[content_ptr] == '}') {
         current_token.type = LEX_RBRACE;
+        current_token.end_offset = content_ptr + 1;
+    } else if (content[content_ptr] == '[') {
+        current_token.type = LEX_LBRACKET;
+        current_token.end_offset = content_ptr + 1;
+    } else if (content[content_ptr] == ']') {
+        current_token.type = LEX_RBRACKET;
         current_token.end_offset = content_ptr + 1;
     } else if (content[content_ptr] == ',') {
         current_token.type = LEX_COMMA;
@@ -165,6 +177,7 @@ static size_t matches_typename() {
     if (matches_prefix_word("real")) return 4;
     if (matches_prefix_word("void")) return 4;
     if (matches_prefix_word("bool")) return 4;
+    if (matches_prefix_word("char")) return 4;
     if (matches_prefix_word("string")) return 6;
     return 0;
 }
