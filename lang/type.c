@@ -266,11 +266,15 @@ static void register_type_node(node_t* node) {
         case FUNCTION_CALL:
             {
                 // Type of function call: Return type of the called function
+                // Register args
+                register_type_node(node->children[1]);
+
                 assert(node->children[0]->symbol != NULL);
                 symbol_t *function_symbol = node->children[0]->symbol;
                 node_t *symbol_definition_node = function_symbol->node;
 
                 if (function_symbol->is_builtin) {
+                    // TODO: check signature of builtin
                     node->type_info = get_builtin_function_type(function_symbol);
                     return;
                 } 
@@ -280,7 +284,31 @@ static void register_type_node(node_t* node) {
                 }
                 assert(symbol_definition_node->type_info != NULL);
                 assert(symbol_definition_node->type_info->type_class == TC_FUNCTION);
-                node->type_info = symbol_definition_node->type_info->info.info_function->return_type;
+
+                type_function_t* info_function = symbol_definition_node->type_info->info.info_function;
+
+                node_t* args_list= node->children[1];
+
+                if (da_size(args_list->children) != da_size(info_function->arg_types->elems)) {
+                    fail("Function %s requires exactly %zu arguments, but was called with %zu\n",
+                        function_symbol->name,
+                        da_size(info_function->arg_types->elems),
+                        da_size(args_list->children)
+                    );
+                }
+
+                for (size_t i = 0; i < da_size(args_list->children); ++i) {
+                    if (!types_equivalent(args_list->children[i]->type_info, info_function->arg_types->elems[i])) {
+                        fprintf(stderr, "Argument %zu of function %s has the wrong type. Required: '", i+1, function_symbol->name);
+                        type_print(stderr, info_function->arg_types->elems[i]);
+                        fprintf(stderr, "', Got: '");
+                        type_print(stderr, args_list->children[i]->type_info);
+                        fprintf(stderr, "'\n");
+                        exit(EXIT_FAILURE);
+                    }
+                }
+
+                node->type_info = info_function->return_type;
             }
             break;
         case PARENTHESIZED_EXPRESSION:
@@ -323,6 +351,15 @@ static void register_type_node(node_t* node) {
                 }
 
                 node->type_info = node->children[0]->type_info;
+            }
+            break;
+        case LIST:
+            {
+                for (size_t i = 0; i < da_size(node->children); ++i) {
+                    register_type_node(node->children[i]);
+                }
+                // TODO: tuple type here in some cases?
+                node->type_info = create_basic(TYPE_VOID);
             }
             break;
         default:

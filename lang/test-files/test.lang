@@ -34,12 +34,14 @@ prec2 := () -> int {
 }
 
 negate := (int x := 3) -> int {
+    // this is a comment
+    // this is another comment
     int y;
     {
-        string z := "foo";
+        string z := "foo"; // this is also a comment
         print(z);
     }
-    return x + -x + prec2(2, 3 + 3, x - 4 - 1);
+    return x + -x + prec2();
 }
 
 test := (int x) -> int {
@@ -49,8 +51,13 @@ test := (int x) -> int {
 countChars := (string s) -> int {
 }
 
+toString := (int x) -> string {
+    return toString(2);
+}
+
 main := () -> void {
     print(global);
-    global := cast(char, 123.0);
+    global := cast(int, 123.0);
+    print(countChars(toString(global)));
     print(global);
 }

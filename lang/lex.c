@@ -37,6 +37,7 @@ int* offset_line_number;
 int* line_start;
 
 static void skip_whitespace();
+static void skip_comments();
 static bool isidentifierchar(char c);
 static bool matches_prefix_word(char* pref);
 static size_t matches_typename();
@@ -66,6 +67,8 @@ token_t lexer_peek() {
     if (current_token.begin_offset == content_ptr) return current_token;
 
     skip_whitespace();
+    skip_comments();
+
     size_t match_len;
     current_token.begin_offset = content_ptr;
     if (content_ptr >= content_size) {
@@ -280,4 +283,27 @@ static void skip_whitespace() {
         ++content_ptr;
     }
     catchup_lines(content_ptr);
+}
+
+static void skip_comments() {
+    if (content[content_ptr] != '/') return;
+    if (content_ptr + 1 < content_size && content[content_ptr+1] == '/') {
+        // Single line comment
+        while (content_ptr < content_size && content[content_ptr] != '\n')
+            ++content_ptr;
+    } else if (content_ptr + 1 < content_size && content[content_ptr + 1] == '*') {
+        /*
+         * Multi line comment
+         */
+        while (content_ptr + 1 < content_size) {
+            if (content[content_ptr] == '*' && content[content_ptr+1] == '/') {
+                content_ptr += 2;
+                break;
+            }
+            ++content_ptr;
+        }
+    }
+    // Keep going until no more comment and no more whitespace
+    skip_whitespace();
+    skip_comments();
 }
