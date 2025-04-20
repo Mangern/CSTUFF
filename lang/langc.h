@@ -19,4 +19,14 @@ typedef struct type_named_t type_named_t;
 typedef struct type_tuple_t type_tuple_t;
 typedef struct type_function_t type_function_t;
 
+typedef struct {
+    int line;
+    int character;
+} location_t;
+
+typedef struct {
+    location_t start;
+    location_t end;
+} range_t;
+
 #endif // LANGC_H

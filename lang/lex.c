@@ -26,6 +26,8 @@ char* TOKEN_TYPE_NAMES[] = {
     "operator",
     "string literal",
     "cast",
+    "if",
+    "else",
     "EOF"
 };
 
@@ -33,8 +35,8 @@ int content_ptr;
 int content_size;
 char* content;
 int current_line;
-int* offset_line_number;
-int* line_start;
+int* offset_line_number; // for each position of the file, records which line it is
+int* line_start;         // for each line, records which offset it starts.
 
 static void skip_whitespace();
 static void skip_comments();
@@ -79,6 +81,12 @@ token_t lexer_peek() {
         current_token.end_offset = content_ptr + 6;
     } else if (matches_prefix_word("cast")) {
         current_token.type = LEX_CAST;
+        current_token.end_offset = content_ptr + 4;
+    } else if (matches_prefix_word("if")) {
+        current_token.type = LEX_IF;
+        current_token.end_offset = content_ptr + 2;
+    } else if (matches_prefix_word("else")) {
+        current_token.type = LEX_ELSE;
         current_token.end_offset = content_ptr + 4;
     } else if ((match_len = matches_typename())) {
         current_token.type = LEX_TYPENAME;
@@ -143,6 +151,12 @@ void lexer_advance() {
 
 char* lexer_substring(int begin_offset, int end_offset) {
     return strndup(&content[begin_offset], end_offset - begin_offset);
+}
+
+char* lexer_linedup(int line_num) {
+    int line_start_offset = line_start[line_num];
+    int line_end_offset = (line_num + 1 >= da_size(line_start)) ? content_size : line_start[line_num + 1];
+    return lexer_substring(line_start_offset, line_end_offset);
 }
 
 location_t lexer_offset_location(int offset) {

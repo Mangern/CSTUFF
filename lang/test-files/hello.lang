@@ -1,3 +1,6 @@
 main := () -> void {
-    print(34 + 35);
+    int x := 34;
+    int y := 35;
+    real z := 0.0;
+    print(x + y + cast(int, z));
 }

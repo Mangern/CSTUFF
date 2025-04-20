@@ -9,6 +9,7 @@
 #include "symbol_table.h"
 #include "tree.h"
 #include "da.h"
+#include "fail.h"
 
 
 static void insert_builtin_functions();
@@ -73,9 +74,8 @@ static void create_function_tables(node_t* function_declaration_node) {
     function_symbol->function_symtable = function_symtable;
     function_symbol->is_builtin = false;
     if (symbol_table_insert(global_symbol_table, function_symbol) == INSERT_COLLISION) {
-        // TODO: location
-        fprintf(stderr, "Error: Redefinition of function '%s'\n", function_symbol->name);
-        exit(EXIT_FAILURE);
+        // TODO: Note:
+        fail_node(identifier_node, "Error: Redefinition of function '%s'", function_symbol->name);
     }
 
     bind_references(function_symtable, function_declaration_node->children[3]);
@@ -89,9 +89,8 @@ static void create_insert_variable_declaration(symbol_table_t* symtable, symbol_
     symbol->node = declaration_node->children[1];
     symbol->function_symtable = NULL;
     if (symbol_table_insert(symtable, symbol) == INSERT_COLLISION) {
-        // TODO: Location
-        fprintf(stderr, "Error: Redefinition of variable '%s'\n", symbol->name);
-        exit(EXIT_FAILURE);
+        // TODO: Node:
+        fail_node(declaration_node->children[1], "Error: Redefinition of variable '%s'", symbol->name);
     }
 }
 
@@ -125,6 +124,7 @@ static void bind_references(symbol_table_t* local_symbols, node_t* node) {
         case ASSIGNMENT_STATEMENT:
         case CAST_EXPRESSION:
         case TYPENAME:
+        case IF_STATEMENT:
             {
                 for (size_t i = 0; i < da_size(node->children); ++i) {
                     bind_references(local_symbols, node->children[i]);
@@ -144,8 +144,7 @@ static void bind_references(symbol_table_t* local_symbols, node_t* node) {
                 symbol->node = node->children[1];
                 symbol->function_symtable = local_symbols;
                 if (symbol_table_insert(local_symbols, symbol) == INSERT_COLLISION) {
-                    fprintf(stderr, "Error: Redefinition of variable '%s'\n", symbol->name);
-                    exit(EXIT_FAILURE);
+                    fail_node(node->children[1], "Error: Redefinition of variable '%s'", symbol->name);
                 }
             }
             break;
@@ -155,9 +154,7 @@ static void bind_references(symbol_table_t* local_symbols, node_t* node) {
                 char* identifier = node->data.identifier_str;
                 symbol_t* symbol_definition = symbol_hashmap_lookup(local_symbols->hashmap, identifier);
                 if (symbol_definition == NULL) {
-                    // TODO: Location
-                    fprintf(stderr, "Error: Unknown reference '%s'\n", identifier);
-                    exit(EXIT_FAILURE);
+                    fail_node(node, "Error: Unknown reference '%s'", identifier);
                 }
                 node->symbol = symbol_definition;
             }
@@ -167,14 +164,12 @@ static void bind_references(symbol_table_t* local_symbols, node_t* node) {
                 node_t* identifier_node = node->children[0];
                 symbol_t* symbol_definition = symbol_hashmap_lookup(local_symbols->hashmap, identifier_node->data.identifier_str);
                 if (symbol_definition == NULL) {
-                    // TODO: location
-                    fprintf(stderr, "Error: Unknown function reference '%s'\n", identifier_node->data.identifier_str);
-                    exit(EXIT_FAILURE);
+                    fail_node(node->children[0], "Error: Unknown function reference '%s'", identifier_node->data.identifier_str);
                 } 
 
                 if (symbol_definition->type != SYMBOL_FUNCTION) {
-                    fprintf(stderr, "Error: '%s' is not a function\n", symbol_definition->name);
-                    exit(EXIT_FAILURE);
+                    // TODO: Note
+                    fail_node(identifier_node, "Error: '%s' is not a function", symbol_definition->name);
                 }
 
                 identifier_node->symbol = symbol_definition;

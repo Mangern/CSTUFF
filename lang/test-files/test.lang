@@ -3,9 +3,12 @@ real y;
 int z := 6;
 int global := 10;
 
+
 int[10][11] arr;
 
 mul1 := (int x) -> int {
+    int x := 3;
+    int x := 4;
     return x * z;
 }
 
@@ -41,6 +44,13 @@ negate := (int x := 3) -> int {
         string z := "foo"; // this is also a comment
         print(z);
     }
+
+    if (x > 4) {
+        y := 4;
+    } else {
+        y := x;
+    }
+
     return x + -x + prec2();
 }
 
@@ -57,6 +67,8 @@ toString := (int x) -> string {
 
 main := () -> void {
     print(global);
+    {
+    }
     global := cast(int, 123.0);
     print(countChars(toString(global)));
     print(global);

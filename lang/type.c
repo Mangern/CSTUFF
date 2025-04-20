@@ -362,6 +362,18 @@ static void register_type_node(node_t* node) {
                 node->type_info = create_basic(TYPE_VOID);
             }
             break;
+        case IF_STATEMENT:
+            {
+                // first child has to have boolean type
+                register_type_node(node->children[0]);
+
+                if (node->children[0]->type_info->type_class != TC_BASIC
+                 || node->children[0]->type_info->info.info_basic != TYPE_BOOL) {
+                    fail("Condition of if statement must be boolean.");
+                }
+                node->type_info = create_basic(TYPE_VOID);
+            }
+            break;
         default:
             fail("Not implemented type check: %s", NODE_TYPE_NAMES[node->type]);
     }

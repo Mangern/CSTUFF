@@ -5,11 +5,10 @@
 
 #include "parser.h"
 #include "da.h"
+#include "fail.h"
 #include "lex.h"
 #include "tree.h"
 
-static void fail(token_t);
-static void fail_expected(token_t, token_type_t);
 static token_t peek_expect_advance(token_type_t);
 static node_t* parse_global_statement();
 static node_t* parse_variable_declaration();
@@ -47,7 +46,7 @@ static node_t* parse_global_statement() {
         return NULL;
     }
 
-    fail(token);
+    fail_token(token);
     // unreachable
     assert(false && "Unreachable");
 }
@@ -62,8 +61,9 @@ static node_t* parse_variable_declaration() {
 
     token_t token = peek_expect_advance(LEX_IDENTIFIER);
 
-    node_t* child = node_create(IDENTIFIER);
+    node_t* child = node_create_leaf(IDENTIFIER, token);
     child->data.identifier_str = lexer_substring(token.begin_offset, token.end_offset);
+
     da_append(&ret->children, child);
 
     token = lexer_peek();
@@ -78,15 +78,19 @@ static node_t* parse_variable_declaration() {
 
 static node_t* parse_function_declaration() {
     token_t token = lexer_peek();
-    node_t* ret = node_create(FUNCTION_DECLARATION);
-    node_t* identifier = node_create(IDENTIFIER);
+    if (token.type != LEX_IDENTIFIER) 
+        fail_token_expected(token, LEX_IDENTIFIER);
+
+    node_t* identifier = node_create_leaf(IDENTIFIER, token);
     identifier->data.identifier_str = lexer_substring(token.begin_offset, token.end_offset);
+
+    node_t* ret = node_create(FUNCTION_DECLARATION);
     da_append(&ret->children, identifier);
     lexer_advance();
 
     token = lexer_peek();
     if (token.type != LEX_WALRUS) 
-        fail_expected(token, LEX_WALRUS);
+        fail_token_expected(token, LEX_WALRUS);
     lexer_advance();
 
 
@@ -95,14 +99,14 @@ static node_t* parse_function_declaration() {
     peek_expect_advance(LEX_ARROW);
     token = peek_expect_advance(LEX_TYPENAME);
 
-    node_t* typename_node = node_create(TYPENAME);
+    node_t* typename_node = node_create_leaf(TYPENAME, token);
     typename_node->data.typename_str = lexer_substring(token.begin_offset, token.end_offset);
 
     da_append(&ret->children, typename_node);
 
     token = lexer_peek();
     if (token.type != LEX_LBRACE)
-        fail_expected(token, LEX_LBRACE);
+        fail_token_expected(token, LEX_LBRACE);
 
     // parse body
     da_append(&ret->children, parse_block());
@@ -122,7 +126,7 @@ static node_t* parse_arg_list() {
         token = lexer_peek();
         if (token.type == LEX_RPAREN) break;
         if (token.type != LEX_COMMA)
-            fail_expected(token, LEX_COMMA);
+            fail_token_expected(token, LEX_COMMA);
         lexer_advance();
     }
     lexer_advance();
@@ -156,10 +160,11 @@ static node_t* parse_block() {
             da_append(&block_node->children, parse_block());
             peek_expect_advance(LEX_RBRACE);
         } else if (token.type == LEX_IDENTIFIER) {
-            lexer_advance();
 
-            node_t* identifier_node = node_create(IDENTIFIER);
+            node_t* identifier_node = node_create_leaf(IDENTIFIER, token);
             identifier_node->data.identifier_str = lexer_substring(token.begin_offset, token.end_offset);
+
+            lexer_advance();
 
             token = lexer_peek();
 
@@ -172,10 +177,35 @@ static node_t* parse_block() {
                 da_append(&block_node->children, parse_assignment(identifier_node));
                 peek_expect_advance(LEX_SEMICOLON);
             } else {
-                fail(token);
+                fail_token(token);
             }
+        } else if (token.type == LEX_IF) {
+            // if ( EXPRESSION ) BLOCK 
+            // if ( EXPRESSION ) BLOCK else BLOCK
+            lexer_advance();
+            node_t* if_node = node_create(IF_STATEMENT);
+
+            peek_expect_advance(LEX_LPAREN);
+            da_append(&if_node->children, parse_expression());
+            peek_expect_advance(LEX_RPAREN);
+
+            da_append(&if_node->children, parse_block());
+
+            peek_expect_advance(LEX_RBRACE);
+
+            token = lexer_peek();
+
+            if (token.type == LEX_ELSE) {
+                lexer_advance();
+
+                da_append(&if_node->children, parse_block());
+
+                peek_expect_advance(LEX_RBRACE);
+            }
+
+            da_append(&block_node->children, if_node);
         } else {
-            fail(token);
+            fail_token(token);
         }
     }
 
@@ -185,7 +215,7 @@ static node_t* parse_block() {
 static node_t* parse_typename() {
     token_t token = peek_expect_advance(LEX_TYPENAME);
 
-    node_t* typename_node = node_create(TYPENAME);
+    node_t* typename_node = node_create_leaf(TYPENAME, token);
 
     // Array indexing.
     // TODO: Is [2, 3, 4] better syntax than [2][3][4] ?
@@ -194,7 +224,7 @@ static node_t* parse_typename() {
 
         token_t literal_token = peek_expect_advance(LEX_INTEGER);
         char* literal_str = lexer_substring(literal_token.begin_offset, literal_token.end_offset);
-        node_t* literal_node = node_create(INTEGER_LITERAL);
+        node_t* literal_node = node_create_leaf(INTEGER_LITERAL, literal_token);
         literal_node->data.int_literal_value = atol(literal_str);
         da_append(&typename_node->children, literal_node);
         free(literal_str);
@@ -296,7 +326,7 @@ static node_t* parse_expression() {
     // Expression: Expression + Expression
     token_t token = lexer_peek();
     if (token.type == LEX_IDENTIFIER) {
-        node_t* node = node_create(IDENTIFIER);
+        node_t* node = node_create_leaf(IDENTIFIER, token);
         node->data.identifier_str = lexer_substring(token.begin_offset, token.end_offset);
         lexer_advance();
         token = lexer_peek();
@@ -312,10 +342,10 @@ static node_t* parse_expression() {
         } else if (token_is_expression_end(token)) {
             return node;
         } else {
-            fail(token);
+            fail_token(token);
         }
     } else if (token.type == LEX_INTEGER || token.type == LEX_REAL || token.type == LEX_STRING) {
-        node_t* node = node_create(INTEGER_LITERAL);
+        node_t* node = node_create_leaf(INTEGER_LITERAL, token);
         // TODO: unnecessary malloc
         if (token.type == LEX_INTEGER) {
             char* literal_str = lexer_substring(token.begin_offset, token.end_offset);
@@ -342,7 +372,7 @@ static node_t* parse_expression() {
         } else if (token_is_expression_end(token)) {
             return node;
         } else {
-            fail(token);
+            fail_token(token);
         }
     } else if (token.type == LEX_LPAREN) {
         lexer_advance();
@@ -360,7 +390,7 @@ static node_t* parse_expression() {
         } else if (token_is_expression_end(token)) {
             return ret;
         } else {
-            fail(token);
+            fail_token(token);
         }
     } else if (token.type == LEX_OPERATOR) {
         lexer_advance();
@@ -382,10 +412,10 @@ static node_t* parse_expression() {
         } else if (token_is_expression_end(token)) {
             return cast_expr;
         } else {
-            fail(token);
+            fail_token(token);
         }
     } else {
-        fail(token);
+        fail_token(token);
     }
     assert(false && "Unreachable");
 }
@@ -435,21 +465,8 @@ static node_t* parse_assignment(node_t* identifier_node) {
 static token_t peek_expect_advance(token_type_t expected) {
     token_t token = lexer_peek();
     if (token.type != expected)
-        fail_expected(token, expected);
+        fail_token_expected(token, expected);
     lexer_advance();
     return token;
 }
 
-static void fail_expected(token_t token, token_type_t expected) {
-    location_t loc;
-    loc = lexer_offset_location(token.begin_offset);
-    fprintf(stderr, "%s:%d:%d: Expected '%s', got '%s'\n", CURRENT_FILE_NAME, loc.line+1, loc.character+1, TOKEN_TYPE_NAMES[expected], TOKEN_TYPE_NAMES[token.type]);
-    exit(1);
-}
-
-static void fail(token_t token) {
-    location_t loc;
-    loc = lexer_offset_location(token.begin_offset);
-    fprintf(stderr, "%s:%d:%d: Unexpected token '%s'\n", CURRENT_FILE_NAME, loc.line+1, loc.character+1, TOKEN_TYPE_NAMES[token.type]);
-    exit(1);
-}

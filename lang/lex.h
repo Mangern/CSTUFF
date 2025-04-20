@@ -2,6 +2,7 @@
 #define LEX_H
 
 #include <stddef.h>
+#include "langc.h"
 
 typedef enum {
     LEX_TYPENAME,
@@ -23,6 +24,8 @@ typedef enum {
     LEX_OPERATOR,
     LEX_STRING,
     LEX_CAST,
+    LEX_IF,
+    LEX_ELSE,
     LEX_END
 } token_type_t;
 
@@ -33,10 +36,6 @@ typedef struct {
     int end_offset;
 } token_t;
 
-typedef struct {
-    int line;
-    int character;
-} location_t;
 
 extern char* CURRENT_FILE_NAME;
 
@@ -44,6 +43,9 @@ void lexer_init(char* file_name, char* file_content);
 
 // Return a heap allocated substring of the file content.
 char* lexer_substring(int begin_offset, int end_offset);
+
+// 0-indexed line num plz
+char* lexer_linedup(int line_num);
 
 token_t lexer_peek();
 void lexer_advance();

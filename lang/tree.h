@@ -2,6 +2,7 @@
 #define TREE_H
 
 #include "langc.h"
+#include "lex.h"
 #include "type.h"
 #include "symbol.h"
 
@@ -21,6 +22,7 @@ typedef enum {
     RETURN_STATEMENT,      // children: [expression]
     ASSIGNMENT_STATEMENT,  // children: [identifier, expression]
     CAST_EXPRESSION,       // children: [typename, expression]
+    IF_STATEMENT           // children: [expression, block] | [expression, block, block]
 } node_type_t;
 
 enum operator_t {
@@ -54,6 +56,9 @@ struct node_t {
         operator_t operator;
     } data;
 
+    bool leaf;
+    token_t pos;
+
     // Only in use if type == IDENTIFIER
     symbol_t* symbol;
 };
@@ -62,6 +67,10 @@ struct node_t {
 extern node_t* root;
 
 node_t* node_create(node_type_t type);
+node_t* node_create_leaf(node_type_t type, token_t token);
+
+// Returns INCLUSIVE range (first and last character)
+void node_find_range(node_t* node, range_t* range);
 
 void print_tree(node_t* node);
 

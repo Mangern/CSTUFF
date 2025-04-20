@@ -1,4 +1,5 @@
 #include "da.h"
+#include "lex.h"
 #include "symbol.h"
 #include "tree.h"
 #include <stdlib.h>
@@ -21,7 +22,8 @@ char* NODE_TYPE_NAMES[] = {
     "FUNCTION_CALL",
     "RETURN_STATEMENT",
     "ASSIGNMENT_STATEMENT",
-    "CAST_EXPRESSION"
+    "CAST_EXPRESSION",
+    "IF_STATEMENT"
 };
 
 char* OPERATOR_TYPE_NAMES[] = {
@@ -41,6 +43,15 @@ node_t* node_create(node_type_t type) {
     node->children = da_init(node_t*);
     node->symbol = NULL;
     node->type_info = NULL;
+    node->pos = (token_t){0};
+    node->leaf = false;
+    return node;
+}
+
+node_t* node_create_leaf(node_type_t type, token_t token) {
+    node_t* node = node_create(type);
+    node->pos = token;
+    node->leaf = true;
     return node;
 }
 
@@ -74,4 +85,20 @@ static void print_tree_impl(node_t* node, int indent) {
 
 void print_tree(node_t* node) {
     print_tree_impl(node, 0);
+}
+
+void node_find_range(node_t* node, range_t* range) {
+    node_t *ptr_lft = node, *ptr_rgt = node;
+
+    while (!ptr_lft->leaf) {
+        ptr_lft = ptr_lft->children[0];
+    }
+
+    while (!ptr_rgt->leaf) {
+        ptr_rgt = ptr_rgt->children[da_size(ptr_rgt->children) - 1];
+    }
+
+    range->start = lexer_offset_location(ptr_lft->pos.begin_offset);
+    range->end   = lexer_offset_location(ptr_rgt->pos.end_offset - 1);
+
 }
