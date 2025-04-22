@@ -1,0 +1,12 @@
+main := () -> void {
+    int n := 0;
+
+    while (n < 10) {
+        int m := 0;
+        while (m <= n) {
+            print(n, "*", m, "=", n * m);
+            m += 1;
+        }
+        n += 1;
+    }
+}

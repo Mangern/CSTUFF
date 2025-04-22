@@ -50,6 +50,7 @@ struct node_t {
     union {
         long int_literal_value;
         char* string_literal_value;
+        size_t string_literal_idx;
         double real_literal_value;
         char* identifier_str;
         char* typename_str;

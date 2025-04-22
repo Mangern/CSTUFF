@@ -30,7 +30,7 @@ static type_info_t* create_basic(basic_type_t basic_type);
 static type_info_t* create_type_function();
 static type_info_t* create_type_array(type_info_t*, size_t);
 static type_tuple_t* create_tuple();
-static void type_print(FILE*, type_info_t*);
+
 
 void register_types() {
     for (size_t i = 0; i < da_size(root->children); ++i) {
@@ -456,7 +456,7 @@ static type_tuple_t* create_tuple() {
     return tuple;
 }
 
-static void type_print(FILE* stream, type_info_t* type) {
+void type_print(FILE* stream, type_info_t* type) {
     switch (type->type_class) {
         case TC_BASIC:
             fprintf(stream, "%s", BASIC_TYPE_NAMES[type->info.info_basic]);

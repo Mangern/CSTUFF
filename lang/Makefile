@@ -1,5 +1,5 @@
 CFLAGS := -g -Wall -Wextra -I../da/
-OBJS   := main.o parser.o tree.o da.o lex.o symbol.o symbol_table.o interpret.o type.o fail.o
+OBJS   := main.o parser.o tree.o da.o lex.o symbol.o symbol_table.o interpret.o type.o fail.o tac.o
 
 langc: $(OBJS)
 	gcc $(CFLAGS) -o langc $(OBJS)

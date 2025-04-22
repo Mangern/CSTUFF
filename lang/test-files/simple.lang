@@ -1,0 +1,8 @@
+compute := (int x) -> int {
+    return x + 34;
+}
+
+main := () -> void {
+    int x := 35;
+    print(compute(x));
+}

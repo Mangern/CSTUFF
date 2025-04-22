@@ -19,6 +19,12 @@ typedef struct type_named_t type_named_t;
 typedef struct type_tuple_t type_tuple_t;
 typedef struct type_function_t type_function_t;
 
+typedef enum addr_type_t addr_type_t;
+typedef enum instruction_t instruction_t;
+typedef struct addr_t addr_t;
+typedef struct tac_t tac_t;
+typedef struct function_code_t function_code_t;
+
 typedef struct {
     int line;
     int character;

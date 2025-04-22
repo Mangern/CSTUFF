@@ -1,6 +1,8 @@
 #ifndef TYPE_H
 #define TYPE_H
 
+#include <stdio.h>
+
 #include "langc.h"
 
 enum basic_type_t {
@@ -55,5 +57,7 @@ struct type_function_t {
 };
 
 void register_types();
+
+void type_print(FILE*, type_info_t*);
 
 #endif // TYPE_H

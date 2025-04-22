@@ -5,6 +5,7 @@
 #include "interpret.h"
 #include "lex.h"
 #include "parser.h"
+#include "tac.h"
 #include "tree.h"
 #include "da.h"
 #include "symbol.h"
@@ -14,6 +15,7 @@
 
 static bool opt_print_tree = false;
 static bool opt_interpret  = false;
+static bool opt_print_tac  = false;
 
 void read_file(const char* file_path, char** content) {
     FILE* file = fopen(file_path, "r");
@@ -40,12 +42,15 @@ void read_file(const char* file_path, char** content) {
 
 static void options(int argc, char **argv) {
     for (;;) {
-        switch (getopt(argc, argv, "ti")) {
+        switch (getopt(argc, argv, "tip")) {
             case 't':
                 opt_print_tree = true;
                 break;
             case 'i':
                 opt_interpret = true;
+                break;
+            case 'p':
+                opt_print_tac = true;
                 break;
             default:
                 return;
@@ -73,13 +78,18 @@ int main(int argc, char** argv) {
 
     register_types();
 
+    generate_function_codes();
 
     if (opt_print_tree) {
         print_tree(root);
     }
 
+    if (opt_print_tac) {
+        print_tac();
+    }
+
     if (opt_interpret) {
-        interpret_root();
+        fprintf(stderr, "Not implemented: interpretation\n");
     }
 
 

@@ -8,7 +8,6 @@ int[10][11] arr;
 
 mul1 := (int x) -> int {
     int x := 3;
-    int x := 4;
     return x * z;
 }
 

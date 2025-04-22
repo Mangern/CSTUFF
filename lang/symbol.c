@@ -25,10 +25,12 @@ char* SYMBOL_TYPE_NAMES[] = {
 };
 
 symbol_table_t* global_symbol_table;
+char** global_string_list;
 
 void create_symbol_tables() {
 
     global_symbol_table = symbol_table_init();
+    global_string_list = da_init(char*);
 
     insert_builtin_functions();
 
@@ -88,6 +90,7 @@ static void create_insert_variable_declaration(symbol_table_t* symtable, symbol_
     symbol->type = symbol_type;
     symbol->node = declaration_node->children[1];
     symbol->function_symtable = NULL;
+    symbol->node->symbol = symbol;
     if (symbol_table_insert(symtable, symbol) == INSERT_COLLISION) {
         // TODO: Node:
         fail_node(declaration_node->children[1], "Error: Redefinition of variable '%s'", symbol->name);
@@ -118,7 +121,6 @@ static void bind_references(symbol_table_t* local_symbols, node_t* node) {
         case RETURN_STATEMENT:
         case OPERATOR:
         case INTEGER_LITERAL:
-        case STRING_LITERAL:
         case REAL_LITERAL:
         case PARENTHESIZED_EXPRESSION:
         case ASSIGNMENT_STATEMENT:
@@ -143,6 +145,7 @@ static void bind_references(symbol_table_t* local_symbols, node_t* node) {
                 symbol->type = SYMBOL_LOCAL_VAR;
                 symbol->node = node->children[1];
                 symbol->function_symtable = local_symbols;
+                symbol->node->symbol = symbol;
                 if (symbol_table_insert(local_symbols, symbol) == INSERT_COLLISION) {
                     fail_node(node->children[1], "Error: Redefinition of variable '%s'", symbol->name);
                 }
@@ -178,6 +181,14 @@ static void bind_references(symbol_table_t* local_symbols, node_t* node) {
                 for (size_t i = 0; i < da_size(list_node->children); ++i) {
                     bind_references(local_symbols, list_node->children[i]);
                 }
+            }
+            break;
+        case STRING_LITERAL:
+            {
+                // Store string data in string table instead
+                size_t idx = da_size(global_string_list);
+                da_append(&global_string_list, node->data.string_literal_value);
+                node->data.string_literal_idx = idx;
             }
             break;
         default:

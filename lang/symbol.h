@@ -35,6 +35,7 @@ struct symbol_t {
 };
 
 extern symbol_table_t* global_symbol_table;
+extern char** global_string_list;
 
 void create_symbol_tables();
 
