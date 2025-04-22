@@ -109,9 +109,19 @@ static node_t* parse_function_declaration() {
         fail_token_expected(token, LEX_LBRACE);
 
     // parse body
-    da_append(&ret->children, parse_block());
+    node_t* block = parse_block();
 
-    peek_expect_advance(LEX_RBRACE);
+    token_t rbrace_token = peek_expect_advance(LEX_RBRACE);
+
+    // insert return statement if not exists
+    if (da_size(block->children) == 0 || block->children[da_size(block->children)-1]->type != RETURN_STATEMENT) {
+        node_t* fake_return_node = node_create(RETURN_STATEMENT);
+        // TODO: check if setting rbrace as location makes sense
+        fake_return_node->pos = rbrace_token;
+        da_append(&block->children, fake_return_node);
+    }
+
+    da_append(&ret->children, block);
     return ret;
 }
 
@@ -204,6 +214,19 @@ static node_t* parse_block() {
             }
 
             da_append(&block_node->children, if_node);
+        } else if (token.type == LEX_WHILE) {
+            // while (expression) BLOCK
+            lexer_advance();
+            node_t* while_node = node_create(WHILE_STATEMENT);
+            peek_expect_advance(LEX_LPAREN);
+            da_append(&while_node->children, parse_expression());
+            peek_expect_advance(LEX_RPAREN);
+
+            da_append(&while_node->children, parse_block());
+
+            peek_expect_advance(LEX_RBRACE);
+
+            da_append(&block_node->children, while_node);
         } else {
             fail_token(token);
         }
@@ -239,6 +262,16 @@ static bool has_precedence(operator_t operator_1, operator_t operator_2) {
     if (operator_1 == BINARY_MUL || operator_1 == BINARY_DIV) {
         return operator_2 != BINARY_MUL && operator_2 != BINARY_DIV;
     }
+    if (operator_2 == BINARY_MUL || operator_2 == BINARY_DIV)
+        return false;
+
+    if (operator_1 == BINARY_ADD || operator_1 == BINARY_SUB) {
+        return operator_2 != BINARY_ADD && operator_2 != BINARY_SUB;
+    }
+
+    if (operator_2 == BINARY_ADD || operator_2 == BINARY_SUB)
+        return false;
+
     return false;
 }
 

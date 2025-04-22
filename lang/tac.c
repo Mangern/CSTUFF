@@ -24,7 +24,6 @@ static char* TAC_INSTRUCTION_NAMES[] = {
     "BINARY_LT",
     "UNARY_SUB", 
     "UNARY_NEG", 
-    "ARG_PUSH", 
     "CALL_VOID", 
     "CALL", 
     "COPY",
@@ -37,15 +36,17 @@ static function_code_t generate_function_code(symbol_t* function_symbol);
 static void generate_node_code(tac_t** list, node_t* node);
 // returns addr where return value is stored
 static size_t generate_valued_code(tac_t** list, node_t* node);
+static void generate_function_call_setup(tac_t**, node_t*, size_t*, size_t*);
 
 static size_t TAC_NEXT_LABEL = 0;
 static size_t tac_emit(tac_t**, instruction_t, size_t, size_t, size_t);
 
-static size_t new_temp();
+static size_t new_temp(basic_type_t);
 static size_t new_int_const(long);
 static size_t new_real_const(double);
 static size_t new_string_idx_const(size_t);
 static size_t new_label_ref(size_t);
+static size_t new_arg_list();
 static instruction_t instr_from_node_operator(operator_t);
 static size_t get_symbol_addr(symbol_t* symbol);
 static void generate_cast_expr(tac_t** list, type_info_t* info_src, size_t addr_src, type_info_t* info_dst, size_t addr_dst);
@@ -72,12 +73,27 @@ void generate_function_codes() {
 static function_code_t generate_function_code(symbol_t* function_symbol) {
 
     function_code_t ret = (function_code_t){
-        .function_symbol = function_symbol
+        .function_symbol = function_symbol,
     };
     ret.tac_list = da_init(tac_t);
     // child idx 3 is BLOCK
+    for (size_t i = 0; i < function_symbol->function_symtable->n_symbols; ++i) {
+        symbol_t* local_symbol = function_symbol->function_symtable->symbols[i];
+        get_symbol_addr(local_symbol);
+    }
     generate_node_code(&ret.tac_list, function_symbol->node->children[3]);
     return ret;
+}
+
+static void generate_function_call_setup(tac_t** list, node_t* node, size_t* addr_function, size_t* addr_arg_list) {
+    symbol_t* function_symbol = node->children[0]->symbol;
+    *addr_function = get_symbol_addr(function_symbol);
+    *addr_arg_list = new_arg_list();
+
+    for (size_t i = 0; i < da_size(node->children[1]->children); ++i) {
+        size_t arg_addr = generate_valued_code(list, node->children[1]->children[i]);
+        da_append(&addr_list[*addr_arg_list].data.arg_addr_list, arg_addr);
+    }
 }
 
 static void generate_node_code(tac_t** list, node_t* node) {
@@ -100,14 +116,9 @@ static void generate_node_code(tac_t** list, node_t* node) {
             break;
         case FUNCTION_CALL:
             {
-                symbol_t* function_symbol = node->children[0]->symbol;
-                for (size_t i = 0; i < da_size(node->children[1]->children); ++i) {
-                    size_t arg_addr = generate_valued_code(list, node->children[1]->children[i]);
-                    tac_emit(list, TAC_ARG_PUSH, arg_addr, 0, 0);
-                }
-                size_t symbol_addr = get_symbol_addr(function_symbol);
-                // If the function returns a value, it will not be saved.
-                tac_emit(list, TAC_CALL_VOID, symbol_addr, 0, 0);
+                size_t addr_function, addr_arg_list;
+                generate_function_call_setup(list, node, &addr_function, &addr_arg_list);
+                tac_emit(list, TAC_CALL_VOID, addr_function, addr_arg_list, 0);
             }
             break;
         case VARIABLE_DECLARATION:
@@ -130,7 +141,7 @@ static void generate_node_code(tac_t** list, node_t* node) {
         case IF_STATEMENT:
             {
                 size_t cond_addr = generate_valued_code(list, node->children[0]);
-                size_t cmp_idx = tac_emit(list, TAC_IF_FALSE, cond_addr, 0, new_label_ref(0));
+                size_t if_jmp_idx = tac_emit(list, TAC_IF_FALSE, cond_addr, 0, new_label_ref(0));
                 // 'true' block
                 generate_node_code(list, node->children[1]);
 
@@ -138,16 +149,31 @@ static void generate_node_code(tac_t** list, node_t* node) {
                     size_t goto_idx = tac_emit(list, TAC_GOTO, 0, 0, new_label_ref(0));
 
                     // backpatch dst label of if statement
-                    addr_list[(*list)[cmp_idx].dst].data.label = TAC_NEXT_LABEL;
+                    addr_list[(*list)[if_jmp_idx].dst].data.label = TAC_NEXT_LABEL;
                     generate_node_code(list, node->children[2]);
 
                     // backpatch dst label of jmp after if
                     addr_list[(*list)[goto_idx].dst].data.label = TAC_NEXT_LABEL;
                 } else {
                     // backpatch dst label of if statement
-                    addr_list[(*list)[cmp_idx].dst].data.label = TAC_NEXT_LABEL;
+                    addr_list[(*list)[if_jmp_idx].dst].data.label = TAC_NEXT_LABEL;
                 }
                 tac_emit(list, TAC_NOP, 0, 0, 0);
+            }
+            break;
+        case WHILE_STATEMENT:
+            {
+                size_t header_start_label = TAC_NEXT_LABEL;
+                size_t cond_addr = generate_valued_code(list, node->children[0]);
+                size_t if_jmp_idx = tac_emit(list, TAC_IF_FALSE, cond_addr, 0, new_label_ref(0));
+                // body
+                generate_node_code(list, node->children[1]);
+                // loop
+                tac_emit(list, TAC_GOTO, 0, 0, new_label_ref(header_start_label));
+
+                size_t loop_end_idx = tac_emit(list, TAC_NOP, 0, 0, 0);
+                // backpatch iffalse jump
+                addr_list[(*list)[if_jmp_idx].dst].data.label = loop_end_idx;
             }
             break;
         default:
@@ -181,7 +207,8 @@ static size_t generate_valued_code(tac_t** list, node_t* node) {
         case CAST_EXPRESSION:
             {
                 size_t to_cast_addr = generate_valued_code(list, node->children[1]);
-                size_t result_addr = new_temp();
+                assert(node->children[0]->type_info->type_class == TC_BASIC);
+                size_t result_addr = new_temp(node->children[0]->type_info->info.info_basic);
                 generate_cast_expr(
                     list, 
                     node->children[1]->type_info, 
@@ -193,21 +220,20 @@ static size_t generate_valued_code(tac_t** list, node_t* node) {
             break;
         case FUNCTION_CALL:
             {
-                symbol_t* function_symbol = node->children[0]->symbol;
-                for (size_t i = 0; i < da_size(node->children[1]->children); ++i) {
-                    size_t arg_addr = generate_valued_code(list, node->children[1]->children[i]);
-                    tac_emit(list, TAC_ARG_PUSH, arg_addr, 0, 0);
-                }
-                size_t symbol_addr = get_symbol_addr(function_symbol);
+                size_t addr_function, addr_arg_list;
+                generate_function_call_setup(list, node, &addr_function, &addr_arg_list);
+
                 if (node->type_info->type_class == TC_BASIC && node->type_info->info.info_basic == TYPE_VOID) {
                     // Don't really know if this actually can happen
-                    fail_node(node, "Expected %s to return a value, but return type is void\n", function_symbol->name);
+                    fail_node(node, "Expected %s to return a value, but return type is void\n", node->children[0]->symbol->name);
                     exit(EXIT_FAILURE);
-                } else {
-                    size_t ret_addr = new_temp();
-                    tac_emit(list, TAC_CALL, symbol_addr, 0, ret_addr);
-                    return ret_addr;
                 }
+
+                assert((node->type_info->type_class == TC_BASIC) && "Can only process basic type");
+
+                size_t ret_addr = new_temp(node->type_info->info.info_basic);
+                tac_emit(list, TAC_CALL, addr_function, addr_arg_list, ret_addr);
+                return ret_addr;
             }
             break;
         case OPERATOR:
@@ -215,14 +241,14 @@ static size_t generate_valued_code(tac_t** list, node_t* node) {
                 if (da_size(node->children) == 1) {
                     // Unary
                     size_t src1_addr = generate_valued_code(list, node->children[0]);
-                    size_t dst_addr = new_temp();
+                    size_t dst_addr = new_temp(node->type_info->info.info_basic);
                     tac_emit(list, instr_from_node_operator(node->data.operator), src1_addr, 0, dst_addr);
                     return dst_addr;
                 } else {
                     // Binary
                     size_t src1_addr = generate_valued_code(list, node->children[0]);
                     size_t src2_addr = generate_valued_code(list, node->children[1]);
-                    size_t dst_addr = new_temp();
+                    size_t dst_addr = new_temp(node->type_info->info.info_basic);
                     tac_emit(list, instr_from_node_operator(node->data.operator), src1_addr, src2_addr, dst_addr);
                     return dst_addr;
                 }
@@ -252,11 +278,12 @@ static size_t tac_emit(tac_t** list, instruction_t instr, size_t src1, size_t sr
     return insert_idx;
 }
 
-static size_t new_temp() {
+static size_t new_temp(basic_type_t type_info) {
     static size_t tmp_count = 0;
     size_t idx = da_size(addr_list);
     addr_t tmp_addr = (addr_t){
         .type = ADDR_TEMP,
+        .type_info = type_info,
         .data.temp_id = tmp_count++
     };
     da_append(&addr_list, tmp_addr);
@@ -267,6 +294,7 @@ static size_t new_int_const(long value) {
     size_t idx = da_size(addr_list);
     addr_t addr = (addr_t){
         .type = ADDR_INT_CONST,
+        .type_info = TYPE_INT,
         .data.int_const = value
     };
     da_append(&addr_list, addr);
@@ -277,6 +305,7 @@ static size_t new_real_const(double value) {
     size_t idx = da_size(addr_list);
     addr_t addr = (addr_t){
         .type = ADDR_REAL_CONST,
+        .type_info = TYPE_REAL,
         .data.real_const = value
     };
     da_append(&addr_list, addr);
@@ -287,6 +316,7 @@ static size_t new_string_idx_const(size_t string_idx) {
     size_t idx = da_size(addr_list);
     addr_t addr = (addr_t) {
         .type = ADDR_STRING_CONST,
+        .type_info = TYPE_STRING,
         .data.string_idx_const = string_idx
     };
     da_append(&addr_list, addr);
@@ -299,6 +329,16 @@ static size_t new_label_ref(size_t label) {
         .type = ADDR_LABEL,
         .data.label = label
     };
+    da_append(&addr_list, addr);
+    return idx;
+}
+
+static size_t new_arg_list() {
+    size_t idx = da_size(addr_list);
+    addr_t addr = (addr_t) {
+        .type = ADDR_ARG_LIST
+    };
+    addr.data.arg_addr_list = da_init(size_t);
     da_append(&addr_list, addr);
     return idx;
 }
@@ -331,10 +371,17 @@ static size_t get_symbol_addr(symbol_t* symbol) {
         return i;
     }
     size_t idx = da_size(addr_list);
-    addr_t addr = (addr_t){
+    addr_t addr = (addr_t) {
         .type = ADDR_SYMBOL,
         .data.symbol = symbol
     };
+
+    if (symbol->type != SYMBOL_FUNCTION) {
+        assert(symbol->node != NULL);
+        assert((symbol->node->type_info->type_class == TC_BASIC) && "Can only process basic type");
+        addr.type_info = symbol->node->type_info->info.info_basic;
+    }
+
     da_append(&addr_list, addr);
     return idx;
 }
@@ -356,40 +403,54 @@ static void generate_cast_expr(tac_t** list, type_info_t* info_src, size_t addr_
     assert(false && "Unhandled cast expr gen");
 }
 
-static void print_tac_addr(size_t addr_idx) {
-    if (addr_idx == 0) return;
+void print_tac_addr(size_t addr_idx) {
+    //if (addr_idx == 0) return;
     addr_t addr = addr_list[addr_idx];
     switch(addr.type) {
         case ADDR_UNUSED:
-            assert(false);
+            {
+                printf("-");
+            }
+            break;
         case ADDR_SYMBOL:
             {
-                printf(", (%s)", addr.data.symbol->name);
+                printf("(%s)", addr.data.symbol->name);
             }
             break;
         case ADDR_INT_CONST:
             {
-                printf(", #%ld", addr.data.int_const);
+                printf("#%ld", addr.data.int_const);
             }
             break;
         case ADDR_REAL_CONST:
             {
-                printf(", #%lf", addr.data.real_const);
+                printf("#%lf", addr.data.real_const);
             }
             break;
         case ADDR_STRING_CONST:
             {
-                printf(", #s%zu [%s]", addr.data.string_idx_const, global_string_list[addr.data.string_idx_const]);
+                printf("#s%zu [%s]", addr.data.string_idx_const, global_string_list[addr.data.string_idx_const]);
             }
             break;
         case ADDR_LABEL:
             {
-                printf(", $%zu", addr.data.label);
+                printf("$%zu", addr.data.label);
             }
             break;
         case ADDR_TEMP:
             {
-                printf(", t%ld", addr.data.temp_id);
+                printf("t%ld", addr.data.temp_id);
+            }
+            break;
+        case ADDR_ARG_LIST:
+            {
+                printf("ARGS [");
+                for (size_t i = 0; i < da_size(addr.data.arg_addr_list); ++i) {
+                    if (i > 0)printf(", ");
+                    printf("%zu", addr.data.arg_addr_list[i]);
+                    //print_tac_addr(addr.data.arg_addr_list[i]);
+                }
+                printf("]");
             }
             break;
       }
@@ -397,15 +458,21 @@ static void print_tac_addr(size_t addr_idx) {
 
 static void print_tac_impl(tac_t tac) {
     printf("%s", TAC_INSTRUCTION_NAMES[tac.instr]);
-    print_tac_addr(tac.src1);
-    print_tac_addr(tac.src2);
-    print_tac_addr(tac.dst);
+    printf(", ");print_tac_addr(tac.src1);
+    printf(", ");print_tac_addr(tac.src2);
+    printf(", ");print_tac_addr(tac.dst);
     puts("");
 }
 
 void print_tac() {
+    printf("=== NAMES ===\n");
+    for (size_t i = 0; i < da_size(addr_list); ++i) {
+        printf("%3zu: %s ", i, BASIC_TYPE_NAMES[addr_list[i].type_info]);
+        print_tac_addr(i);
+        puts("");
+    }
     for (size_t func_idx = 0; func_idx < da_size(function_codes); ++func_idx) {
-        printf("function %s\n", function_codes[func_idx].function_symbol->name);
+        printf("=== FUNCTION %s ===\n", function_codes[func_idx].function_symbol->name);
 
         for (size_t i = 0; i < da_size(function_codes[func_idx].tac_list); ++i) {
             printf("%3zu:  ", function_codes[func_idx].tac_list[i].label);

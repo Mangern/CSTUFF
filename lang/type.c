@@ -13,7 +13,7 @@
             exit(EXIT_FAILURE);\
         } while (0);
 
-static char* BASIC_TYPE_NAMES[] = {
+char* BASIC_TYPE_NAMES[] = {
     "void",
     "int",
     "real",
@@ -364,12 +364,27 @@ static void register_type_node(node_t* node) {
             break;
         case IF_STATEMENT:
             {
-                // first child has to have boolean type
-                register_type_node(node->children[0]);
+                for (size_t i = 0; i < da_size(node->children); ++i) {
+                    register_type_node(node->children[i]);
+                }
 
+                // first child has to have boolean type
                 if (node->children[0]->type_info->type_class != TC_BASIC
                  || node->children[0]->type_info->info.info_basic != TYPE_BOOL) {
                     fail("Condition of if statement must be boolean.");
+                }
+                node->type_info = create_basic(TYPE_VOID);
+            }
+            break;
+        case WHILE_STATEMENT:
+            {
+                for (size_t i = 0; i < da_size(node->children); ++i) {
+                    register_type_node(node->children[i]);
+                }
+
+                if (node->children[0]->type_info->type_class != TC_BASIC
+                 || node->children[0]->type_info->info.info_basic != TYPE_BOOL) {
+                    fail("Condition of while statement must be boolean.");
                 }
                 node->type_info = create_basic(TYPE_VOID);
             }

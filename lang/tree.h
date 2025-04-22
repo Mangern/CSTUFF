@@ -22,16 +22,17 @@ typedef enum {
     RETURN_STATEMENT,      // children: [expression]
     ASSIGNMENT_STATEMENT,  // children: [identifier, expression]
     CAST_EXPRESSION,       // children: [typename, expression]
-    IF_STATEMENT           // children: [expression, block] | [expression, block, block]
+    IF_STATEMENT,           // children: [expression, block] | [expression, block, block]
+    WHILE_STATEMENT
 } node_type_t;
 
 enum operator_t {
-    BINARY_ADD,
-    BINARY_SUB,
-    BINARY_MUL,
-    BINARY_DIV,
-    BINARY_GT,
-    BINARY_LT,
+    BINARY_ADD, // 2
+    BINARY_SUB, // 2
+    BINARY_MUL, // 1
+    BINARY_DIV, // 1
+    BINARY_GT,  // 3
+    BINARY_LT,  // 3
     UNARY_SUB, // -
     UNARY_NEG, // !
 };

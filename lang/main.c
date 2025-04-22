@@ -2,7 +2,7 @@
 #include <stdbool.h>
 #include <getopt.h>
 
-#include "interpret.h"
+#include "gen.h"
 #include "lex.h"
 #include "parser.h"
 #include "tac.h"
@@ -14,8 +14,8 @@
 #define BUFSIZE 1024
 
 static bool opt_print_tree = false;
-static bool opt_interpret  = false;
 static bool opt_print_tac  = false;
+static bool opt_emit_asm  = false;
 
 void read_file(const char* file_path, char** content) {
     FILE* file = fopen(file_path, "r");
@@ -42,15 +42,15 @@ void read_file(const char* file_path, char** content) {
 
 static void options(int argc, char **argv) {
     for (;;) {
-        switch (getopt(argc, argv, "tip")) {
+        switch (getopt(argc, argv, "tpa")) {
             case 't':
                 opt_print_tree = true;
                 break;
-            case 'i':
-                opt_interpret = true;
-                break;
             case 'p':
                 opt_print_tac = true;
+                break;
+            case 'a':
+                opt_emit_asm = true;
                 break;
             default:
                 return;
@@ -88,10 +88,9 @@ int main(int argc, char** argv) {
         print_tac();
     }
 
-    if (opt_interpret) {
-        fprintf(stderr, "Not implemented: interpretation\n");
+    if (opt_emit_asm) {
+        generate_program();
     }
-
 
     return 0;
 }

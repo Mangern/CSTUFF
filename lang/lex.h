@@ -26,6 +26,7 @@ typedef enum {
     LEX_CAST,
     LEX_IF,
     LEX_ELSE,
+    LEX_WHILE,
     LEX_END
 } token_type_t;
 

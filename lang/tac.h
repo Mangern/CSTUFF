@@ -2,6 +2,7 @@
 #define TAC_H
 
 #include "langc.h"
+#include "type.h"
 
 enum instruction_t {
     TAC_NOP,
@@ -14,8 +15,7 @@ enum instruction_t {
     TAC_BINARY_LT,
     TAC_UNARY_SUB, // -
     TAC_UNARY_NEG, // !
-    TAC_ARG_PUSH, // push argument src1 before calling function
-    TAC_CALL_VOID, // call function without return value, using args pushed from arg_push. 
+    TAC_CALL_VOID, // call function src1 without return value. src2 stores arg list
     TAC_CALL, // same as above, but stores result in dst.
     TAC_COPY, // src1 -> dst
     TAC_CAST_REAL_INT,
@@ -30,11 +30,13 @@ enum addr_type_t {
     ADDR_REAL_CONST,
     ADDR_STRING_CONST,
     ADDR_LABEL,
-    ADDR_TEMP
+    ADDR_TEMP,
+    ADDR_ARG_LIST
 };
 
 struct addr_t {
     addr_type_t type;
+    basic_type_t type_info;
     union {
         symbol_t* symbol;
         long int_const;
@@ -42,6 +44,7 @@ struct addr_t {
         size_t string_idx_const;
         long temp_id;
         size_t label;
+        size_t* arg_addr_list; // TODO: unsure if want to store types or values
     } data;
 };
 
@@ -65,6 +68,7 @@ extern function_code_t* function_codes;
 
 void generate_function_codes();
 
+void print_tac_addr(size_t addr_idx);
 void print_tac();
 
 #endif // TAC_H

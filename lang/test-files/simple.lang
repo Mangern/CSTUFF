@@ -1,8 +1,8 @@
-compute := (int x) -> int {
-    return x + 34;
+sum3 := (int x, int y, int z) -> int {
+    return x + y + z;
 }
 
 main := () -> void {
-    int x := 35;
-    print(compute(x));
+    int result := sum3(1, 34, 2 * 17);
+    print(result);
 }

@@ -56,6 +56,8 @@ struct type_function_t {
     type_info_t* return_type;
 };
 
+extern char* BASIC_TYPE_NAMES[];
+
 void register_types();
 
 void type_print(FILE*, type_info_t*);

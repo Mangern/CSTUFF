@@ -57,9 +57,6 @@ test := (int x) -> int {
     return 3 + test(3);
 }
 
-countChars := (string s) -> int {
-}
-
 toString := (int x) -> string {
     return toString(2);
 }
@@ -69,6 +66,5 @@ main := () -> void {
     {
     }
     global := cast(int, 123.0);
-    print(countChars(toString(global)));
     print(global);
 }

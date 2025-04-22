@@ -1,0 +1,4 @@
+int[100] arr;
+main := () -> void {
+    arr[0] := 2;
+}
