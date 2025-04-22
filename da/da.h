@@ -25,6 +25,15 @@ void* da_init_impl(size_t elem_size);
     meta[DA_IDX_CAP] = cap;\
 } while (0);
     
+#define da_resize(arr_ptr, new_size) do {\
+    size_t* meta = *(size_t**)(arr_ptr);\
+    size_t size = meta[DA_IDX_SIZE];\
+    if (size < new_size) {\
+        da_reserve((arr_ptr), new_size);\
+        meta = *(size_t**)(arr_ptr);\
+    }\
+    meta[DA_IDX_SIZE] = new_size;\
+} while(0);
 
 #define da_append(arr, x) do {\
     size_t* meta = *(size_t**)(arr);\

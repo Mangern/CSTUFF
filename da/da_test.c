@@ -62,9 +62,35 @@ void da_indexof_test() {
     printf("Index of z: %ld\n", da_indexof(arr, &z));
 }
 
+void da_resize_test() {
+    int* arr = da_init(int);
+
+    da_append(&arr, 1);
+    da_append(&arr, 2);
+    da_append(&arr, 3);
+    da_append(&arr, 4);
+
+    for (size_t i = 0; i < da_size(arr); ++i) {
+        printf("%d%c", arr[i], " \n"[i==da_size(arr)-1]);
+    }
+
+    da_resize(&arr, 2);
+
+    for (size_t i = 0; i < da_size(arr); ++i) {
+        printf("%d%c", arr[i], " \n"[i==da_size(arr)-1]);
+    }
+
+    da_resize(&arr, 8);
+
+    for (size_t i = 0; i < da_size(arr); ++i) {
+        printf("%d%c", arr[i], " \n"[i==da_size(arr)-1]);
+    }
+}
+
 int main() {
     da_int_test();
     da_string_test();
     da_indexof_test();
+    da_resize_test();
     return 0;
 }
