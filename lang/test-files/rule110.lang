@@ -1,0 +1,62 @@
+int[50] pat;
+int[50] npat;
+
+int[8] TABLE;
+
+main := () -> void {
+    TABLE[0] := 0;
+    TABLE[1] := 1;
+    TABLE[2] := 1;
+    TABLE[3] := 1;
+    TABLE[4] := 0;
+    TABLE[5] := 1;
+    TABLE[6] := 1;
+    TABLE[7] := 0;
+
+    int size := 50;
+    int NUM_ITER := size;
+
+    pat[size-1] := 1;
+
+    int iter := 0;
+
+    while (iter < NUM_ITER) {
+        int i := 0;
+        while (i < size) {
+            if (pat[i] > 0) {
+                print("#");
+            } else {
+                print(" ");
+            }
+            i := i + 1;
+        }
+        println();
+
+        i := 0;
+
+        while (i < size) {
+            int lft := 0;
+            if (i > 0) {
+                lft := pat[i-1];
+            }
+            int mid := pat[i];
+            int rgt := 0;
+            if (i < size - 1) {
+                rgt := pat[i+1];
+            }
+
+            int idx := 4 * lft + 2 * mid + rgt;
+            npat[i] := TABLE[idx];
+            i := i + 1;
+        }
+
+        i := 0;
+
+        while (i < size) {
+            pat[i] := npat[i];
+            i := i + 1;
+        }
+
+        iter := iter + 1;
+    }
+}

@@ -49,6 +49,14 @@ void create_symbol_tables() {
 static void insert_builtin_functions() {
     {
         symbol_t* symbol = malloc(sizeof(symbol_t));
+        symbol->name = "println";
+        symbol->type = SYMBOL_FUNCTION;
+        symbol->is_builtin = true;
+        assert((symbol_table_insert(global_symbol_table, symbol) == INSERT_OK) && "Error when inserting builtin function");
+    }
+
+    {
+        symbol_t* symbol = malloc(sizeof(symbol_t));
         symbol->name = "print";
         symbol->type = SYMBOL_FUNCTION;
         symbol->is_builtin = true;
@@ -128,6 +136,8 @@ static void bind_references(symbol_table_t* local_symbols, node_t* node) {
         case TYPENAME:
         case IF_STATEMENT:
         case WHILE_STATEMENT:
+        case ARRAY_INDEXING:
+        case LIST:
             {
                 for (size_t i = 0; i < da_size(node->children); ++i) {
                     bind_references(local_symbols, node->children[i]);

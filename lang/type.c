@@ -5,7 +5,9 @@
 
 #include "type.h"
 #include "da.h"
+#include "fail.h"
 #include "langc.h"
+#include "lex.h"
 #include "tree.h"
 
 #define fail(s, ...) do {\
@@ -28,7 +30,7 @@ static bool types_equivalent(type_info_t* type_a, type_info_t* type_b);
 static bool can_cast(type_info_t* type_dst, type_info_t* type_src);
 static type_info_t* create_basic(basic_type_t basic_type);
 static type_info_t* create_type_function();
-static type_info_t* create_type_array(type_info_t*, size_t);
+static type_info_t* create_type_array(type_info_t*, node_t*);
 static type_tuple_t* create_tuple();
 
 
@@ -85,19 +87,15 @@ static void register_type_node(node_t* node) {
                     fail("Unhandled type name %s", type_str);
                 }
 
-                // Could be array type
-                type_info_t* result_type = node->type_info;
-                for (int i = (int)da_size(node->children) - 1; i >= 0; --i) {
-                    node_t* count_node = node->children[i];
-                    assert(count_node->type == INTEGER_LITERAL && "Unexpected type child");
-
-                    size_t count = count_node->data.int_literal_value;
-
-                    result_type = create_type_array(result_type, count);
-                }
-                node->type_info = result_type;
-
                 return;
+            }
+            break;
+        case ARRAY_TYPE:
+            {
+                register_type_node(node->children[0]);
+                register_type_node(node->children[1]);
+
+                node->type_info = create_type_array(node->children[0]->type_info, node->children[1]);
             }
             break;
         case INTEGER_LITERAL:
@@ -226,6 +224,7 @@ static void register_type_node(node_t* node) {
                         break;
                     case BINARY_GT:
                     case BINARY_LT:
+                    case BINARY_EQ:
                         {
                             if (!types_equivalent(node->children[0]->type_info, node->children[1]->type_info)) {
                                 fprintf(stderr, "Cannot combine ");
@@ -326,10 +325,10 @@ static void register_type_node(node_t* node) {
                 if (!types_equivalent(node->children[0]->type_info, node->children[1]->type_info)) {
                     fprintf(stderr, "Cannot assign expression of type '");
                     type_print(stderr, node->children[1]->type_info);
-                    fprintf(stderr, "' to '%s', which has type '", node->children[0]->data.identifier_str);
+                    fprintf(stderr, "' to element of type '");
                     type_print(stderr, node->children[0]->type_info);
                     fprintf(stderr, "'\n");
-                    exit(EXIT_FAILURE);
+                    fail_node(node, "%s", "");
                 }
 
                 // Should it be void or type of assignment?
@@ -376,6 +375,31 @@ static void register_type_node(node_t* node) {
                 node->type_info = create_basic(TYPE_VOID);
             }
             break;
+        case ARRAY_INDEXING:
+            {
+                register_type_node(node->children[0]);
+                register_type_node(node->children[1]);
+
+                type_info_t* array_type = node->children[0]->type_info;
+                if (array_type->type_class != TC_ARRAY) {
+                    fail_node(node, "Attempt to index non-array");
+                }
+
+                node_t* dim_list = node->children[1];
+
+                if (da_size(dim_list->children) != da_size(array_type->info.info_array->dims)) {
+                    fail_node(node, "Wrong number of dimensions");
+                }
+
+                for (size_t i = 0; i < da_size(dim_list->children); ++i) {
+                    if (dim_list->children[i]->type_info->type_class != TC_BASIC || dim_list->children[i]->type_info->info.info_basic != TYPE_INT) {
+                        fail_node(dim_list->children[i], "Array indices must be integers");
+                    }
+                }
+
+                node->type_info = node->children[0]->type_info->info.info_array->subtype;
+            }
+            break;
         case WHILE_STATEMENT:
             {
                 for (size_t i = 0; i < da_size(node->children); ++i) {
@@ -395,7 +419,11 @@ static void register_type_node(node_t* node) {
 }
 
 static type_info_t* get_builtin_function_type(symbol_t* function_symbol) {
-    if (strcmp(function_symbol->name, "print") == 0) {
+    if (strcmp(function_symbol->name, "println") == 0) {
+        type_info_t* type_info = create_type_function();
+        type_info->info.info_function->return_type = create_basic(TYPE_VOID);
+        return type_info;
+    } else if (strcmp(function_symbol->name, "print") == 0) {
         type_info_t* type_info = create_type_function();
         type_info->info.info_function->return_type = create_basic(TYPE_VOID);
         return type_info;
@@ -415,7 +443,10 @@ static bool types_equivalent(type_info_t* type_a, type_info_t* type_b) {
         type_array_t* array_a = type_a->info.info_array;
         type_array_t* array_b = type_b->info.info_array;
 
-        if (array_a->count != array_b->count) return false;
+        if (da_size(array_a->dims) != da_size(array_b->dims)) return false;
+        for (size_t i = 0; i < da_size(array_a->dims); ++i) {
+            if (array_a->dims[i] != array_b->dims[i]) return false;
+        }
         return types_equivalent(array_a->subtype, array_b->subtype);
     } else {
         fprintf(stderr, "Not implemented type class equivalency:\n");
@@ -456,11 +487,14 @@ static type_info_t* create_type_function() {
     return type_info;
 }
 
-static type_info_t* create_type_array(type_info_t* subtype, size_t count) {
+static type_info_t* create_type_array(type_info_t* subtype, node_t* dim_list_node) {
     type_info_t *type_info = malloc(sizeof(type_info_t));
     type_info->type_class = TC_ARRAY;
     type_info->info.info_array = malloc(sizeof(type_array_t));
-    type_info->info.info_array->count = count;
+    type_info->info.info_array->dims = da_init(size_t);
+    for (size_t i = 0; i < da_size(dim_list_node->children); ++i) {
+        da_append(&type_info->info.info_array->dims, (size_t)dim_list_node->children[i]->data.int_literal_value);
+    }
     type_info->info.info_array->subtype = subtype;
     return type_info;
 }
@@ -478,9 +512,13 @@ void type_print(FILE* stream, type_info_t* type) {
             break;
         case TC_ARRAY:
             {
-                fprintf(stream, "array(%zu, ", type->info.info_array->count);
                 type_print(stream, type->info.info_array->subtype);
-                fprintf(stream, ")");
+                fprintf(stream, "[");
+                for (size_t i = 0; i < da_size(type->info.info_array->dims); ++i) {
+                    if (i > 0)fprintf(stream, ", ");
+                    fprintf(stream, "%zu", type->info.info_array->dims[i]);
+                }
+                fprintf(stream, "]");
             }
             break;
         case TC_STRUCT:

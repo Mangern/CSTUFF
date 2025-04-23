@@ -22,6 +22,7 @@ static char* TAC_INSTRUCTION_NAMES[] = {
     "BINARY_DIV",
     "BINARY_GT",
     "BINARY_LT",
+    "BINARY_EQ",
     "UNARY_SUB", 
     "UNARY_NEG", 
     "CALL_VOID", 
@@ -29,7 +30,10 @@ static char* TAC_INSTRUCTION_NAMES[] = {
     "COPY",
     "CAST_REAL_TO_INT",
     "IF_FALSE",
-    "GOTO"
+    "GOTO",
+    "LOCOF", 
+    "LOAD", 
+    "STORE", 
 };
 
 static function_code_t generate_function_code(symbol_t* function_symbol);
@@ -37,6 +41,8 @@ static void generate_node_code(tac_t** list, node_t* node);
 // returns addr where return value is stored
 static size_t generate_valued_code(tac_t** list, node_t* node);
 static void generate_function_call_setup(tac_t**, node_t*, size_t*, size_t*);
+static void generate_cast_expr(tac_t** list, type_info_t* info_src, size_t addr_src, type_info_t* info_dst, size_t addr_dst);
+static size_t generate_indexing(tac_t**, node_t*);
 
 static size_t TAC_NEXT_LABEL = 0;
 static size_t tac_emit(tac_t**, instruction_t, size_t, size_t, size_t);
@@ -47,9 +53,9 @@ static size_t new_real_const(double);
 static size_t new_string_idx_const(size_t);
 static size_t new_label_ref(size_t);
 static size_t new_arg_list();
+
 static instruction_t instr_from_node_operator(operator_t);
 static size_t get_symbol_addr(symbol_t* symbol);
-static void generate_cast_expr(tac_t** list, type_info_t* info_src, size_t addr_src, type_info_t* info_dst, size_t addr_dst);
 
 void generate_function_codes() {
     function_codes = da_init(function_code_t);
@@ -133,9 +139,30 @@ static void generate_node_code(tac_t** list, node_t* node) {
             break;
         case ASSIGNMENT_STATEMENT:
             {
-                size_t dst_addr = get_symbol_addr(node->children[0]->symbol);
-                size_t src_addr = generate_valued_code(list, node->children[1]);
-                tac_emit(list, TAC_COPY, src_addr, 0, dst_addr);
+                if (node->children[0]->type == IDENTIFIER) {
+                    size_t dst_addr = get_symbol_addr(node->children[0]->symbol);
+                    size_t src_addr = generate_valued_code(list, node->children[1]);
+                    tac_emit(list, TAC_COPY, src_addr, 0, dst_addr);
+                } else if (node->children[0]->type == ARRAY_INDEXING) {
+                    size_t src_addr = generate_valued_code(list, node->children[1]);
+
+                    node_t* indexing_node = node->children[0];
+                    node_t* identifier = indexing_node->children[0];
+                    size_t arr_addr = get_symbol_addr(identifier->symbol);
+                    if (identifier->type_info->type_class != TC_ARRAY) {
+                        fprintf(stderr, "generate_node_code: Invalid type class for array indexing\n");
+                        exit(EXIT_FAILURE);
+                    }
+                    assert(identifier->type_info->info.info_array->subtype->type_class == TC_BASIC);
+                    basic_type_t array_type = identifier->type_info->info.info_array->subtype->info.info_basic;
+                    size_t loc_addr = new_temp(array_type);
+                    size_t index_addr = generate_indexing(list, indexing_node);
+                    tac_emit(list, TAC_LOCOF, arr_addr, 0, loc_addr);
+                    tac_emit(list, TAC_STORE, src_addr, loc_addr, index_addr);
+                } else {
+                    fprintf(stderr, "generate_node_code: Unhandled assignment LHS type %s\n", NODE_TYPE_NAMES[node->children[0]->type]);
+                    exit(EXIT_FAILURE);
+                }
             }
             break;
         case IF_STATEMENT:
@@ -259,6 +286,29 @@ static size_t generate_valued_code(tac_t** list, node_t* node) {
                 return generate_valued_code(list, node->children[0]);
             }
             break;
+        case ARRAY_INDEXING:
+            {
+                node_t* identifier = node->children[0];
+
+                size_t arr_addr = get_symbol_addr(identifier->symbol);
+                if (identifier->type_info->type_class != TC_ARRAY) {
+                    fprintf(stderr, "generate_node_code: Invalid type class for array indexing\n");
+                    exit(EXIT_FAILURE);
+                }
+                assert(identifier->type_info->info.info_array->subtype->type_class == TC_BASIC);
+                basic_type_t array_type = identifier->type_info->info.info_array->subtype->info.info_basic;
+
+                size_t loc_addr = new_temp(array_type);
+                size_t index_addr = generate_indexing(list, node);
+
+                tac_emit(list, TAC_LOCOF, arr_addr, 0, loc_addr);
+
+                size_t dst_addr = new_temp(array_type);
+
+                tac_emit(list, TAC_LOAD, loc_addr, index_addr, dst_addr);
+                return dst_addr;
+            }
+            break;
         default:
             fprintf(stderr, "generate_valued_code: Unhandled node type: %s\n", NODE_TYPE_NAMES[node->type]);
             exit(EXIT_FAILURE);
@@ -351,6 +401,7 @@ static instruction_t instr_from_node_operator(operator_t op) {
         case BINARY_DIV: return TAC_BINARY_DIV;
         case BINARY_GT: return TAC_BINARY_GT;
         case BINARY_LT: return TAC_BINARY_LT;
+        case BINARY_EQ: return TAC_BINARY_EQ;
         case UNARY_SUB: return TAC_UNARY_SUB;
         case UNARY_NEG: return TAC_UNARY_NEG;
         default:
@@ -378,8 +429,14 @@ static size_t get_symbol_addr(symbol_t* symbol) {
 
     if (symbol->type != SYMBOL_FUNCTION) {
         assert(symbol->node != NULL);
-        assert((symbol->node->type_info->type_class == TC_BASIC) && "Can only process basic type");
-        addr.type_info = symbol->node->type_info->info.info_basic;
+
+        if (symbol->node->type_info->type_class == TC_ARRAY) {
+            assert(symbol->node->type_info->info.info_array->subtype->type_class == TC_BASIC);
+            addr.type_info = symbol->node->type_info->info.info_array->subtype->info.info_basic;
+        } else {
+            assert((symbol->node->type_info->type_class == TC_BASIC) && "Can only process basic type");
+            addr.type_info = symbol->node->type_info->info.info_basic;
+        }
     }
 
     da_append(&addr_list, addr);
@@ -401,6 +458,39 @@ static void generate_cast_expr(tac_t** list, type_info_t* info_src, size_t addr_
         return;
     } 
     assert(false && "Unhandled cast expr gen");
+}
+
+static size_t generate_indexing(tac_t** list, node_t* array_indexing) {
+    // int[10, 20, 30] arr
+    // idx1 * 20 * 30 + idx2 * 30 + idx3?
+    // t1 = idx3
+    // t2 = 30
+    //
+    type_info_t* type_info = array_indexing->children[0]->type_info;
+    assert(type_info->type_class == TC_ARRAY);
+    type_array_t* array_info = type_info->info.info_array;
+    node_t* indexing_list = array_indexing->children[1];
+
+    long mul = 1;
+    long prev_idx = -1;
+    for (long i = (long)da_size(array_info->dims) - 1; i >= 0; --i) {
+        size_t idx_addr = generate_valued_code(list, indexing_list->children[i]);
+        if (mul > 1) {
+            size_t tmp = new_temp(TYPE_INT);
+            tac_emit(list, TAC_BINARY_MUL, idx_addr, new_int_const(mul), tmp);
+            idx_addr = tmp;
+        }
+        if (prev_idx == -1) {
+            prev_idx = idx_addr;
+        } else {
+            size_t tmp = new_temp(TYPE_INT);
+            tac_emit(list, TAC_BINARY_ADD, prev_idx, idx_addr, tmp);
+            prev_idx = tmp;
+        }
+        mul *= array_info->dims[i];
+    }
+    assert(prev_idx != -1);
+    return prev_idx;
 }
 
 void print_tac_addr(size_t addr_idx) {

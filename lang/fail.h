@@ -22,7 +22,7 @@ void print_visual_node_error(FILE* stream, node_t* node);
     } while (0);
 
 
-
+char* location_str(location_t loc);
 
 void fail_token(token_t);
 void fail_token_expected(token_t, token_type_t);

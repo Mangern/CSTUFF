@@ -34,8 +34,8 @@ struct type_info_t {
 };
 
 struct type_array_t {
-    size_t count;
     type_info_t* subtype;
+    size_t* dims;
 };
 
 struct type_named_t {

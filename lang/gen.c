@@ -66,11 +66,27 @@ static void generate_global_variables() {
         type_info_t* type = sym->node->type_info;
         assert(type != NULL);
 
-        // TODO
-        assert((type->type_class == TC_BASIC) && "I can only generate basic types:(");
+        switch (type->type_class) {
+            case TC_BASIC:
+                {
+                    size_t size = 8;
+                    DIRECTIVE(".%s: .zero %zu", sym->name, size);
+                }
+                break;
+            case TC_ARRAY:
+                {
+                    size_t total_size = 1;
+                    for (size_t j = 0; j < da_size(type->info.info_array->dims); ++j) {
+                        total_size *= type->info.info_array->dims[j];
+                    }
+                    total_size *= 8;
+                    DIRECTIVE(".%s: .zero %zu", sym->name, total_size);
+                }
+                break;
+            default:
+                assert(false && "Not implemented");
+        }
 
-        size_t size = 8;
-        DIRECTIVE(".%s: .zero %zu", sym->name, size);
     }
 }
 
@@ -259,6 +275,7 @@ static void generate_tac(tac_t tac) {
     case TAC_BINARY_DIV:
     case TAC_BINARY_GT:
     case TAC_BINARY_LT:
+    case TAC_BINARY_EQ:
         {
             char* SRC1_REG = RAX;
             char* SRC2_REG = RCX;
@@ -318,6 +335,15 @@ static void generate_tac(tac_t tac) {
                     SETL(AL);
                     MOVZBQ(AL, SRC1_REG);
                     break;
+                case TAC_BINARY_EQ:
+                    if (is_float) {
+                        EMIT("comisd %s, %s", SRC2_REG, SRC1_REG);
+                    } else {
+                        CMPQ(SRC2_REG, SRC1_REG);
+                    }
+                    SETE(AL);
+                    MOVZBQ(AL, SRC1_REG);
+                    break;
                 default:
                     assert(false);
             }
@@ -330,7 +356,7 @@ static void generate_tac(tac_t tac) {
             addr_t called_addr = addr_list[tac.src1];
             symbol_t* called_func = called_addr.data.symbol;
             if (called_func->is_builtin) {
-                if (strcmp(called_func->name, "print") == 0) {
+                if (strncmp(called_func->name, "print", 5) == 0) {
                     addr_t addr_arg_list = addr_list[tac.src2];
 
                     for (size_t i = 0; i < da_size(addr_arg_list.data.arg_addr_list); ++i) {
@@ -360,8 +386,10 @@ static void generate_tac(tac_t tac) {
                         EMIT("call safe_printf");
                     }
                         
-                    MOVQ("$'\\n'", RDI);
-                    EMIT("call safe_putchar");
+                    if (strncmp(called_func->name, "println", 7) == 0) {
+                        MOVQ("$'\\n'", RDI);
+                        EMIT("call safe_putchar");
+                    }
                 } else {
                     assert(false && "Not implemented");
                 }
@@ -436,9 +464,51 @@ static void generate_tac(tac_t tac) {
             MOVQ(RAX, generate_addr_access(tac.dst));
         }
         break;
+    case TAC_LOCOF:
+        {
+            EMIT("leaq %s, %s", generate_addr_access(tac.src1), RAX);
+            MOVQ(RAX, generate_addr_access(tac.dst));
+        }
+        break;
+    case TAC_STORE:
+        {
+            // src1 -> src2[dst]
+            // Load base of array
+            MOVQ(generate_addr_access(tac.src2), RAX);
+
+            // load index of array
+            MOVQ(generate_addr_access(tac.dst), RCX);
+
+            // store exact memory location in rax
+            // TODO: size??
+            EMIT("leaq (%s, %s, 8), %s", RAX, RCX, RAX);
+
+            // What we want to store
+            MOVQ(generate_addr_access(tac.src1), RCX);
+
+            MOVQ(RCX, MEM(RAX));
+        }
+        break;
+    case TAC_LOAD:
+        {
+            // src1[src2] -> dst
+            // Load base
+            MOVQ(generate_addr_access(tac.src1), RAX);
+
+            // Load index
+            MOVQ(generate_addr_access(tac.src2), RCX);
+
+            // store exact location
+            EMIT("leaq (%s, %s, 8), %s", RAX, RCX, RAX);
+
+            MOVQ(MEM(RAX), RCX);
+
+            MOVQ(RCX, generate_addr_access(tac.dst));
+        }
+        break;
     case TAC_UNARY_SUB:
     case TAC_UNARY_NEG:
-      break;
+        assert(false && "not implemented");
     }
 }
 

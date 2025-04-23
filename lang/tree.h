@@ -10,6 +10,7 @@ typedef enum {
     LIST,
     VARIABLE_DECLARATION, // children: [typename, identifier] | [typename, identifier, expression]
     TYPENAME,             // leaf
+    ARRAY_TYPE,           // children: [typename, list[int_literal]]
     IDENTIFIER,
     FUNCTION_DECLARATION, // children: [identifier, list[variable_declaration], typename, block]
     BLOCK,                // children: [block | return_statement | function_call | variable_declaration]
@@ -20,10 +21,11 @@ typedef enum {
     PARENTHESIZED_EXPRESSION, // children: [expression | parenthesized_expression]
     FUNCTION_CALL,            // children: [identifier, list[expression]]
     RETURN_STATEMENT,      // children: [expression]
-    ASSIGNMENT_STATEMENT,  // children: [identifier, expression]
+    ASSIGNMENT_STATEMENT,  // children: [identifier, expression] | [array_indexing, expression]
     CAST_EXPRESSION,       // children: [typename, expression]
     IF_STATEMENT,           // children: [expression, block] | [expression, block, block]
-    WHILE_STATEMENT
+    WHILE_STATEMENT,
+    ARRAY_INDEXING,         // children: [identifier, list[expression]]
 } node_type_t;
 
 enum operator_t {
@@ -33,6 +35,7 @@ enum operator_t {
     BINARY_DIV, // 1
     BINARY_GT,  // 3
     BINARY_LT,  // 3
+    BINARY_EQ,  // 3
     UNARY_SUB, // -
     UNARY_NEG, // !
 };

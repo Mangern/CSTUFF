@@ -13,6 +13,7 @@ enum instruction_t {
     TAC_BINARY_DIV,
     TAC_BINARY_GT,
     TAC_BINARY_LT,
+    TAC_BINARY_EQ,
     TAC_UNARY_SUB, // -
     TAC_UNARY_NEG, // !
     TAC_CALL_VOID, // call function src1 without return value. src2 stores arg list
@@ -21,6 +22,9 @@ enum instruction_t {
     TAC_CAST_REAL_INT,
     TAC_IF_FALSE, // ifFalse(src1) goto dst (label)
     TAC_GOTO, // unconditional jmp to dst
+    TAC_LOCOF, // store location of src1 into dst
+    TAC_LOAD, // load src1[src2] -> dst. src1: location
+    TAC_STORE, // store src1 -> src2[dst]. src2: location
 };
 
 enum addr_type_t {

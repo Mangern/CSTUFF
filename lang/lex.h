@@ -23,6 +23,7 @@ typedef enum {
     LEX_REAL,
     LEX_OPERATOR,
     LEX_STRING,
+    LEX_CHAR,
     LEX_CAST,
     LEX_IF,
     LEX_ELSE,

@@ -1,5 +1,6 @@
 #include "lex.h"
 #include "da.h"
+#include "fail.h"
 #include <ctype.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -25,6 +26,7 @@ char* TOKEN_TYPE_NAMES[] = {
     "real literal",
     "operator",
     "string literal",
+    "char literal",
     "cast",
     "if",
     "else",
@@ -142,7 +144,7 @@ token_t lexer_peek() {
         current_token.end_offset = content_ptr + match_len;
     } else {
         // TODO: line number information
-        fprintf(stderr, "Unexpected character: '%c' at position %d\n", content[content_ptr], content_ptr);
+        fprintf(stderr, "%s: Unexpected character '%c'\n", location_str(lexer_offset_location(content_ptr)), content[content_ptr]);
         exit(1);
     }
     return current_token;
@@ -246,11 +248,30 @@ static size_t matches_string() {
     }
     if (ptr >= content_size) {
         fprintf(stderr, "Unexpected EOF when parsing string literal\n");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
     ++ptr;
     return ptr - content_ptr;
 }
+
+/*
+static size_t matches_char() {
+    if (content[content_ptr] != '\'')return 0;
+    int ptr = content_ptr + 1;
+    while (ptr < content_size && content[ptr] != '\'') {
+        if (content[ptr] == '\\')
+            ptr += 2;
+        else
+            ptr += 1;
+    }
+    if (ptr >= content_size) {
+        fprintf(stderr, "Unexpected EOF when parsing char literal\n");
+        exit(EXIT_FAILURE);
+    }
+    ++ptr;
+    return ptr - content_ptr;
+}
+*/
 
 static size_t matches_operator() {
     // TODO: *=, **
@@ -277,6 +298,13 @@ static size_t matches_operator() {
                 if (content_ptr + 1 >= content_size) return 1;
                 //if (content[content_ptr+1] == c || content[content_ptr+1] == '=') return 2;
                 return 1;
+            }
+        // double char operators
+        case '=':
+            {
+                if (content_ptr + 1 >= content_size) return 0;
+                if (content[content_ptr + 1] == c) return 2;
+                return 0;
             }
         default:
             return 0;

@@ -11,6 +11,7 @@ char* NODE_TYPE_NAMES[] = {
     "LIST",
     "VARIABLE_DECLARATION",
     "TYPENAME",
+    "ARRAY_TYPE",
     "IDENTIFIER",
     "FUNCTION_DECLARATION",
     "BLOCK",
@@ -25,6 +26,7 @@ char* NODE_TYPE_NAMES[] = {
     "CAST_EXPRESSION",
     "IF_STATEMENT",
     "WHILE_STATEMENT",
+    "ARRAY_INDEXING",
 };
 
 char* OPERATOR_TYPE_NAMES[] = {
@@ -34,6 +36,7 @@ char* OPERATOR_TYPE_NAMES[] = {
     "binary_div",
     "binary_gt",
     "binary_lt",
+    "binary_eq",
     "unary_sub",
     "unary_neg"
 };

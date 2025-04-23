@@ -18,7 +18,7 @@ void print_node_location(FILE* stream, node_t* node) {
         return;
     }
     location_t loc = lexer_offset_location(node->pos.begin_offset);
-    fprintf(stream, "%s:%d:%d: ", CURRENT_FILE_NAME, loc.line+1, loc.character+1);
+    fprintf(stream, "%s: ", location_str(loc));
 }
 
 //  9 | void foo() {
@@ -46,17 +46,24 @@ void print_visual_node_error(FILE* stream, node_t* node) {
     }
 }
 
+char* location_str(location_t loc) {
+    static char BUFFER[1024];
+    snprintf(BUFFER, sizeof BUFFER, "%s:%d:%d", CURRENT_FILE_NAME, loc.line+1, loc.character + 1);
+
+    return BUFFER;
+}
+
 void fail_token(token_t token) {
     location_t loc;
     loc = lexer_offset_location(token.begin_offset);
-    fprintf(stderr, "%s:%d:%d: Unexpected token '%s'\n", CURRENT_FILE_NAME, loc.line+1, loc.character+1, TOKEN_TYPE_NAMES[token.type]);
+    fprintf(stderr, "%s: Unexpected token '%s'\n", location_str(loc), TOKEN_TYPE_NAMES[token.type]);
     exit(1);
 }
 
 void fail_token_expected(token_t token, token_type_t expected) {
     location_t loc;
     loc = lexer_offset_location(token.begin_offset);
-    fprintf(stderr, "%s:%d:%d: Expected '%s', got '%s'\n", CURRENT_FILE_NAME, loc.line+1, loc.character+1, TOKEN_TYPE_NAMES[expected], TOKEN_TYPE_NAMES[token.type]);
+    fprintf(stderr, "%s: Expected '%s', got '%s'\n",location_str(loc),  TOKEN_TYPE_NAMES[expected], TOKEN_TYPE_NAMES[token.type]);
     exit(1);
 }
 
