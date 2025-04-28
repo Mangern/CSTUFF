@@ -301,6 +301,7 @@ static size_t matches_operator() {
             }
         // double char operators
         case '=':
+        case ':': // note: walrus is not an operator
             {
                 if (content_ptr + 1 >= content_size) return 0;
                 if (content[content_ptr + 1] == c) return 2;

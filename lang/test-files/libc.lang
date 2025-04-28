@@ -1,0 +1,3 @@
+main := () -> void {
+    libc::puts("Hello World");
+}

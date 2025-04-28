@@ -1,7 +1,7 @@
 main := () -> void {
     int x := 34;
     int y := 30;
-    real z := 2.0 + 3.0;
-    print(x + y + cast(int, z));
-    print("hello", "world!");
+    int z := cast(int, 2.0 + 3.0) + x * (y - x + y - (2 * x));
+    println(x + y + z);
+    println("hello", "world!");
 }

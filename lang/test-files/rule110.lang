@@ -45,8 +45,7 @@ main := () -> void {
                 rgt := pat[i+1];
             }
 
-            int idx := 4 * lft + 2 * mid + rgt;
-            npat[i] := TABLE[idx];
+            npat[i] := TABLE[4 * lft + 2 * mid + rgt];
             i := i + 1;
         }
 
