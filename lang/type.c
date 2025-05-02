@@ -116,6 +116,12 @@ static void register_type_node(node_t* node) {
                 return;
             }
             break;
+        case BOOL_LITERAL:
+            {
+                node->type_info = create_basic(TYPE_BOOL);
+                return;
+            }
+            break;
         case FUNCTION_DECLARATION:
             {
                 // Return type

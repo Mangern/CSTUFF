@@ -1,7 +1,11 @@
 main := () -> void {
     if (2 < 1) {
-        print(420.0);
+        println(420.0);
     } else {
-        print(1, 2, 3, 69.0);
+        println(1, 2, 3, 69.0);
     }
+
+    real a := 34.0;
+    real b := 2.0 * 17.0 + 1.0;
+    println(a+b);
 }

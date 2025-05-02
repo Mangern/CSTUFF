@@ -19,6 +19,7 @@ char* NODE_TYPE_NAMES[] = {
     "INTEGER_LITERAL",
     "REAL_LITERAL",
     "STRING_LITERAL",
+    "BOOL_LITERAL",
     "PARENTHESIZED_EXPRESSION",
     "FUNCTION_CALL",
     "RETURN_STATEMENT",
@@ -72,6 +73,8 @@ static void print_tree_impl(node_t* node, int indent) {
         printf(" (%ld)", node->data.int_literal_value);
     } else if (node->type == STRING_LITERAL) {
         printf(" (%s)", global_string_list[node->data.string_literal_idx]);
+    } else if (node->type == BOOL_LITERAL) {
+        printf(" (%s)", node->data.bool_literal_value ? "true" : "false");
     } else if (node->type == TYPENAME) {
         printf(" (%s)", node->data.typename_str);
     }

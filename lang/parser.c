@@ -412,7 +412,7 @@ static node_t* parse_expression() {
         } else {
             fail_token(token);
         }
-    } else if (token.type == LEX_INTEGER || token.type == LEX_REAL || token.type == LEX_STRING) {
+    } else if (token.type == LEX_INTEGER || token.type == LEX_REAL || token.type == LEX_STRING || token.type == LEX_TRUE || token.type == LEX_FALSE) {
         node_t* node = node_create_leaf(INTEGER_LITERAL, token);
         // TODO: unnecessary malloc
         if (token.type == LEX_INTEGER) {
@@ -427,6 +427,12 @@ static node_t* parse_expression() {
             char* literal_str = lexer_substring(token.begin_offset, token.end_offset);
             node->data.real_literal_value = atof(literal_str);
             free(literal_str);
+        } else if (token.type == LEX_TRUE) {
+            node->type = BOOL_LITERAL;
+            node->data.bool_literal_value = true;
+        } else if (token.type == LEX_FALSE) {
+            node->type = BOOL_LITERAL;
+            node->data.bool_literal_value = false;
         } else {
             assert(false && "Not implemented");
         }

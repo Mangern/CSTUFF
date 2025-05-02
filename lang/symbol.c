@@ -138,6 +138,7 @@ static void bind_references(symbol_table_t* local_symbols, node_t* node) {
         case WHILE_STATEMENT:
         case ARRAY_INDEXING:
         case LIST:
+        case BOOL_LITERAL:
             {
                 for (size_t i = 0; i < da_size(node->children); ++i) {
                     bind_references(local_symbols, node->children[i]);

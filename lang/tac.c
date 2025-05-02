@@ -51,6 +51,7 @@ static size_t new_temp(basic_type_t);
 static size_t new_int_const(long);
 static size_t new_real_const(double);
 static size_t new_string_idx_const(size_t);
+static size_t new_bool_const(bool);
 static size_t new_label_ref(size_t);
 static size_t new_arg_list();
 
@@ -231,6 +232,11 @@ static size_t generate_valued_code(tac_t** list, node_t* node) {
                 return new_string_idx_const(node->data.string_literal_idx);
             }
             break;
+        case BOOL_LITERAL:
+            {
+                return new_bool_const(node->data.bool_literal_value);
+            }
+            break;
         case CAST_EXPRESSION:
             {
                 size_t to_cast_addr = generate_valued_code(list, node->children[1]);
@@ -368,6 +374,17 @@ static size_t new_string_idx_const(size_t string_idx) {
         .type = ADDR_STRING_CONST,
         .type_info = TYPE_STRING,
         .data.string_idx_const = string_idx
+    };
+    da_append(&addr_list, addr);
+    return idx;
+}
+
+static size_t new_bool_const(bool value) {
+    size_t idx = da_size(addr_list);
+    addr_t addr = (addr_t) {
+        .type = ADDR_BOOL_CONST,
+        .type_info = TYPE_BOOL,
+        .data.bool_const = value
     };
     da_append(&addr_list, addr);
     return idx;
@@ -520,6 +537,11 @@ void print_tac_addr(size_t addr_idx) {
         case ADDR_STRING_CONST:
             {
                 printf("#s%zu [%s]", addr.data.string_idx_const, global_string_list[addr.data.string_idx_const]);
+            }
+            break;
+        case ADDR_BOOL_CONST:
+            {
+                printf("#%s", addr.data.bool_const ? "true" : "false");
             }
             break;
         case ADDR_LABEL:

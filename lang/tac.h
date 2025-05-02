@@ -4,6 +4,8 @@
 #include "langc.h"
 #include "type.h"
 
+#include <stdbool.h>
+
 enum instruction_t {
     TAC_NOP,
     TAC_RETURN, // src1: addr to return
@@ -33,6 +35,7 @@ enum addr_type_t {
     ADDR_INT_CONST,
     ADDR_REAL_CONST,
     ADDR_STRING_CONST,
+    ADDR_BOOL_CONST,
     ADDR_LABEL,
     ADDR_TEMP,
     ADDR_ARG_LIST
@@ -46,6 +49,7 @@ struct addr_t {
         long int_const;
         double real_const;
         size_t string_idx_const;
+        bool bool_const;
         long temp_id;
         size_t label;
         size_t* arg_addr_list; // TODO: unsure if want to store types or values

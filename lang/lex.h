@@ -28,6 +28,8 @@ typedef enum {
     LEX_IF,
     LEX_ELSE,
     LEX_WHILE,
+    LEX_TRUE,
+    LEX_FALSE,
     LEX_END
 } token_type_t;
 

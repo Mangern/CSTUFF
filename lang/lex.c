@@ -31,6 +31,8 @@ char* TOKEN_TYPE_NAMES[] = {
     "if",
     "else",
     "while",
+    "true",
+    "false",
     "EOF"
 };
 
@@ -93,6 +95,12 @@ token_t lexer_peek() {
         current_token.end_offset = content_ptr + 4;
     } else if (matches_prefix_word("while")) {
         current_token.type = LEX_WHILE;
+        current_token.end_offset = content_ptr + 5;
+    } else if (matches_prefix_word("true")) {
+        current_token.type = LEX_TRUE;
+        current_token.end_offset = content_ptr + 4;
+    } else if (matches_prefix_word("false")) {
+        current_token.type = LEX_FALSE;
         current_token.end_offset = content_ptr + 5;
     } else if ((match_len = matches_typename())) {
         current_token.type = LEX_TYPENAME;

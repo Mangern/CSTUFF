@@ -99,6 +99,7 @@ static void generate_constants() {
                 DIRECTIVE("CONST%zu: .quad %ld", i, *(long*)&addr.data.real_const);
                 break;
             case ADDR_INT_CONST:
+            case ADDR_BOOL_CONST:
             case ADDR_UNUSED:
             case ADDR_SYMBOL:
             case ADDR_STRING_CONST:
@@ -154,6 +155,7 @@ static void generate_function(function_code_t func_code) {
         case ADDR_INT_CONST:
         case ADDR_REAL_CONST:
         case ADDR_STRING_CONST:
+        case ADDR_BOOL_CONST:
           break;
         }
     }
@@ -218,6 +220,11 @@ static const char* generate_addr_access(size_t addr_idx) {
         case ADDR_INT_CONST:
             {
                 snprintf(result, sizeof result, "$%ld", addr.data.int_const);
+            }
+            break;
+        case ADDR_BOOL_CONST:
+            {
+                snprintf(result, sizeof result, "$%d", addr.data.bool_const);
             }
             break;
         case ADDR_REAL_CONST:
@@ -527,10 +534,24 @@ static void preprocess_tac_list(tac_t* tac_list) {
     }
 
     for (size_t i = 0; i < da_size(tac_list); ++i) {
+        printf("%zu ", i);
+        fflush(stdout);
         tac_t tac = tac_list[i];
-        if (tac.src1 != 0)da_append(&current_used_addrs, tac.src1);
-        if (tac.src2 != 0)da_append(&current_used_addrs, tac.src2);
-        if (tac.dst != 0)da_append(&current_used_addrs, tac.dst);
+        printf("%zu %p ", tac.src1, &current_used_addrs[-3]);
+        fflush(stdout);
+        if (tac.src1 != 0) {
+            da_append(&current_used_addrs, tac.src1);
+        }
+        printf("%zu %p ", tac.src2, &current_used_addrs[-3]);
+        fflush(stdout);
+        if (tac.src2 != 0) {
+            da_append(&current_used_addrs, tac.src2);
+        }
+        printf("%zu %p\n", tac.dst, &current_used_addrs[-3]);
+        fflush(stdout);
+        if (tac.dst != 0) {
+            da_append(&current_used_addrs, tac.dst);
+        }
 
         if (addr_list[tac.dst].type == ADDR_LABEL) {
             is_jmp_dst[addr_list[tac.dst].data.label] = 1;
