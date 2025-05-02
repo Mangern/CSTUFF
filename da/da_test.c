@@ -87,10 +87,26 @@ void da_resize_test() {
     }
 }
 
+static size_t* test_arr = 0;
+void da_test_2() {
+    test_arr = da_init(size_t);
+
+    for (size_t i = 0; i <= 128; ++i) {
+        da_append(&test_arr, i);
+        da_append(&test_arr, i);
+        da_append(&test_arr, i);
+    }
+
+    for (size_t i = 0; i < da_size(test_arr); ++i) {
+        printf("%zu%c", test_arr[i], " \n"[i==da_size(test_arr)-1]);
+    }
+}
+
 int main() {
     da_int_test();
     da_string_test();
     da_indexof_test();
     da_resize_test();
+    da_test_2();
     return 0;
 }
