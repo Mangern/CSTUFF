@@ -35,11 +35,11 @@ void* da_reserve_impl(void*, size_t, size_t);
     (arr)[da_header(arr)->size++] = x;\
     } while (0);
 
-#define da_size(arr) da_header(arr)->size
+#define da_size(arr) ((arr) ? da_header(arr)->size : 0)
 
 #define da_pop(arr) (arr)[--da_header(arr)->size]
 
-#define da_clear(arr) da_header(arr)->size = 0
+#define da_clear(arr) if (arr) { da_header(arr)->size = 0; }
 
 #define da_deinit(arr) if (arr) { free(da_header(arr)); }
 
