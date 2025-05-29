@@ -299,6 +299,7 @@ static size_t matches_operator() {
         case '*':
         case '<':
         case '>':
+        case '%':
             {
                 if (content_ptr + 1 >= content_size) return 1;
                 //if (content[content_ptr+1] == c || content[content_ptr+1] == '=') return 2;

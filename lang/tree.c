@@ -7,6 +7,21 @@
 
 node_t* root;
 
+// This is the values from 
+// https://www.cppreference.com/w/c/language/operator_precedence.html
+const int OPERATOR_PRECEDENCE[] = {
+    4,
+    4,
+    3,
+    3,
+    3,
+    6,
+    6,
+    7,
+    2,
+    2
+};
+
 char* NODE_TYPE_NAMES[] = {
     "LIST",
     "VARIABLE_DECLARATION",
@@ -35,6 +50,7 @@ char* OPERATOR_TYPE_NAMES[] = {
     "binary_sub",
     "binary_mul",
     "binary_div",
+    "binary_mod",
     "binary_gt",
     "binary_lt",
     "binary_eq",

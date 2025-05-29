@@ -30,17 +30,21 @@ typedef enum {
 } node_type_t;
 
 enum operator_t {
-    BINARY_ADD, // 2
-    BINARY_SUB, // 2
-    BINARY_MUL, // 1
-    BINARY_DIV, // 1
-    BINARY_GT,  // 3
-    BINARY_LT,  // 3
-    BINARY_EQ,  // 3
-    UNARY_SUB, // -
-    UNARY_NEG, // !
+    BINARY_ADD = 0,
+    BINARY_SUB,
+    BINARY_MUL,
+    BINARY_DIV,
+    BINARY_MOD,
+    BINARY_GT, 
+    BINARY_LT, 
+    BINARY_EQ, 
+    UNARY_SUB, 
+    UNARY_NEG, 
 };
 
+// This is the values from 
+// https://www.cppreference.com/w/c/language/operator_precedence.html
+extern const int OPERATOR_PRECEDENCE[];
 extern char* NODE_TYPE_NAMES[];
 extern char* OPERATOR_TYPE_NAMES[];
 

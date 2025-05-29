@@ -287,20 +287,7 @@ static node_t* parse_typename() {
 }
 
 static bool has_precedence(operator_t operator_1, operator_t operator_2) {
-    if (operator_1 == BINARY_MUL || operator_1 == BINARY_DIV) {
-        return operator_2 != BINARY_MUL && operator_2 != BINARY_DIV;
-    }
-    if (operator_2 == BINARY_MUL || operator_2 == BINARY_DIV)
-        return false;
-
-    if (operator_1 == BINARY_ADD || operator_1 == BINARY_SUB) {
-        return operator_2 != BINARY_ADD && operator_2 != BINARY_SUB;
-    }
-
-    if (operator_2 == BINARY_ADD || operator_2 == BINARY_SUB)
-        return false;
-
-    return false;
+    return OPERATOR_PRECEDENCE[operator_1] < OPERATOR_PRECEDENCE[operator_2];
 }
 
 // Find the correct place in `rhs` to insert `lhs`, preserving operator precedence.
@@ -332,6 +319,8 @@ static operator_t parse_operator_str(char* operator_str, bool binary) {
             return BINARY_MUL;
         } else if (strcmp(operator_str, "/") == 0) {
             return BINARY_DIV;
+        } else if (strcmp(operator_str, "%") == 0) {
+            return BINARY_MOD;
         } else if (strcmp(operator_str, ">") == 0) {
             return BINARY_GT;
         } else if (strcmp(operator_str, "<") == 0) {

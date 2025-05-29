@@ -279,6 +279,7 @@ static void generate_tac(tac_t tac) {
     case TAC_BINARY_SUB:
     case TAC_BINARY_MUL:
     case TAC_BINARY_DIV:
+    case TAC_BINARY_MOD:
     case TAC_BINARY_GT:
     case TAC_BINARY_LT:
     case TAC_BINARY_EQ:
@@ -321,6 +322,16 @@ static void generate_tac(tac_t tac) {
                     } else {
                         CQO; // sign extend rax to rdx:rax
                         IDIVQ(SRC2_REG); // rdx:rax /= rcx
+                    }
+                    break;
+                case TAC_BINARY_MOD:
+                    if (is_float) {
+                        fprintf(stderr, "Cannot mod floats\n");
+                        exit(EXIT_FAILURE);
+                    } else {
+                        CQO;
+                        IDIVQ(SRC2_REG); // rdx:rax /= rcx
+                        MOVQ(RDX, SRC1_REG);
                     }
                     break;
                 case TAC_BINARY_GT:

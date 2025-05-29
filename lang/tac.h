@@ -13,6 +13,7 @@ enum instruction_t {
     TAC_BINARY_SUB,
     TAC_BINARY_MUL,
     TAC_BINARY_DIV,
+    TAC_BINARY_MOD,
     TAC_BINARY_GT,
     TAC_BINARY_LT,
     TAC_BINARY_EQ,

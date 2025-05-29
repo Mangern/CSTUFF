@@ -197,6 +197,7 @@ static void register_type_node(node_t* node) {
                     case BINARY_SUB:
                     case BINARY_MUL:
                     case BINARY_DIV:
+                    case BINARY_MOD:
                         {
                             switch(node->data.operator) {
                                 case BINARY_ADD:
@@ -210,6 +211,9 @@ static void register_type_node(node_t* node) {
                                     break;
                                 case BINARY_DIV:
                                     opstr = "divide";
+                                    break;
+                                case BINARY_MOD:
+                                    opstr = "mod";
                                     break;
                                 default:
                                     assert(false);
