@@ -1,0 +1,14 @@
+// TODO: modulo operator
+main := () -> void {
+    int num := 600851475143;
+
+    int i := 2;
+
+    int ans := num;
+    while (!(i * i > num)) {
+        if (num % i == 0) {
+            ans := num / i;
+        }
+        i := i + 1;
+    }
+}

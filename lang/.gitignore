@@ -1,3 +1,6 @@
 *.o
 langc
 *.S
+lexer-test
+parser-test
+symbol-type-test

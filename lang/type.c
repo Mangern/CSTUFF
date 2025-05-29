@@ -138,7 +138,7 @@ static void register_type_node(node_t* node) {
                 // Declarations in arg_list
                 for (size_t i = 0; i < da_size(node->children[1]->children); ++i) {
                     register_type_node(node->children[1]->children[i]);
-                    da_append(&node->type_info->info.info_function->arg_types->elems, node->children[1]->children[i]->type_info);
+                    da_append(node->type_info->info.info_function->arg_types->elems, node->children[1]->children[i]->type_info);
                 }
 
                 // Block
@@ -497,9 +497,9 @@ static type_info_t* create_type_array(type_info_t* subtype, node_t* dim_list_nod
     type_info_t *type_info = malloc(sizeof(type_info_t));
     type_info->type_class = TC_ARRAY;
     type_info->info.info_array = malloc(sizeof(type_array_t));
-    type_info->info.info_array->dims = da_init(size_t);
+    type_info->info.info_array->dims = 0;
     for (size_t i = 0; i < da_size(dim_list_node->children); ++i) {
-        da_append(&type_info->info.info_array->dims, (size_t)dim_list_node->children[i]->data.int_literal_value);
+        da_append(type_info->info.info_array->dims, (size_t)dim_list_node->children[i]->data.int_literal_value);
     }
     type_info->info.info_array->subtype = subtype;
     return type_info;
@@ -507,7 +507,7 @@ static type_info_t* create_type_array(type_info_t* subtype, node_t* dim_list_nod
 
 static type_tuple_t* create_tuple() {
     type_tuple_t* tuple = malloc(sizeof(type_tuple_t));
-    tuple->elems = da_init(type_info_t*);
+    tuple->elems = 0;
     return tuple;
 }
 

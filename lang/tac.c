@@ -10,8 +10,8 @@
 #include "tree.h"
 #include "type.h"
 
-function_code_t* function_codes;
-addr_t* addr_list;
+function_code_t* function_codes = 0;
+addr_t* addr_list = 0;
 
 static char* TAC_INSTRUCTION_NAMES[] = {
     "NOP",
@@ -59,10 +59,8 @@ static instruction_t instr_from_node_operator(operator_t);
 static size_t get_symbol_addr(symbol_t* symbol);
 
 void generate_function_codes() {
-    function_codes = da_init(function_code_t);
-    addr_list = da_init(addr_t);
     // addr 0: UNUSED
-    da_append(&addr_list, (addr_t){.type = ADDR_UNUSED});
+    da_append(addr_list, (addr_t){.type = ADDR_UNUSED});
 
     for (size_t i = 0; i < global_symbol_table->n_symbols; ++i) {
         symbol_t* function_symbol = global_symbol_table->symbols[i];
@@ -73,7 +71,7 @@ void generate_function_codes() {
             continue;
         }
 
-        da_append(&function_codes, generate_function_code(function_symbol));
+        da_append(function_codes, generate_function_code(function_symbol));
     }
 }
 
@@ -82,7 +80,7 @@ static function_code_t generate_function_code(symbol_t* function_symbol) {
     function_code_t ret = (function_code_t){
         .function_symbol = function_symbol,
     };
-    ret.tac_list = da_init(tac_t);
+    ret.tac_list = 0;
     // child idx 3 is BLOCK
     for (size_t i = 0; i < function_symbol->function_symtable->n_symbols; ++i) {
         symbol_t* local_symbol = function_symbol->function_symtable->symbols[i];
@@ -99,7 +97,7 @@ static void generate_function_call_setup(tac_t** list, node_t* node, size_t* add
 
     for (size_t i = 0; i < da_size(node->children[1]->children); ++i) {
         size_t arg_addr = generate_valued_code(list, node->children[1]->children[i]);
-        da_append(&addr_list[*addr_arg_list].data.arg_addr_list, arg_addr);
+        da_append(addr_list[*addr_arg_list].data.arg_addr_list, arg_addr);
     }
 }
 
@@ -330,7 +328,7 @@ static size_t tac_emit(tac_t** list, instruction_t instr, size_t src1, size_t sr
         .src2  = src2,
         .dst   = dst,
     };
-    da_append(list, tac);
+    da_append(*list, tac);
     return insert_idx;
 }
 
@@ -342,7 +340,7 @@ static size_t new_temp(basic_type_t type_info) {
         .type_info = type_info,
         .data.temp_id = tmp_count++
     };
-    da_append(&addr_list, tmp_addr);
+    da_append(addr_list, tmp_addr);
     return idx;
 }
 
@@ -353,7 +351,7 @@ static size_t new_int_const(long value) {
         .type_info = TYPE_INT,
         .data.int_const = value
     };
-    da_append(&addr_list, addr);
+    da_append(addr_list, addr);
     return idx;
 }
 
@@ -364,7 +362,7 @@ static size_t new_real_const(double value) {
         .type_info = TYPE_REAL,
         .data.real_const = value
     };
-    da_append(&addr_list, addr);
+    da_append(addr_list, addr);
     return idx;
 }
 
@@ -375,7 +373,7 @@ static size_t new_string_idx_const(size_t string_idx) {
         .type_info = TYPE_STRING,
         .data.string_idx_const = string_idx
     };
-    da_append(&addr_list, addr);
+    da_append(addr_list, addr);
     return idx;
 }
 
@@ -386,7 +384,7 @@ static size_t new_bool_const(bool value) {
         .type_info = TYPE_BOOL,
         .data.bool_const = value
     };
-    da_append(&addr_list, addr);
+    da_append(addr_list, addr);
     return idx;
 }
 
@@ -396,7 +394,7 @@ static size_t new_label_ref(size_t label) {
         .type = ADDR_LABEL,
         .data.label = label
     };
-    da_append(&addr_list, addr);
+    da_append(addr_list, addr);
     return idx;
 }
 
@@ -405,8 +403,8 @@ static size_t new_arg_list() {
     addr_t addr = (addr_t) {
         .type = ADDR_ARG_LIST
     };
-    addr.data.arg_addr_list = da_init(size_t);
-    da_append(&addr_list, addr);
+    addr.data.arg_addr_list = 0;
+    da_append(addr_list, addr);
     return idx;
 }
 
@@ -456,7 +454,7 @@ static size_t get_symbol_addr(symbol_t* symbol) {
         }
     }
 
-    da_append(&addr_list, addr);
+    da_append(addr_list, addr);
     return idx;
 }
 

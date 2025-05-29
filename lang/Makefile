@@ -13,9 +13,20 @@ da.o: ../da/da.c
 
 .PHONY: lexer-test
 lexer-test: lexer_test.o lex.o da.o fail.o tree.o symbol.o symbol_table.o
-	gcc $(CFLAGS) -o lexer-test $?
-	./lexer-test
+	gcc $(CFLAGS) -o $@ $?
+	./$@
+
+.PHONY: parser-test
+parser-test: parser_test.o lex.o da.o fail.o tree.o symbol.o symbol_table.o parser.o
+	gcc $(CFLAGS) -o $@ $?
+	./$@
+
+.PHONY: symbol-type-test
+symbol-type-test: symbol_type_test.o lex.o da.o fail.o tree.o symbol.o symbol_table.o parser.o type.o
+	gcc $(CFLAGS) -o $@ $?
+	./$@
+
 
 .PHONY: clean
 clean:
-	rm *.o
+	rm *.o lexer-test parser-test symbol-type-test langc *.S

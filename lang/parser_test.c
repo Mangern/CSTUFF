@@ -1,6 +1,11 @@
 #include <stdio.h>
+#include <stdlib.h>
+
 #include "da.h"
 #include "lex.h"
+#include "parser.h"
+#include "symbol.h"
+#include "tree.h"
 
 #define BUFSIZE 1024
 void read_file(const char* file_path, char** content) {
@@ -33,13 +38,7 @@ int main() {
 
     lexer_init(filename, file_content);
 
-    for (;;) {
-        token_t token = lexer_peek();
+    parse();
 
-        printf("%s\n", TOKEN_TYPE_NAMES[token.type]);
-
-        if (token.type == LEX_END) break;
-
-        lexer_advance();
-    }
+    print_tree(root);
 }

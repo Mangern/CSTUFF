@@ -72,7 +72,6 @@ int main(int argc, char** argv) {
 
     lexer_init(argv[optind], file_content);
 
-    /*
     parse();
 
     create_symbol_tables();
@@ -92,7 +91,6 @@ int main(int argc, char** argv) {
     if (opt_emit_asm) {
         generate_program();
     }
-    */
 
     return 0;
 }

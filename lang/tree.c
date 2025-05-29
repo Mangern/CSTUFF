@@ -72,7 +72,11 @@ static void print_tree_impl(node_t* node, int indent) {
     } else if (node->type == INTEGER_LITERAL) {
         printf(" (%ld)", node->data.int_literal_value);
     } else if (node->type == STRING_LITERAL) {
-        printf(" (%s)", global_string_list[node->data.string_literal_idx]);
+        if (global_string_list == NULL) {
+            printf(" (%s)", node->data.string_literal_value);
+        } else {
+            printf(" (%s)", global_string_list[node->data.string_literal_idx]);
+        }
     } else if (node->type == BOOL_LITERAL) {
         printf(" (%s)", node->data.bool_literal_value ? "true" : "false");
     } else if (node->type == TYPENAME) {

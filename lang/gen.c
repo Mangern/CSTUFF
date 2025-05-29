@@ -208,7 +208,6 @@ static long get_addr_rbp_offset(size_t addr_idx) {
                 break;
         }
     }
-    printf("%zu\n", addr_idx);
     assert(false);
 }
 
@@ -526,31 +525,22 @@ int comp_sizet(const void* a, const void* b) {
 static void preprocess_tac_list(tac_t* tac_list) {
     // generate unique sorted list of addrs used in the tac_list
     if (current_used_addrs == 0) {
-        current_used_addrs = da_init(size_t);
         is_jmp_dst = malloc(sizeof(int) * da_size(addr_list));
         memset(is_jmp_dst, 0, sizeof(int) * da_size(addr_list));
     } else {
-        da_clear(&current_used_addrs);
+        da_clear(current_used_addrs);
     }
 
     for (size_t i = 0; i < da_size(tac_list); ++i) {
-        printf("%zu ", i);
-        fflush(stdout);
         tac_t tac = tac_list[i];
-        printf("%zu %p ", tac.src1, &current_used_addrs[-3]);
-        fflush(stdout);
         if (tac.src1 != 0) {
-            da_append(&current_used_addrs, tac.src1);
+            da_append(current_used_addrs, tac.src1);
         }
-        printf("%zu %p ", tac.src2, &current_used_addrs[-3]);
-        fflush(stdout);
         if (tac.src2 != 0) {
-            da_append(&current_used_addrs, tac.src2);
+            da_append(current_used_addrs, tac.src2);
         }
-        printf("%zu %p\n", tac.dst, &current_used_addrs[-3]);
-        fflush(stdout);
         if (tac.dst != 0) {
-            da_append(&current_used_addrs, tac.dst);
+            da_append(current_used_addrs, tac.dst);
         }
 
         if (addr_list[tac.dst].type == ADDR_LABEL) {
@@ -566,7 +556,7 @@ static void preprocess_tac_list(tac_t* tac_list) {
         if (i > ptr && current_used_addrs[ptr] == current_used_addrs[i]) continue;
         current_used_addrs[++ptr] = current_used_addrs[i];
     }
-    da_resize(&current_used_addrs, ptr+1);
+    da_resize(current_used_addrs, ptr+1);
 }
 
 static void generate_safe_putchar(void)
