@@ -28,7 +28,7 @@ void read_file(const char* file_path, char** content) {
 
 int main() {
     char* file_content;
-    char* filename = "./test-files/hello.lang";
+    char* filename = "./test-files/euler3.lang";
     read_file(filename, &file_content);
 
     lexer_init(filename, file_content);

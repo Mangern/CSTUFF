@@ -1,4 +1,7 @@
-// TODO: modulo operator
+// TODO: break, modulo, <=
+
+// Project Euler Problem 3: 
+// - Find the largest prime factor of 600851475143
 main := () -> void {
     int num := 600851475143;
 
@@ -6,9 +9,17 @@ main := () -> void {
 
     int ans := num;
     while (!(i * i > num)) {
-        if (num % i == 0) {
-            ans := num / i;
+        bool flag := true;
+        while (flag) {
+            int div := num / i;
+            if (!(div * i == num)) {
+                flag := false;
+            } else {
+                num := num / i;
+            }
         }
         i := i + 1;
     }
+
+    println(num);
 }

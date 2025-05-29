@@ -512,8 +512,16 @@ static void generate_tac(tac_t tac) {
             MOVQ(RCX, generate_addr_access(tac.dst));
         }
         break;
-    case TAC_UNARY_SUB:
     case TAC_UNARY_NEG:
+        {
+            MOVQ(generate_addr_access(tac.src1), RCX);
+            EMIT("xor %s, %s", RAX, RAX);
+            EMIT("test %s, %s", RCX, RCX);
+            SETE(AL);
+            MOVQ(RAX, generate_addr_access(tac.dst));
+        }
+        break;
+    case TAC_UNARY_SUB:
         assert(false && "not implemented");
     }
 }

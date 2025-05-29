@@ -284,8 +284,8 @@ static size_t matches_operator() {
     char c = content[content_ptr];
     switch (c) {
         // 1 char operators that also makes sense if followed by '='
-        case '/':
         case '!':
+        case '/':
         //case '~':
         //case '^':
             {
@@ -293,7 +293,6 @@ static size_t matches_operator() {
                 //if (content[content_ptr + 1] == '=') return 2;
                 return 1;
             }
-            return 1;
         // 1 char operators that also makes sense if followed by itself or '='
         case '+':
         case '-':
@@ -355,6 +354,8 @@ static void skip_comments() {
             }
             ++content_ptr;
         }
+    } else {
+        return;
     }
     // Keep going until no more comment and no more whitespace
     skip_whitespace();
