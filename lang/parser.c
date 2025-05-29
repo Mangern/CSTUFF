@@ -239,6 +239,14 @@ static node_t* parse_block() {
             peek_expect_advance(LEX_RBRACE);
 
             da_append(block_node->children, while_node);
+        } else if (token.type == LEX_BREAK) {
+            lexer_advance();
+
+            node_t* break_node = node_create(BREAK_STATEMENT);
+
+            da_append(block_node->children, break_node);
+
+            peek_expect_advance(LEX_SEMICOLON);
         } else {
             fail_token(token);
         }

@@ -10,9 +10,9 @@ main := () -> void {
     int ans := num;
     while (!(i * i > num)) {
         while (num % i == 0) {
-            //if (i == num) {
-            //    break;
-            //}
+            if (i == num) {
+                break;
+            }
             num := num / i;
         }
         i := i + 1;

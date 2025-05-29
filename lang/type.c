@@ -423,6 +423,11 @@ static void register_type_node(node_t* node) {
                 node->type_info = create_basic(TYPE_VOID);
             }
             break;
+        case BREAK_STATEMENT:
+            {
+                node->type_info = create_basic(TYPE_VOID);
+            }
+            break;
         default:
             fail("Not implemented type check: %s", NODE_TYPE_NAMES[node->type]);
     }

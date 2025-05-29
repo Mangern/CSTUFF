@@ -1,0 +1,26 @@
+main := () -> void {
+    int i := 0;
+    int j := 0;
+
+    while (i < 5) {
+        break;
+
+        println("Unreachable!!!");
+    }
+
+    while (i < 100) {
+        while (j < 100) {
+            println(i, j);
+
+            if (j == 10) {
+                break;
+            }
+            j := j + 1;
+        }
+        if (i == 10) {
+            break;
+        }
+
+        i := i + 1;
+    }
+}

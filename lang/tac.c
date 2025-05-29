@@ -102,6 +102,8 @@ static void generate_function_call_setup(tac_t** list, node_t* node, size_t* add
     }
 }
 
+static size_t* break_statement_idxs = 0;
+
 static void generate_node_code(tac_t** list, node_t* node) {
     switch (node->type) {
         case BLOCK:
@@ -193,14 +195,29 @@ static void generate_node_code(tac_t** list, node_t* node) {
                 size_t header_start_label = TAC_NEXT_LABEL;
                 size_t cond_addr = generate_valued_code(list, node->children[0]);
                 size_t if_jmp_idx = tac_emit(list, TAC_IF_FALSE, cond_addr, 0, new_label_ref(0));
+
+                size_t curr_break_statement_size = da_size(break_statement_idxs);
+
                 // body
                 generate_node_code(list, node->children[1]);
-                // loop
+                // loop back to head
                 tac_emit(list, TAC_GOTO, 0, 0, new_label_ref(header_start_label));
 
                 size_t loop_end_idx = tac_emit(list, TAC_NOP, 0, 0, 0);
                 // backpatch iffalse jump
                 addr_list[(*list)[if_jmp_idx].dst].data.label = loop_end_idx;
+
+                // backpatch break statements
+                while (da_size(break_statement_idxs) > curr_break_statement_size) {
+                    size_t break_stmt = da_pop(break_statement_idxs);
+                    addr_list[(*list)[break_stmt].dst].data.label = loop_end_idx;
+                }
+            }
+            break;
+        case BREAK_STATEMENT:
+            {
+                size_t idx = tac_emit(list, TAC_GOTO, 0, 0, new_label_ref(0));
+                da_append(break_statement_idxs, idx);
             }
             break;
         default:

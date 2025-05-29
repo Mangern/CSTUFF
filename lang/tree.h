@@ -27,6 +27,7 @@ typedef enum {
     IF_STATEMENT,           // children: [expression, block] | [expression, block, block]
     WHILE_STATEMENT,
     ARRAY_INDEXING,         // children: [identifier, list[expression]]
+    BREAK_STATEMENT
 } node_type_t;
 
 enum operator_t {
@@ -42,8 +43,6 @@ enum operator_t {
     UNARY_NEG, 
 };
 
-// This is the values from 
-// https://www.cppreference.com/w/c/language/operator_precedence.html
 extern const int OPERATOR_PRECEDENCE[];
 extern char* NODE_TYPE_NAMES[];
 extern char* OPERATOR_TYPE_NAMES[];

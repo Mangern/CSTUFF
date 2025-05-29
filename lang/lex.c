@@ -33,6 +33,7 @@ char* TOKEN_TYPE_NAMES[] = {
     "while",
     "true",
     "false",
+    "break",
     "EOF"
 };
 
@@ -99,6 +100,9 @@ token_t lexer_peek() {
         current_token.end_offset = content_ptr + 4;
     } else if (matches_prefix_word("false")) {
         current_token.type = LEX_FALSE;
+        current_token.end_offset = content_ptr + 5;
+    } else if (matches_prefix_word("break")) {
+        current_token.type = LEX_BREAK;
         current_token.end_offset = content_ptr + 5;
     } else if ((match_len = matches_typename())) {
         current_token.type = LEX_TYPENAME;

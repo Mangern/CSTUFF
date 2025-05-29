@@ -43,6 +43,7 @@ char* NODE_TYPE_NAMES[] = {
     "IF_STATEMENT",
     "WHILE_STATEMENT",
     "ARRAY_INDEXING",
+    "BREAK_STATEMENT"
 };
 
 char* OPERATOR_TYPE_NAMES[] = {
