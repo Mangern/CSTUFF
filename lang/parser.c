@@ -30,7 +30,7 @@ void parse() {
     for (;;) {
         node = parse_global_statement();
         if (!node) break;
-        da_append(&root->children, node);
+        da_append(root->children, node);
     }
 }
 
@@ -58,20 +58,20 @@ static node_t* parse_variable_declaration() {
     node_t* typename_node = parse_typename();
 
     node_t* ret = node_create(VARIABLE_DECLARATION);
-    da_append(&ret->children, typename_node);
+    da_append(ret->children, typename_node);
 
     token_t token = peek_expect_advance(LEX_IDENTIFIER);
 
     node_t* child = node_create_leaf(IDENTIFIER, token);
     child->data.identifier_str = lexer_substring(token.begin_offset, token.end_offset);
 
-    da_append(&ret->children, child);
+    da_append(ret->children, child);
 
     token = lexer_peek();
 
     if (token.type == LEX_WALRUS) {
         lexer_advance();
-        da_append(&ret->children, parse_expression());
+        da_append(ret->children, parse_expression());
     }
 
     return ret;
@@ -86,7 +86,7 @@ static node_t* parse_function_declaration() {
     identifier->data.identifier_str = lexer_substring(token.begin_offset, token.end_offset);
 
     node_t* ret = node_create(FUNCTION_DECLARATION);
-    da_append(&ret->children, identifier);
+    da_append(ret->children, identifier);
     lexer_advance();
 
     token = lexer_peek();
@@ -95,7 +95,7 @@ static node_t* parse_function_declaration() {
     lexer_advance();
 
 
-    da_append(&ret->children, parse_arg_list());
+    da_append(ret->children, parse_arg_list());
 
     peek_expect_advance(LEX_ARROW);
     token = peek_expect_advance(LEX_TYPENAME);
@@ -103,7 +103,7 @@ static node_t* parse_function_declaration() {
     node_t* typename_node = node_create_leaf(TYPENAME, token);
     typename_node->data.typename_str = lexer_substring(token.begin_offset, token.end_offset);
 
-    da_append(&ret->children, typename_node);
+    da_append(ret->children, typename_node);
 
     token = lexer_peek();
     if (token.type != LEX_LBRACE)
@@ -119,10 +119,10 @@ static node_t* parse_function_declaration() {
         node_t* fake_return_node = node_create(RETURN_STATEMENT);
         // TODO: check if setting rbrace as location makes sense
         fake_return_node->pos = rbrace_token;
-        da_append(&block->children, fake_return_node);
+        da_append(block->children, fake_return_node);
     }
 
-    da_append(&ret->children, block);
+    da_append(ret->children, block);
     return ret;
 }
 
@@ -133,7 +133,7 @@ static node_t* parse_arg_list() {
     token = lexer_peek();
 
     while (token.type != LEX_RPAREN) {
-        da_append(&ret->children, parse_variable_declaration());
+        da_append(ret->children, parse_variable_declaration());
         token = lexer_peek();
         if (token.type == LEX_RPAREN) break;
         if (token.type != LEX_COMMA)
@@ -157,18 +157,18 @@ static node_t* parse_block() {
             lexer_advance();
             node_t* return_node = node_create(RETURN_STATEMENT);
             if (lexer_peek().type != LEX_SEMICOLON) {
-                da_append(&return_node->children, parse_expression());
+                da_append(return_node->children, parse_expression());
             }
-            da_append(&block_node->children, return_node);
+            da_append(block_node->children, return_node);
             peek_expect_advance(LEX_SEMICOLON);
         } else if (token.type == LEX_TYPENAME) {
             // <TYPENAME> <DECLARATION> ';' -> VARIABLE_DECLARATION
-            da_append(&block_node->children, parse_variable_declaration());
+            da_append(block_node->children, parse_variable_declaration());
             peek_expect_advance(LEX_SEMICOLON);
 
         } else if (token.type == LEX_LBRACE) {
             // '{' ... '}' -> BLOCK[...]
-            da_append(&block_node->children, parse_block());
+            da_append(block_node->children, parse_block());
             peek_expect_advance(LEX_RBRACE);
         } else if (token.type == LEX_IDENTIFIER) {
 
@@ -181,17 +181,17 @@ static node_t* parse_block() {
 
             if (token.type == LEX_LPAREN) {
                 // FUNCTION_CALL[...]
-                da_append(&block_node->children, parse_function_call(identifier_node));
+                da_append(block_node->children, parse_function_call(identifier_node));
                 peek_expect_advance(LEX_SEMICOLON);
             } else if (token.type == LEX_WALRUS) {
-                da_append(&block_node->children, parse_assignment(identifier_node));
+                da_append(block_node->children, parse_assignment(identifier_node));
                 peek_expect_advance(LEX_SEMICOLON);
             } else if (token.type == LEX_LBRACKET) {
                 node_t* indexing_node = parse_array_indexing(identifier_node);
                 token = lexer_peek();
 
                 if (token.type == LEX_WALRUS) {
-                    da_append(&block_node->children, parse_assignment(indexing_node));
+                    da_append(block_node->children, parse_assignment(indexing_node));
                     peek_expect_advance(LEX_SEMICOLON);
                 } else if (token.type == LEX_SEMICOLON) {
                     lexer_advance();
@@ -208,10 +208,10 @@ static node_t* parse_block() {
             node_t* if_node = node_create(IF_STATEMENT);
 
             peek_expect_advance(LEX_LPAREN);
-            da_append(&if_node->children, parse_expression());
+            da_append(if_node->children, parse_expression());
             peek_expect_advance(LEX_RPAREN);
 
-            da_append(&if_node->children, parse_block());
+            da_append(if_node->children, parse_block());
 
             peek_expect_advance(LEX_RBRACE);
 
@@ -220,25 +220,25 @@ static node_t* parse_block() {
             if (token.type == LEX_ELSE) {
                 lexer_advance();
 
-                da_append(&if_node->children, parse_block());
+                da_append(if_node->children, parse_block());
 
                 peek_expect_advance(LEX_RBRACE);
             }
 
-            da_append(&block_node->children, if_node);
+            da_append(block_node->children, if_node);
         } else if (token.type == LEX_WHILE) {
             // while (expression) BLOCK
             lexer_advance();
             node_t* while_node = node_create(WHILE_STATEMENT);
             peek_expect_advance(LEX_LPAREN);
-            da_append(&while_node->children, parse_expression());
+            da_append(while_node->children, parse_expression());
             peek_expect_advance(LEX_RPAREN);
 
-            da_append(&while_node->children, parse_block());
+            da_append(while_node->children, parse_block());
 
             peek_expect_advance(LEX_RBRACE);
 
-            da_append(&block_node->children, while_node);
+            da_append(block_node->children, while_node);
         } else {
             fail_token(token);
         }
@@ -258,7 +258,7 @@ static node_t* parse_typename() {
         lexer_advance();
 
         node_t* array_type_node = node_create(ARRAY_TYPE);
-        da_append(&array_type_node->children, typename_node);
+        da_append(array_type_node->children, typename_node);
         node_t* dim_list = node_create(LIST);
 
         for (;;) {
@@ -266,7 +266,7 @@ static node_t* parse_typename() {
             char* literal_str = lexer_substring(literal_token.begin_offset, literal_token.end_offset);
             node_t* literal_node = node_create_leaf(INTEGER_LITERAL, literal_token);
             literal_node->data.int_literal_value = atol(literal_str);
-            da_append(&dim_list->children, literal_node);
+            da_append(dim_list->children, literal_node);
             free(literal_str);
 
             token_t nxt = lexer_peek();
@@ -280,7 +280,7 @@ static node_t* parse_typename() {
         }
         peek_expect_advance(LEX_RBRACKET);
 
-        da_append(&array_type_node->children, dim_list);
+        da_append(array_type_node->children, dim_list);
         return array_type_node;
     }
     return typename_node;
@@ -312,8 +312,8 @@ static node_t* merge_subtrees(token_t operator_token, node_t* lhs, node_t* rhs) 
     if (rhs->type != OPERATOR || da_size(rhs->children) != 2 || has_precedence(rhs->data.operator, lhs_operator)) {
         node_t* operator_node = node_create(OPERATOR);
         operator_node->data.operator = lhs_operator;
-        da_append(&operator_node->children, lhs);
-        da_append(&operator_node->children, rhs);
+        da_append(operator_node->children, lhs);
+        da_append(operator_node->children, rhs);
         return operator_node;
     }
 
@@ -359,7 +359,7 @@ static node_t* merge_unary_op(token_t operator_token, node_t* rhs) {
     if (rhs->type != OPERATOR || da_size(rhs->children) != 2 || has_precedence(rhs->data.operator, operator)) {
         node_t* operator_node = node_create(OPERATOR);
         operator_node->data.operator = operator;
-        da_append(&operator_node->children, rhs);
+        da_append(operator_node->children, rhs);
 
         return operator_node;
     }
@@ -454,7 +454,7 @@ static node_t* parse_expression() {
         peek_expect_advance(LEX_RPAREN);
 
         node_t* ret = node_create(PARENTHESIZED_EXPRESSION);
-        da_append(&ret->children, expr);
+        da_append(ret->children, expr);
 
         token = lexer_peek();
 
@@ -499,20 +499,20 @@ static node_t* parse_function_call(node_t* identifier_node) {
     token_t token = peek_expect_advance(LEX_LPAREN);
 
     node_t* ret = node_create(FUNCTION_CALL);
-    da_append(&ret->children, identifier_node);
+    da_append(ret->children, identifier_node);
 
     node_t* list_node = node_create(LIST);
 
     token = lexer_peek();
     while (token.type != LEX_RPAREN) {
-        da_append(&list_node->children, parse_expression());
+        da_append(list_node->children, parse_expression());
         token = lexer_peek();
         if (token.type == LEX_RPAREN) break;
         token = peek_expect_advance(LEX_COMMA);
     }
     lexer_advance();
 
-    da_append(&ret->children, list_node);
+    da_append(ret->children, list_node);
     return ret;
 }
 
@@ -522,8 +522,8 @@ static node_t* parse_cast() {
     peek_expect_advance(LEX_COMMA);
     node_t* expr_node = parse_expression();
     node_t* ret = node_create(CAST_EXPRESSION);
-    da_append(&ret->children, typename_node);
-    da_append(&ret->children, expr_node);
+    da_append(ret->children, typename_node);
+    da_append(ret->children, expr_node);
     return ret;
 }
 
@@ -531,21 +531,21 @@ static node_t* parse_assignment(node_t* lhs_node) {
     peek_expect_advance(LEX_WALRUS);
 
     node_t* ret = node_create(ASSIGNMENT_STATEMENT);
-    da_append(&ret->children, lhs_node);
-    da_append(&ret->children, parse_expression());
+    da_append(ret->children, lhs_node);
+    da_append(ret->children, parse_expression());
     return ret;
 }
 
 static node_t* parse_array_indexing(node_t* identifier_node) {
     peek_expect_advance(LEX_LBRACKET);
     node_t* indexing = node_create(ARRAY_INDEXING);
-    da_append(&indexing->children, identifier_node);
+    da_append(indexing->children, identifier_node);
 
     node_t* index_list = node_create(LIST);
 
     for (;;) {
         node_t* expr = parse_expression();
-        da_append(&index_list->children, expr);
+        da_append(index_list->children, expr);
         token_t token = lexer_peek();
 
         if (token.type == LEX_COMMA) {
@@ -556,7 +556,7 @@ static node_t* parse_array_indexing(node_t* identifier_node) {
         fail_token(token);
     }
     peek_expect_advance(LEX_RBRACKET);
-    da_append(&indexing->children, index_list);
+    da_append(indexing->children, index_list);
     return indexing;
 }
 

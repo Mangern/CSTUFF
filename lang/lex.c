@@ -40,8 +40,8 @@ int content_ptr;
 int content_size;
 char* content;
 int current_line;
-int* offset_line_number; // for each position of the file, records which line it is
-int* line_start;         // for each line, records which offset it starts.
+int* offset_line_number = 0; // for each position of the file, records which line it is
+int* line_start = 0;         // for each line, records which offset it starts.
 
 static void skip_whitespace();
 static void skip_comments();
@@ -63,9 +63,7 @@ void lexer_init(char* file_name, char* file_content) {
     content = file_content;
     content_size = da_size(content);
 
-    offset_line_number = da_init(int);
-    line_start = da_init(int);
-    da_append(&line_start, 0);
+    da_append(line_start, 0);
 }
 
 token_t current_token = (token_t){.begin_offset = -1};
@@ -324,11 +322,11 @@ static void catchup_lines(size_t goal_offset) {
     if (goal_offset > (size_t)content_size)goal_offset = (size_t)content_size;
     size_t current_ptr = da_size(offset_line_number);
     while (current_ptr <= goal_offset) {
-        da_append(&offset_line_number, current_line);
+        da_append(offset_line_number, current_line);
         ++current_ptr;
         if (current_ptr < (size_t)content_size && content[current_ptr] == '\n') {
             ++current_line;
-            da_append(&line_start, current_ptr+1);
+            da_append(line_start, current_ptr+1);
         }
     }
 }

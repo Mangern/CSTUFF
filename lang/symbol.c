@@ -25,12 +25,11 @@ char* SYMBOL_TYPE_NAMES[] = {
 };
 
 symbol_table_t* global_symbol_table;
-char** global_string_list;
+char** global_string_list = 0;
 
 void create_symbol_tables() {
 
     global_symbol_table = symbol_table_init();
-    global_string_list = da_init(char*);
 
     insert_builtin_functions();
 
@@ -199,7 +198,7 @@ static void bind_references(symbol_table_t* local_symbols, node_t* node) {
             {
                 // Store string data in string table instead
                 size_t idx = da_size(global_string_list);
-                da_append(&global_string_list, node->data.string_literal_value);
+                da_append(global_string_list, node->data.string_literal_value);
                 node->data.string_literal_idx = idx;
             }
             break;

@@ -11,6 +11,11 @@ da.o: ../da/da.c
 	gcc $(CFLAGS) -c $? -o $@
 
 
+.PHONY: lexer-test
+lexer-test: lexer_test.o lex.o da.o fail.o tree.o symbol.o symbol_table.o
+	gcc $(CFLAGS) -o lexer-test $?
+	./lexer-test
+
 .PHONY: clean
 clean:
 	rm *.o

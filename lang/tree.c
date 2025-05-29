@@ -45,7 +45,7 @@ char* OPERATOR_TYPE_NAMES[] = {
 node_t* node_create(node_type_t type) {
     node_t* node = malloc(sizeof(node_t));
     node->type = type;
-    node->children = da_init(node_t*);
+    node->children = NULL;
     node->symbol = NULL;
     node->type_info = NULL;
     node->pos = (token_t){0};

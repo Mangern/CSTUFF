@@ -25,7 +25,7 @@ void read_file(const char* file_path, char** content) {
         exit(1);
     }
 
-    *content = da_init(char);
+    *content = 0;
 
     char buffer[BUFSIZE];
     for (;;) {
@@ -33,7 +33,7 @@ void read_file(const char* file_path, char** content) {
         if (num_read == 0) break;
 
         for (size_t i = 0; i < num_read; ++i) {
-            da_append(content, buffer[i]);
+            da_append(*content, buffer[i]);
         }
     }
 
@@ -72,6 +72,7 @@ int main(int argc, char** argv) {
 
     lexer_init(argv[optind], file_content);
 
+    /*
     parse();
 
     create_symbol_tables();
@@ -91,6 +92,7 @@ int main(int argc, char** argv) {
     if (opt_emit_asm) {
         generate_program();
     }
+    */
 
     return 0;
 }
