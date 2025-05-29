@@ -4,60 +4,48 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-#define DA_DEFAULT_CAPACITY 1
+#define DA_DEFAULT_CAPACITY 1024
 #define DA_META_SIZE     (3)
 #define DA_IDX_SIZE      (-DA_META_SIZE+0)
 #define DA_IDX_CAP       (-DA_META_SIZE+1)
 #define DA_IDX_ELEM_SIZE (-DA_META_SIZE+2)
 
-void* da_init_impl(size_t elem_size);
+typedef struct {
+    size_t size;
+    size_t capacity;
+} da_header_t;
 
-#define da_init(t) da_init_impl(sizeof(t))
+void* da_reserve_impl(void*, size_t, size_t);
 
-#define da_reserve(arr, new_cap) do {\
-    size_t* meta = *(size_t**)(arr);\
-    size_t cap = meta[DA_IDX_CAP];\
-    size_t elem_size = meta[DA_IDX_ELEM_SIZE];\
-    if (cap >= (new_cap))break;\
-    cap = (new_cap);\
-    (*(arr)) = (void*)((size_t*)realloc(&meta[-DA_META_SIZE], DA_META_SIZE * sizeof(size_t) + cap * elem_size)+DA_META_SIZE);\
-    meta = *(size_t**)(arr);\
-    meta[DA_IDX_CAP] = cap;\
-} while (0);
-    
-#define da_resize(arr_ptr, new_size) do {\
-    size_t* meta = *(size_t**)(arr_ptr);\
-    size_t size = meta[DA_IDX_SIZE];\
-    if (size < new_size) {\
-        da_reserve((arr_ptr), new_size);\
-        meta = *(size_t**)(arr_ptr);\
-    }\
-    meta[DA_IDX_SIZE] = new_size;\
-} while(0);
+#define da_header(arr) (((da_header_t*)(arr)) - 1)
+
+#define da_reserve(arr, new_cap) if (!((arr)) || da_header(arr)->capacity < new_cap) {\
+    (arr) = da_reserve_impl((arr), new_cap, sizeof(*(arr))); }
+
+#define da_resize(arr, new_size) do {\
+    da_reserve(arr, new_size);\
+    da_header(arr)->size = new_size;\
+    } while (0);
 
 #define da_append(arr, x) do {\
-    size_t* meta = *(size_t**)(arr);\
-    size_t size = meta[DA_IDX_SIZE];\
-    size_t cap  = meta[DA_IDX_CAP];\
-    if (size == cap) {\
-        da_reserve((arr), cap * 2);\
-        meta = *(size_t**)(arr);\
+    if (!(arr)) da_reserve(arr, 1);\
+    if (da_header(arr)->size == da_header(arr)->capacity) {\
+        da_reserve(arr, 2 * da_header(arr)->capacity);\
     }\
-    (*(arr))[size] = (x);\
-    meta[DA_IDX_SIZE]++;\
-} while(0);
+    (arr)[da_header(arr)->size++] = x;\
+    } while (0);
 
-size_t da_size(void* arr);
+#define da_size(arr) da_header(arr)->size
 
-// Accept pointer to arr
-void da_pop(void* arr_ptr);
+#define da_pop(arr) (arr)[--da_header(arr)->size]
 
-// Accept pointer to arr
-void da_clear(void* arr_ptr);
+#define da_clear(arr) da_header(arr)->size = 0
 
-void da_deinit(void* arr_ptr);
+#define da_deinit(arr) if (arr) { free(da_header(arr)); }
 
 // Elem: pointer to element to find
-int64_t da_indexof(void* arr, void* elem);
+#define da_indexof(arr, elem) da_indexof_impl((arr), elem, sizeof (*(arr)))
+
+int64_t da_indexof_impl(void* arr, void* elem, size_t elem_size);
 
 #endif
