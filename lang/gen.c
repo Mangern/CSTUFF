@@ -113,7 +113,7 @@ static void generate_constants() {
 
 static symbol_t* current_function;
 static size_t* current_used_addrs = 0;
-static int* is_jmp_dst = 0; // true if addr_idx is used as a jump destination. (needs a label)
+static int* is_jmp_dst = 0; // true if label is used as a jump destination
 static void generate_function(function_code_t func_code) {
     current_function = func_code.function_symbol;
 
@@ -543,12 +543,7 @@ int comp_sizet(const void* a, const void* b) {
 
 static void preprocess_tac_list(tac_t* tac_list) {
     // generate unique sorted list of addrs used in the tac_list
-    if (current_used_addrs == 0) {
-        is_jmp_dst = malloc(sizeof(int) * da_size(addr_list));
-        memset(is_jmp_dst, 0, sizeof(int) * da_size(addr_list));
-    } else {
-        da_clear(current_used_addrs);
-    }
+    da_clear(current_used_addrs);
 
     for (size_t i = 0; i < da_size(tac_list); ++i) {
         tac_t tac = tac_list[i];
@@ -563,7 +558,12 @@ static void preprocess_tac_list(tac_t* tac_list) {
         }
 
         if (addr_list[tac.dst].type == ADDR_LABEL) {
-            is_jmp_dst[addr_list[tac.dst].data.label] = 1;
+            // TODO: refactor
+            size_t dst_label = addr_list[tac.dst].data.label;
+            while (da_size(is_jmp_dst) <= dst_label) {
+                da_append(is_jmp_dst, 0);
+            }
+            is_jmp_dst[dst_label] = 1;
         }
     }
 
