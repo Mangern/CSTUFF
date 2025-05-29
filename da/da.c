@@ -19,6 +19,7 @@ void* da_reserve_impl(void* arr, size_t capacity, size_t elem_size) {
 }
 
 int64_t da_indexof_impl(void* arr, void* elem, size_t elem_size) {
+    if (!arr) return -1;
     da_header_t* header = (da_header_t*)arr - 1;
     char* byte_arr = (char*)arr;
     for (int64_t i = 0; i < header->size; ++i) {
