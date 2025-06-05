@@ -23,6 +23,8 @@ static char* TAC_INSTRUCTION_NAMES[] = {
     "BINARY_MOD",
     "BINARY_GT",
     "BINARY_LT",
+    "BINARY_GEQ",
+    "BINARY_LEQ",
     "BINARY_EQ",
     "UNARY_SUB", 
     "UNARY_NEG", 
@@ -435,6 +437,8 @@ static instruction_t instr_from_node_operator(operator_t op) {
         case BINARY_MOD: return TAC_BINARY_MOD;
         case BINARY_GT: return TAC_BINARY_GT;
         case BINARY_LT: return TAC_BINARY_LT;
+        case BINARY_GEQ: return TAC_BINARY_GEQ;
+        case BINARY_LEQ: return TAC_BINARY_LEQ;
         case BINARY_EQ: return TAC_BINARY_EQ;
         case UNARY_SUB: return TAC_UNARY_SUB;
         case UNARY_NEG: return TAC_UNARY_NEG;

@@ -335,6 +335,10 @@ static operator_t parse_operator_str(char* operator_str, bool binary) {
             return BINARY_LT;
         } else if (strcmp(operator_str, "==") == 0) {
             return BINARY_EQ;
+        } else if (strcmp(operator_str, "<=") == 0) {
+            return BINARY_LEQ;
+        } else if (strcmp(operator_str, ">=") == 0) {
+            return BINARY_GEQ;
         }
     } else {
         if (strcmp(operator_str, "-") == 0) {

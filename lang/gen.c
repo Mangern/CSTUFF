@@ -282,6 +282,8 @@ static void generate_tac(tac_t tac) {
     case TAC_BINARY_MOD:
     case TAC_BINARY_GT:
     case TAC_BINARY_LT:
+    case TAC_BINARY_GEQ:
+    case TAC_BINARY_LEQ:
     case TAC_BINARY_EQ:
         {
             char* SRC1_REG = RAX;
@@ -350,6 +352,24 @@ static void generate_tac(tac_t tac) {
                         CMPQ(SRC2_REG, SRC1_REG);
                     }
                     SETL(AL);
+                    MOVZBQ(AL, SRC1_REG);
+                    break;
+                case TAC_BINARY_GEQ:
+                    if (is_float) {
+                        EMIT("comisd %s, %s", SRC2_REG, SRC1_REG);
+                    } else {
+                        CMPQ(SRC2_REG, SRC1_REG);
+                    }
+                    SETGE(AL);
+                    MOVZBQ(AL, SRC1_REG);
+                    break;
+                case TAC_BINARY_LEQ:
+                    if (is_float) {
+                        EMIT("comisd %s, %s", SRC2_REG, SRC1_REG);
+                    } else {
+                        CMPQ(SRC2_REG, SRC1_REG);
+                    }
+                    SETLE(AL);
                     MOVZBQ(AL, SRC1_REG);
                     break;
                 case TAC_BINARY_EQ:

@@ -38,6 +38,8 @@ enum operator_t {
     BINARY_MOD,
     BINARY_GT, 
     BINARY_LT, 
+    BINARY_GEQ,
+    BINARY_LEQ,
     BINARY_EQ, 
     UNARY_SUB, 
     UNARY_NEG, 

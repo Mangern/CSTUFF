@@ -294,7 +294,7 @@ static size_t matches_operator() {
         //case '^':
             {
                 if (content_ptr + 1 >= content_size) return 1;
-                //if (content[content_ptr + 1] == '=') return 2;
+                if (content[content_ptr + 1] == '=') return 2;
                 return 1;
             }
         // 1 char operators that also makes sense if followed by itself or '='
@@ -306,7 +306,7 @@ static size_t matches_operator() {
         case '%':
             {
                 if (content_ptr + 1 >= content_size) return 1;
-                //if (content[content_ptr+1] == c || content[content_ptr+1] == '=') return 2;
+                if (content[content_ptr+1] == '=') return 2;
                 return 1;
             }
         // double char operators

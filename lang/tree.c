@@ -10,16 +10,18 @@ node_t* root;
 // This is the values from 
 // https://www.cppreference.com/w/c/language/operator_precedence.html
 const int OPERATOR_PRECEDENCE[] = {
-    4,
-    4,
-    3,
-    3,
-    3,
-    6,
-    6,
-    7,
-    2,
-    2
+    4,  // BINARY_ADD
+    4,  // BINARY_SUB,
+    3,  // BINARY_MUL,
+    3,  // BINARY_DIV,
+    3,  // BINARY_MOD,
+    6,  // BINARY_GT, 
+    6,  // BINARY_LT, 
+    6,  // BINARY_GEQ,
+    6,  // BINARY_LEQ,
+    7,  // BINARY_EQ,
+    2,  // UNARY_SUB,
+    2   // UNARY_NEG,
 };
 
 char* NODE_TYPE_NAMES[] = {
@@ -54,6 +56,8 @@ char* OPERATOR_TYPE_NAMES[] = {
     "binary_mod",
     "binary_gt",
     "binary_lt",
+    "binary_geq",
+    "binary_leq",
     "binary_eq",
     "unary_sub",
     "unary_neg"

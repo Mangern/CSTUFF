@@ -16,6 +16,8 @@ enum instruction_t {
     TAC_BINARY_MOD,
     TAC_BINARY_GT,
     TAC_BINARY_LT,
+    TAC_BINARY_GEQ,
+    TAC_BINARY_LEQ,
     TAC_BINARY_EQ,
     TAC_UNARY_SUB, // -
     TAC_UNARY_NEG, // !

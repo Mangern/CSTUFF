@@ -234,6 +234,8 @@ static void register_type_node(node_t* node) {
                         break;
                     case BINARY_GT:
                     case BINARY_LT:
+                    case BINARY_LEQ:
+                    case BINARY_GEQ:
                     case BINARY_EQ:
                         {
                             if (!types_equivalent(node->children[0]->type_info, node->children[1]->type_info)) {
