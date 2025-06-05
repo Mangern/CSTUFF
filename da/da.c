@@ -1,6 +1,7 @@
 #include "da.h"
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 void* da_reserve_impl(void* arr, size_t capacity, size_t elem_size) {
     da_header_t header = {0};

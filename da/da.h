@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-#define DA_DEFAULT_CAPACITY 1024
+#define DA_DEFAULT_CAPACITY 1
 #define DA_META_SIZE     (3)
 #define DA_IDX_SIZE      (-DA_META_SIZE+0)
 #define DA_IDX_CAP       (-DA_META_SIZE+1)
@@ -28,7 +28,7 @@ void* da_reserve_impl(void*, size_t, size_t);
     } while (0);
 
 #define da_append(arr, x) do {\
-    if (!(arr)) da_reserve(arr, 1);\
+    if (!(arr)) da_reserve(arr, DA_DEFAULT_CAPACITY);\
     if (da_header(arr)->size == da_header(arr)->capacity) {\
         da_reserve(arr, 2 * da_header(arr)->capacity);\
     }\
