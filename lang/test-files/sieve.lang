@@ -13,13 +13,13 @@ main := () -> void {
 
     i := 2;
 
-    //int prime_count := 0;
+    int prime_count := 0;
 
     while (i < n) {
         if (isp[i]) {
             int j := i * i;
-            //primes[prime_count] := i;
-            //prime_count := prime_count + 1;
+            primes[prime_count] := i;
+            prime_count := prime_count + 1;
             while (j < n) {
                 isp[j] := false;
                 j := j + i;
@@ -28,11 +28,11 @@ main := () -> void {
         i := i + 1;
     }
 
-    //i := 0;
+    i := 0;
 
-    //println("Generated", prime_count, "primes");
-    //while (i < prime_count) {
-    //    println(primes[i]);
-    //    i := i + 1;
-    //}
+    println("Generated", prime_count, "primes");
+    while (i < prime_count) {
+        println(primes[i]);
+        i := i + 1;
+    }
 }
