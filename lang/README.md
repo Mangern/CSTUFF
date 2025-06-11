@@ -49,8 +49,6 @@ make
 
 ## Compile the assembly
 
-Use `as` and `ld`, or just simply use `gcc`:
-
 ```bash
 gcc out.S
 ```

@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-#define DA_DEFAULT_CAPACITY 1024
+#define DA_DEFAULT_CAPACITY 1
 #define DA_META_SIZE     (3)
 #define DA_IDX_SIZE      (-DA_META_SIZE+0)
 #define DA_IDX_CAP       (-DA_META_SIZE+1)
@@ -49,3 +49,4 @@ void* da_reserve_impl(void*, size_t, size_t);
 int64_t da_indexof_impl(void* arr, void* elem, size_t elem_size);
 
 #endif
+
