@@ -162,7 +162,7 @@ static void generate_function(function_code_t func_code) {
 
     for (size_t i = 0; i < da_size(func_code.tac_list); ++i) {
         tac_t tac = func_code.tac_list[i];
-        if (is_jmp_dst[tac.label]) {
+        if (tac.label < da_size(is_jmp_dst) && is_jmp_dst[tac.label]) {
             LABEL("L%zu", tac.label);
         }
         generate_tac(tac);
@@ -285,6 +285,7 @@ static void generate_tac(tac_t tac) {
     case TAC_BINARY_GEQ:
     case TAC_BINARY_LEQ:
     case TAC_BINARY_EQ:
+    case TAC_BINARY_NEQ:
         {
             char* SRC1_REG = RAX;
             char* SRC2_REG = RCX;
@@ -379,6 +380,15 @@ static void generate_tac(tac_t tac) {
                         CMPQ(SRC2_REG, SRC1_REG);
                     }
                     SETE(AL);
+                    MOVZBQ(AL, SRC1_REG);
+                    break;
+                case TAC_BINARY_NEQ:
+                    if (is_float) {
+                        EMIT("comisd %s, %s", SRC2_REG, SRC1_REG);
+                    } else {
+                        CMPQ(SRC2_REG, SRC1_REG);
+                    }
+                    SETNE(AL);
                     MOVZBQ(AL, SRC1_REG);
                     break;
                 default:
@@ -553,8 +563,20 @@ static void generate_tac(tac_t tac) {
         }
         break;
     case TAC_UNARY_SUB:
+        {
+            if (addr_list[tac.src1].type_info == TYPE_REAL) {
+                assert(false && "Not implemented");
+            }
+            MOVQ(generate_addr_access(tac.src1), RAX);
+            EMIT("neg %s", RAX);
+            MOVQ(RAX, generate_addr_access(tac.dst));
+        }
+        break;
+
+    default:
         assert(false && "not implemented");
     }
+
 }
 
 int comp_sizet(const void* a, const void* b) {

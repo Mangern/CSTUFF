@@ -20,6 +20,7 @@ static node_t* parse_expression();
 static node_t* parse_function_call(node_t*);
 static node_t* parse_cast();
 static node_t* parse_assignment(node_t*);
+static node_t* parse_operator_assignment(node_t*);
 static node_t* parse_array_indexing(node_t*);
 static operator_t parse_operator_str(char* operator_str, bool);
 
@@ -78,6 +79,7 @@ static node_t* parse_variable_declaration() {
 }
 
 static node_t* parse_function_declaration() {
+    // function name, assign the identifier
     token_t token = lexer_peek();
     if (token.type != LEX_IDENTIFIER) 
         fail_token_expected(token, LEX_IDENTIFIER);
@@ -95,8 +97,10 @@ static node_t* parse_function_declaration() {
     lexer_advance();
 
 
+    // arguments 
     da_append(ret->children, parse_arg_list());
 
+    // return type
     peek_expect_advance(LEX_ARROW);
     token = peek_expect_advance(LEX_TYPENAME);
 
@@ -186,12 +190,18 @@ static node_t* parse_block() {
             } else if (token.type == LEX_WALRUS) {
                 da_append(block_node->children, parse_assignment(identifier_node));
                 peek_expect_advance(LEX_SEMICOLON);
+            } else if (token.type == LEX_OPERATOR) {
+                da_append(block_node->children, parse_operator_assignment(identifier_node));
+                peek_expect_advance(LEX_SEMICOLON);
             } else if (token.type == LEX_LBRACKET) {
                 node_t* indexing_node = parse_array_indexing(identifier_node);
                 token = lexer_peek();
 
                 if (token.type == LEX_WALRUS) {
                     da_append(block_node->children, parse_assignment(indexing_node));
+                    peek_expect_advance(LEX_SEMICOLON);
+                } else if (token.type == LEX_OPERATOR) {
+                    da_append(block_node->children, parse_operator_assignment(indexing_node));
                     peek_expect_advance(LEX_SEMICOLON);
                 } else if (token.type == LEX_SEMICOLON) {
                     lexer_advance();
@@ -333,12 +343,24 @@ static operator_t parse_operator_str(char* operator_str, bool binary) {
             return BINARY_GT;
         } else if (strcmp(operator_str, "<") == 0) {
             return BINARY_LT;
+        } else if (strcmp(operator_str, "+=") == 0) {
+            return BINARY_ASS_ADD;
+        } else if (strcmp(operator_str, "-=") == 0) {
+            return BINARY_ASS_SUB;
+        } else if (strcmp(operator_str, "*=") == 0) {
+            return BINARY_ASS_MUL;
+        } else if (strcmp(operator_str, "/=") == 0) {
+            return BINARY_ASS_DIV;
+        } else if (strcmp(operator_str, "%=") == 0) {
+            return BINARY_ASS_MOD;
         } else if (strcmp(operator_str, "==") == 0) {
             return BINARY_EQ;
         } else if (strcmp(operator_str, "<=") == 0) {
             return BINARY_LEQ;
         } else if (strcmp(operator_str, ">=") == 0) {
             return BINARY_GEQ;
+        } else if (strcmp(operator_str, "!=") == 0) {
+            return BINARY_NEQ;
         }
     } else {
         if (strcmp(operator_str, "-") == 0) {
@@ -535,6 +557,48 @@ static node_t* parse_assignment(node_t* lhs_node) {
     da_append(ret->children, lhs_node);
     da_append(ret->children, parse_expression());
     return ret;
+}
+
+static node_t* parse_operator_assignment(node_t* lhs_node) {
+    token_t operator_token = peek_expect_advance(LEX_OPERATOR);
+
+    char* operator_str = lexer_substring(operator_token.begin_offset, operator_token.end_offset);
+    operator_t op = parse_operator_str(operator_str, true);
+    free(operator_str);
+
+    node_t* assignment_node = node_create(ASSIGNMENT_STATEMENT);
+    da_append(assignment_node->children, lhs_node);
+
+    node_t* rhs_node = parse_expression();
+
+    node_t* operator_node = node_create(OPERATOR);
+
+    da_append(operator_node->children, lhs_node);
+    da_append(operator_node->children, rhs_node);
+
+    switch(op) {
+        case BINARY_ASS_ADD:
+            operator_node->data.operator = BINARY_ADD;
+            break;
+        case BINARY_ASS_SUB:
+            operator_node->data.operator = BINARY_SUB;
+            break;
+        case BINARY_ASS_MUL:
+            operator_node->data.operator = BINARY_MUL;
+            break;
+        case BINARY_ASS_DIV:
+            operator_node->data.operator = BINARY_DIV;
+            break;
+        case BINARY_ASS_MOD:
+            operator_node->data.operator = BINARY_MOD;
+            break;
+
+        default:
+            fail_token(operator_token);
+    }
+
+    da_append(assignment_node->children, operator_node);
+    return assignment_node;
 }
 
 static node_t* parse_array_indexing(node_t* identifier_node) {

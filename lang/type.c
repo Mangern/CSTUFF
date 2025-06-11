@@ -237,6 +237,7 @@ static void register_type_node(node_t* node) {
                     case BINARY_LEQ:
                     case BINARY_GEQ:
                     case BINARY_EQ:
+                    case BINARY_NEQ:
                         {
                             if (!types_equivalent(node->children[0]->type_info, node->children[1]->type_info)) {
                                 fprintf(stderr, "Cannot combine ");

@@ -19,6 +19,7 @@ enum instruction_t {
     TAC_BINARY_GEQ,
     TAC_BINARY_LEQ,
     TAC_BINARY_EQ,
+    TAC_BINARY_NEQ,
     TAC_UNARY_SUB, // -
     TAC_UNARY_NEG, // !
     TAC_CALL_VOID, // call function src1 without return value. src2 stores arg list

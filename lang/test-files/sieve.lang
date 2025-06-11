@@ -8,7 +8,7 @@ main := () -> void {
 
     while (i < n) {
         isp[i] := true;
-        i := i + 1;
+        i += 1;
     }
 
     i := 2;
@@ -19,13 +19,13 @@ main := () -> void {
         if (isp[i]) {
             int j := i * i;
             primes[prime_count] := i;
-            prime_count := prime_count + 1;
+            prime_count += 1;
             while (j < n) {
                 isp[j] := false;
-                j := j + i;
+                j += i;
             }
         }
-        i := i + 1;
+        i += 1;
     }
 
     i := 0;
@@ -33,6 +33,6 @@ main := () -> void {
     println("Generated", prime_count, "primes");
     while (i < prime_count) {
         println(primes[i]);
-        i := i + 1;
+        i += 1;
     }
 }
