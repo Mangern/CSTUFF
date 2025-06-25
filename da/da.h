@@ -49,4 +49,3 @@ void* da_reserve_impl(void*, size_t, size_t);
 int64_t da_indexof_impl(void* arr, void* elem, size_t elem_size);
 
 #endif
-
