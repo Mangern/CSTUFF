@@ -29,4 +29,4 @@ symbol-type-test: symbol_type_test.o lex.o da.o fail.o tree.o symbol.o symbol_ta
 
 .PHONY: clean
 clean:
-	rm *.o lexer-test parser-test symbol-type-test langc *.S
+	rm -f *.o lexer-test parser-test symbol-type-test langc langls *.S
