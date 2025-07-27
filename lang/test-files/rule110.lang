@@ -28,7 +28,7 @@ main := () -> void {
             } else {
                 print(" ");
             }
-            i := i + 1;
+            i += 1;
         }
         println();
 
@@ -46,16 +46,16 @@ main := () -> void {
             }
 
             npat[i] := TABLE[4 * lft + 2 * mid + rgt];
-            i := i + 1;
+            i += 1;
         }
 
         i := 0;
 
         while (i < size) {
             pat[i] := npat[i];
-            i := i + 1;
+            i += 1;
         }
 
-        iter := iter + 1;
+        iter += 1;
     }
 }

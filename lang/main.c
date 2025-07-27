@@ -57,7 +57,7 @@ static void options(int argc, char **argv) {
     }
 }
 
-#define WALLTIME(t) ((double)(t).tv_sec + 1e-6 * (double)(t).tv_usec)
+#define WALLTIME(t) (((double)(t).tv_sec + 1e-6 * (double)(t).tv_usec)*1000.0)
 
 int assemble_and_link() {
     pid_t pid = fork();
@@ -93,7 +93,7 @@ int assemble_and_link() {
 }
 
 int main(int argc, char** argv) {
-    struct timeval t_start, t_end;
+    struct timeval t_start, t_parse, t_create_symbols, t_types, t_ir, t_gen, t_gcc, t_end;
 
     gettimeofday ( &t_start, NULL );
 
@@ -111,11 +111,19 @@ int main(int argc, char** argv) {
 
     parse();
 
+    gettimeofday(&t_parse, NULL);
+
     create_symbol_tables();
+
+    gettimeofday(&t_create_symbols, NULL);
 
     register_types();
 
+    gettimeofday(&t_types, NULL);
+
     generate_function_codes();
+
+    gettimeofday(&t_ir, NULL);
 
     if (opt_print_tree) {
         print_tree(root);
@@ -127,17 +135,29 @@ int main(int argc, char** argv) {
 
     gen_outfile = fopen("tmp.S", "w");
     generate_program();
+    gettimeofday(&t_gen, NULL);
     fclose(gen_outfile);
 
     if (assemble_and_link()) {
         fprintf(stderr, "Assembler failed\n");
         return EXIT_FAILURE;
     }
+
+    gettimeofday(&t_gcc, NULL);
     
     gettimeofday ( &t_end, NULL );
-    printf ("Total elapsed time: %lf milliseconds\n",
-        (WALLTIME(t_end) - WALLTIME(t_start)) * 1000.0
-    );
+
+    printf("==== Execution times ====\n");
+
+    printf("Parser        : %7.3f ms\n", WALLTIME(t_parse) - WALLTIME(t_start));
+    printf("Symbol tables : %7.3f ms\n", WALLTIME(t_create_symbols) - WALLTIME(t_parse));
+    printf("Type checking : %7.3f ms\n", WALLTIME(t_types) - WALLTIME(t_create_symbols));
+    printf("IR gen        : %7.3f ms\n", WALLTIME(t_ir) - WALLTIME(t_types));
+    printf("ASM gen       : %7.3f ms\n", WALLTIME(t_gen) - WALLTIME(t_ir));
+    printf("GCC           : %7.3f ms\n", WALLTIME(t_gcc) - WALLTIME(t_gen));
+    printf("Total time    : %7.3f ms\n", WALLTIME(t_end) - WALLTIME(t_start));
+
+    printf("\nDone compiling %s (%zu bytes)\n", CURRENT_FILE_NAME, da_size(file_content));
 
     return 0;
 }
