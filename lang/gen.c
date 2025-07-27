@@ -432,6 +432,9 @@ static void generate_tac(tac_t tac) {
                         } else if (arg.type_info == TYPE_REAL) {
                             EMIT("leaq realout(%s), %s", RIP, RDI);
                             MOVSD(generate_addr_access(arg_idx), XMM0);
+                        } else if (arg.type_info == TYPE_BOOL) {
+                            MOVQ(generate_addr_access(arg_idx), RSI);
+                            EMIT("leaq intout(%s), %s", RIP, RDI);
                         } else {
                             assert(false && "Not implemented");
                         }

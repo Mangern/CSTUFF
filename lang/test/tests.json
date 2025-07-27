@@ -1,0 +1,22 @@
+[
+    {
+        "file": "arr.lang",
+        "expected": "0 1 2 3 4 \n"
+    },
+    {
+        "file": "sorting.lang",
+        "expected": "2841809\n"
+    },
+    {
+        "file": "simple-if.lang",
+        "expected": "69\n"
+    },
+    {
+        "file": "operators.lang",
+        "expected": "1 + 2 = 3\n1 - 2 = -1\n3 * 2 = 6\n10 / 5 = 2\n7 % 3 = 1\n1 > 1 = 0\n1 > 0 = 1\n1 >= 1 = 1\n1 < 0 = 0\n0 < 1 = 1\n1 < 1 = 0\n1 <= 1 = 1\n" 
+    },
+    {
+        "file": "euler3.lang",
+        "expected": "6857\n"
+    }
+]

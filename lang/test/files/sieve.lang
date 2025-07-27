@@ -31,8 +31,5 @@ main := () -> void {
     i := 0;
 
     println("Generated", prime_count, "primes");
-    while (i < prime_count) {
-        println(primes[i]);
-        i += 1;
-    }
+    println(primes[prime_count - 1]);
 }

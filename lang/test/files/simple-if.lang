@@ -1,6 +1,6 @@
 main := () -> void {
     int x;
-    int y;
+    int y := 69;
     x := 12;
 
     if (x > 10) {
@@ -10,4 +10,5 @@ main := () -> void {
     } else {
         y := 21;
     }
+    println(y);
 }

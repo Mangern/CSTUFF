@@ -1,15 +1,15 @@
 int x;
-int[69] foo;
+int[5] foo;
 main := () -> void {
     int i := 0;
 
-    while (i < 69) {
+    while (i < 5) {
         foo[i] := i;
         i := i + 1;
     }
 
     i := 0;
-    while (i < 69) {
+    while (i < 5) {
         print(foo[i]);
         print(" ");
         i := i + 1;

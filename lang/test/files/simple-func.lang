@@ -11,14 +11,5 @@ sum := (int x, int y) -> int {
 main := () -> void {
     int x := 34;
     int y := 35;
-    print(sum(x, y));
-
-    //real z := 69.0;
-    if (2 < 1) {
-        print(global_var, 69.0);
-    } else {
-        print(69.0);
-    }
-
-    //print(69.0);
+    println(sum(x, y));
 }
