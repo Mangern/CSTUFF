@@ -1,0 +1,66 @@
+// https://open.kattis.com/problems/magicsequence
+
+int[1000000] arr;
+
+quick_sort := (int l, int r) -> void {
+    if (l >= r) {
+        return;
+    }
+
+    int p := arr[r];
+
+    int i := l - 1;
+
+    int j := l;
+
+    while (j < r) {
+        if (arr[j] <= p) {
+            i += 1;
+            int t := arr[j];
+            arr[j] := arr[i];
+            arr[i] := t;
+        }
+        j += 1;
+    }
+
+    int t := arr[i+1];
+    arr[i+1] := arr[r];
+    arr[r] := t;
+
+    quick_sort(l, i);
+    quick_sort(i + 2, r);
+}
+
+main := () -> void {
+    int n := 1000000;
+
+    int a := 501234;
+    int b := 15432;
+    int c := 1251532;
+    int x := 757387;
+    int y := 3712091;
+
+    // ANSWER: 2841809
+
+    int i := 1;
+
+    arr[0] := a;
+
+    while (i < n) {
+        arr[i] := ((arr[i-1] * b) % c + a) % c;
+        i += 1;
+    }
+
+    quick_sort(0, n - 1);
+
+    int v := 0;
+
+    i := 0;
+
+    while (i < n) {
+        v := ((v * x) % y + arr[i]) % y;
+        i += 1;
+    }
+
+    println(v);
+}
