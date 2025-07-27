@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include "langc.h"
 
+extern FILE * gen_outfile;
+
 // Macros from TDT4205
 #define RAX "%rax"
 #define EAX "%eax" // lowest 32 bits of %rax
@@ -30,9 +32,9 @@
 #define MEM(reg) "(" reg ")"
 #define ARRAY_MEM(array, index, stride) "(" array "," index "," stride ")"
 
-#define DIRECTIVE(fmt, ...) printf(fmt "\n" __VA_OPT__(, ) __VA_ARGS__)
-#define LABEL(name, ...) printf(name ":\n" __VA_OPT__(, ) __VA_ARGS__)
-#define EMIT(fmt, ...) printf("\t" fmt "\n" __VA_OPT__(, ) __VA_ARGS__)
+#define DIRECTIVE(fmt, ...) fprintf(gen_outfile, fmt "\n" __VA_OPT__(, ) __VA_ARGS__)
+#define LABEL(name, ...) fprintf(gen_outfile, name ":\n" __VA_OPT__(, ) __VA_ARGS__)
+#define EMIT(fmt, ...) fprintf(gen_outfile, "\t" fmt "\n" __VA_OPT__(, ) __VA_ARGS__)
 
 #define MOVQ(src, dst) EMIT("movq %s, %s", (src), (dst))
 #define MOVSD(src, dst) EMIT("movsd %s, %s", (src), (dst))

@@ -12,6 +12,8 @@
 #include "type.h"
 #include "tac.h"
 
+FILE *gen_outfile = 0;
+
 #define NUM_REGISTER_PARAMS 6
 static const char* REGISTER_PARAMS[6] = {RDI, RSI, RDX, RCX, R8, R9};
 
@@ -26,6 +28,10 @@ static void generate_safe_printf();
 static void generate_main_function();
 
 void generate_program() {
+    if (gen_outfile == 0) {
+        gen_outfile = stdout;
+    }
+
     generate_stringtable();
     generate_constants();
 
@@ -441,7 +447,39 @@ static void generate_tac(tac_t tac) {
                     assert(false && "Not implemented");
                 }
             } else {
-                assert(false && "Not implemented");
+                symbol_t* function_symbol = addr_list[tac.src1].data.symbol;
+                addr_t addr_arg_list = addr_list[tac.src2];
+
+                long num_params = da_size(addr_arg_list.data.arg_addr_list);
+
+                for (long i = num_params - 1; i >= 0; --i) {
+                    size_t arg_idx = addr_arg_list.data.arg_addr_list[i];
+                    addr_t arg = addr_list[arg_idx];
+                    if (arg.type_info == TYPE_CHAR) {
+                        EMIT("leaq %s, %s", generate_addr_access(arg_idx), RAX);
+                        PUSHQ(RAX);
+                    } else if (arg.type_info == TYPE_INT) {
+                        MOVQ(generate_addr_access(arg_idx), RAX);
+                        PUSHQ(RAX);
+                    } else if (arg.type_info == TYPE_REAL) {
+                        MOVSD(generate_addr_access(arg_idx), XMM0);
+                        PUSHQ(XMM0);
+                    } else {
+                        assert(false && "Not implemented");
+                    }
+                }
+
+
+                for (long i = 0; i < num_params && i < NUM_REGISTER_PARAMS; ++i) {
+                    POPQ(REGISTER_PARAMS[i]);
+                }
+                EMIT("call .%s", function_symbol->name);
+
+                // restore stack
+                if (num_params > NUM_REGISTER_PARAMS)
+                {
+                    EMIT("addq $%zu, %s", (num_params - NUM_REGISTER_PARAMS) * 8, RSP);
+                }
             }
         }
         break;

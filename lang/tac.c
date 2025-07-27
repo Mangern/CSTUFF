@@ -207,13 +207,14 @@ static void generate_node_code(tac_t** list, node_t* node) {
                 tac_emit(list, TAC_GOTO, 0, 0, new_label_ref(header_start_label));
 
                 size_t loop_end_idx = tac_emit(list, TAC_NOP, 0, 0, 0);
+                size_t loop_end_label = (*list)[loop_end_idx].label;
                 // backpatch iffalse jump
-                addr_list[(*list)[if_jmp_idx].dst].data.label = loop_end_idx;
+                addr_list[(*list)[if_jmp_idx].dst].data.label = loop_end_label;
 
                 // backpatch break statements
                 while (da_size(break_statement_idxs) > curr_break_statement_size) {
                     size_t break_stmt = da_pop(break_statement_idxs);
-                    addr_list[(*list)[break_stmt].dst].data.label = loop_end_idx;
+                    addr_list[(*list)[break_stmt].dst].data.label = loop_end_label;
                 }
             }
             break;
