@@ -69,7 +69,7 @@ int assemble_and_link() {
 
     if (pid == 0) {
         // i am a child
-        char * args[] = {"gcc", "tmp.S", NULL};
+        char * args[] = {"gcc", "-g", "tmp.S", NULL};
         execvp("gcc", args);
 
         fprintf(stderr, "execv failed\n");

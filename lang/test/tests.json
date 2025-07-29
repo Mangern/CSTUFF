@@ -48,6 +48,10 @@
         "expect-stdout": "1 + 2 = 3\n1 - 2 = -1\n3 * 2 = 6\n10 / 5 = 2\n7 % 3 = 1\n1 > 1 = 0\n1 > 0 = 1\n1 >= 1 = 1\n1 < 0 = 0\n0 < 1 = 1\n1 < 1 = 0\n1 <= 1 = 1\n" 
     },
     {
+        "file": "rec.lang",
+        "expect-stdout": "89\n"
+    },
+    {
         "file": "euler3.lang",
         "expect-stdout": "6857\n"
     },

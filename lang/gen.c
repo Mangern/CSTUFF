@@ -128,9 +128,14 @@ static void generate_function(function_code_t func_code) {
     MOVQ(RSP, RBP);
 
     // Push register args to stack
+
+    size_t local_space = 0;
+    size_t home_space = 0;
+
     for (size_t i = 0; i < da_size(current_function->node->children[1]->children) && i < NUM_REGISTER_PARAMS; ++i) {
         // lol
         EMIT("pushq %s // %s", REGISTER_PARAMS[i], current_function->node->children[1]->children[i]->children[1]->symbol->name);
+        home_space += 8;
     }
 
     preprocess_tac_list(func_code.tac_list);
@@ -144,12 +149,14 @@ static void generate_function(function_code_t func_code) {
                 symbol_t* sym = addr.data.symbol;
                 if (sym->type == SYMBOL_LOCAL_VAR) {
                     EMIT("pushq $0 // %s", sym->name);
+                    local_space += 8;
                 }
             }
             break;
         case ADDR_TEMP:
             {
                 EMIT("pushq $0 // t%ld", addr.data.temp_id);
+                local_space += 8;
             }
             break;
         case ADDR_ARG_LIST:
@@ -164,6 +171,13 @@ static void generate_function(function_code_t func_code) {
         case ADDR_BOOL_CONST:
           break;
         }
+    }
+
+    size_t frame_space = local_space + home_space;
+
+    if (frame_space & 0xF) {
+        // align
+        PUSHQ("$0");
     }
 
     for (size_t i = 0; i < da_size(func_code.tac_list); ++i) {
@@ -184,8 +198,9 @@ static long get_addr_rbp_offset(size_t addr_idx) {
     addr_t addr = addr_list[addr_idx];
     if (addr.type == ADDR_SYMBOL && addr.data.symbol->type == SYMBOL_PARAMETER) {
         if (addr.data.symbol->sequence_number >= NUM_REGISTER_PARAMS) {
-            // TODO: offset above rbp
-            assert(false);
+            long offs = (long)addr.data.symbol->sequence_number - NUM_REGISTER_PARAMS + 2;
+            offs *= 8;
+            return offs;
         }
         long offs = (long)addr.data.symbol->sequence_number;
         offs++;
@@ -455,6 +470,17 @@ static void generate_tac(tac_t tac) {
 
                 long num_params = da_size(addr_arg_list.data.arg_addr_list);
 
+                size_t stack_arg_space = 0;
+
+                if (num_params > NUM_REGISTER_PARAMS) {
+                    stack_arg_space = (num_params - NUM_REGISTER_PARAMS) * 8;
+                }
+
+                if (stack_arg_space & 0xF) {
+                    PUSHQ("$0");
+                    stack_arg_space += 8;
+                }
+
                 for (long i = num_params - 1; i >= 0; --i) {
                     size_t arg_idx = addr_arg_list.data.arg_addr_list[i];
                     addr_t arg = addr_list[arg_idx];
@@ -472,7 +498,6 @@ static void generate_tac(tac_t tac) {
                     }
                 }
 
-
                 for (long i = 0; i < num_params && i < NUM_REGISTER_PARAMS; ++i) {
                     POPQ(REGISTER_PARAMS[i]);
                 }
@@ -481,7 +506,7 @@ static void generate_tac(tac_t tac) {
                 // restore stack
                 if (num_params > NUM_REGISTER_PARAMS)
                 {
-                    EMIT("addq $%zu, %s", (num_params - NUM_REGISTER_PARAMS) * 8, RSP);
+                    EMIT("addq $%zu, %s", stack_arg_space, RSP);
                 }
             }
         }
@@ -494,6 +519,17 @@ static void generate_tac(tac_t tac) {
 
             addr_t addr_arg_list = addr_list[tac.src2];
             long num_params = da_size(addr_arg_list.data.arg_addr_list);
+
+            size_t stack_arg_space = 0;
+
+            if (num_params > NUM_REGISTER_PARAMS) {
+                stack_arg_space = (num_params - NUM_REGISTER_PARAMS) * 8;
+            }
+
+            if (stack_arg_space & 0xF) {
+                PUSHQ("$0");
+                stack_arg_space += 8;
+            }
 
             for (long i = num_params - 1; i >= 0; --i) {
                 size_t arg_idx = addr_arg_list.data.arg_addr_list[i];
@@ -521,7 +557,7 @@ static void generate_tac(tac_t tac) {
             // restore stack
             if (num_params > NUM_REGISTER_PARAMS)
             {
-                EMIT("addq $%zu, %s", (num_params - NUM_REGISTER_PARAMS) * 8, RSP);
+                EMIT("addq $%zu, %s", stack_arg_space, RSP);
             }
             // store result
             MOVQ(RAX, generate_addr_access(tac.dst));
@@ -696,9 +732,16 @@ static void generate_safe_printf(void)
 static void generate_main_function() {
     LABEL("main");
 
+    PUSHQ(RBP);
+    MOVQ(RSP, RBP);
+    ANDQ("$-16", RSP);
+
     // TODO: argc, argv
     EMIT("call .main");
     // TODO: return value
+    MOVQ(RBP, RSP);
+    POPQ(RBP);
+
     MOVQ("$0", RDI);
     EMIT("call exit");
 
