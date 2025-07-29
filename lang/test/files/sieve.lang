@@ -31,5 +31,6 @@ main := () -> void {
     i := 0;
 
     println("Generated", prime_count, "primes");
-    println(primes[prime_count - 1]);
+    println("Smallest prime:", primes[0]);
+    println("Largest prime:", primes[prime_count - 1]);
 }

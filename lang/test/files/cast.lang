@@ -1,0 +1,7 @@
+main := () -> void {
+    int x := 34;
+    int y := 35;
+
+    real out := x + y;
+    println(out);
+}

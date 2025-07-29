@@ -2,9 +2,6 @@ int global_var;
 
 sum := (int x, int y) -> int {
     global_var := global_var + 1;
-    if (global_var > 1) {
-        break;
-    }
     return x + y;
 }
 
@@ -12,4 +9,5 @@ main := () -> void {
     int x := 34;
     int y := 35;
     println(sum(x, y));
+    println(global_var);
 }

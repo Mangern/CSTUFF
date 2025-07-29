@@ -1,7 +1,3 @@
 main := () -> void {
-    int x := 34;
-    int y := 30;
-    int z := cast(int, 2.0 + 3.0) + x * (y - x + y - (2 * x)) * 0;
-    println(x + y + z);
-    println("hello", "world!");
+    println("Hello", "world!");
 }

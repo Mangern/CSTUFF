@@ -1,22 +1,69 @@
 [
     {
-        "file": "arr.lang",
-        "expected": "0 1 2 3 4 \n"
+        "file": "hello.lang",
+        "expect-stdout": "Hello world!\n"
     },
     {
-        "file": "sorting.lang",
-        "expected": "2841809\n"
+        "file": "simple-var.lang",
+        "expect-stdout": "69\n"
     },
     {
         "file": "simple-if.lang",
-        "expected": "69\n"
+        "expect-stdout": "69\n"
+    },
+    {
+        "file": "simple-while.lang",
+        "expect-stdout": "55\n"
+    },
+    {
+        "file": "simple-func.lang",
+        "expect-stdout": "69\n1\n"
+    },
+    {
+        "file": "scope.lang",
+        "expect-stdout": "3\n2\n1\n"
+    },
+    {
+        "file": "opassign.lang",
+        "expect-stdout": "1\n"
+    },
+    {
+        "file": "arr.lang",
+        "expect-stdout": "0 1 2 3 4\n"
+    },
+    {
+        "file": "real.lang",
+        "expect-stdout": "420.000000\n1 2 3 69.000000\n69.000000\n3.141593\n"
+    },
+    {
+        "file": "sorting.lang",
+        "expect-stdout": "2841809\n"
+    },
+    {
+        "file": "sieve.lang",
+        "expect-stdout": "Generated 25 primes\nSmallest prime: 2\nLargest prime: 97\n"
     },
     {
         "file": "operators.lang",
-        "expected": "1 + 2 = 3\n1 - 2 = -1\n3 * 2 = 6\n10 / 5 = 2\n7 % 3 = 1\n1 > 1 = 0\n1 > 0 = 1\n1 >= 1 = 1\n1 < 0 = 0\n0 < 1 = 1\n1 < 1 = 0\n1 <= 1 = 1\n" 
+        "expect-stdout": "1 + 2 = 3\n1 - 2 = -1\n3 * 2 = 6\n10 / 5 = 2\n7 % 3 = 1\n1 > 1 = 0\n1 > 0 = 1\n1 >= 1 = 1\n1 < 0 = 0\n0 < 1 = 1\n1 < 1 = 0\n1 <= 1 = 1\n" 
     },
     {
         "file": "euler3.lang",
-        "expected": "6857\n"
+        "expect-stdout": "6857\n"
+    },
+
+
+    {
+        "file": "cast.lang",
+        "expect-stderr": "Cannot assign out of type real to expression of type int\n"
+    },
+    {
+        "file": "call-type.lang",
+        "expect-stderr": "Argument 1 of function func has the wrong type. Required: 'int', Got: 'real'\n"
+    },
+    {
+        "file": "err.lang",
+        "expect-stderr": "./test/files/err.lang:2:14: Error: Unknown reference 'nothing'\n    2 |     int x := nothing + foo;\n      |              ^~~~~~~\n"
+
     }
 ]

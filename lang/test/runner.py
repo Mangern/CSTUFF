@@ -2,7 +2,20 @@ import json
 import os
 import subprocess
 
-def test_file(filename: str, expected_output: str):
+def test_file(filename: str, expected_stdout: str, expected_stderr: str):
+
+    def compare_output(stdout: str, stderr: str):
+        if stdout != expected_stdout:
+            print(f"Expected: '{expected_stdout}', got '{stdout}'")
+            return False
+
+        if stderr != expected_stderr:
+            print(f"Expected: '{expected_stderr}', got '{stderr}'")
+            return False
+
+        return True
+
+
     full_path = f"./test/files/{filename}"
     result = subprocess.run(
         ["./langc", full_path],
@@ -12,10 +25,7 @@ def test_file(filename: str, expected_output: str):
     )
 
     if result.returncode != 0:
-        print("COMPILATION FAILED")
-        print(f"Stdout: {result.stdout}")
-        print(f"Stderr: {result.stderr}")
-        return False
+        return compare_output(result.stdout, result.stderr)
 
     result = subprocess.run(
         "./a.out",
@@ -24,23 +34,17 @@ def test_file(filename: str, expected_output: str):
         text=True
     )
 
-    if result.returncode != 0:
-        print("PROGRAM FAILED")
-        print(f"Stdout: {result.stdout}")
-        print(f"Stderr: {result.stderr}")
-        return False
-
-    if result.stdout != expected_output:
-        print(f"Expected: '{expected_output}', got '{result.stdout}'")
-        return False
-
-    return True
+    return compare_output(result.stdout, result.stderr)
 
 tests = json.load(open("./test/tests.json"))
 
 for test in tests:
     fn = test["file"]
-    success = test_file(fn, test["expected"])
+    success = test_file(
+        fn, 
+        test.get("expect-stdout", ""),
+        test.get("expect-stderr", "")
+    )
 
     if success:
         print(f"OK  : {fn}")

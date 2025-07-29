@@ -1,15 +1,17 @@
-int global_var;
 main := () -> void {
     int n := 0;
+    int i := 0;
 
-    while (n < 10) {
+    while (i < 10) {
         int m := 0;
-        while (m < n + 1) {
-            print(n * m);
-            m := m + 1;
+
+        while (m <= i) {
+            m += 1;
         }
-        n := n + 1;
+
+        n += m;
+        i += 1;
     }
 
-    print((n + 2) * (n + 3));
+    println(n);
 }

@@ -1,0 +1,6 @@
+main := () -> void {
+    int x := 6;
+    int y := 9;
+    print(x);
+    println(y);
+}
