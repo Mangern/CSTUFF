@@ -1,0 +1,11 @@
+func := (int x) -> int {
+    return x * x;
+}
+
+main := () -> void {
+  int x := 2 + 3;
+
+  int y := func(x);
+
+  println(y);
+}

@@ -10,7 +10,8 @@ enum symbol_type_t {
     SYMBOL_GLOBAL_VAR,
     SYMBOL_FUNCTION,
     SYMBOL_PARAMETER,
-    SYMBOL_LOCAL_VAR
+    SYMBOL_LOCAL_VAR,
+    SYMBOL_NAMESPACE
 };
 
 extern char* SYMBOL_TYPE_NAMES[];

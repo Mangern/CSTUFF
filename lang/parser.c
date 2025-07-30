@@ -20,7 +20,8 @@ static node_t* parse_expression();
 static node_t* parse_function_call(node_t*);
 static node_t* parse_cast();
 static node_t* parse_assignment(node_t*);
-static node_t* parse_operator_assignment(node_t*);
+static node_t* parse_block_operation(node_t*);
+static node_t* parse_scope_resolution(node_t*);
 static node_t* parse_array_indexing(node_t*);
 static operator_t parse_operator_str(char* operator_str, bool);
 
@@ -191,7 +192,7 @@ static node_t* parse_block() {
                 da_append(block_node->children, parse_assignment(identifier_node));
                 peek_expect_advance(LEX_SEMICOLON);
             } else if (token.type == LEX_OPERATOR) {
-                da_append(block_node->children, parse_operator_assignment(identifier_node));
+                da_append(block_node->children, parse_block_operation(identifier_node));
                 peek_expect_advance(LEX_SEMICOLON);
             } else if (token.type == LEX_LBRACKET) {
                 node_t* indexing_node = parse_array_indexing(identifier_node);
@@ -201,7 +202,7 @@ static node_t* parse_block() {
                     da_append(block_node->children, parse_assignment(indexing_node));
                     peek_expect_advance(LEX_SEMICOLON);
                 } else if (token.type == LEX_OPERATOR) {
-                    da_append(block_node->children, parse_operator_assignment(indexing_node));
+                    da_append(block_node->children, parse_block_operation(indexing_node));
                     peek_expect_advance(LEX_SEMICOLON);
                 } else if (token.type == LEX_SEMICOLON) {
                     lexer_advance();
@@ -361,6 +362,8 @@ static operator_t parse_operator_str(char* operator_str, bool binary) {
             return BINARY_GEQ;
         } else if (strcmp(operator_str, "!=") == 0) {
             return BINARY_NEQ;
+        } else if (strcmp(operator_str, "::") == 0) {
+            return BINARY_SCOPE_RES;
         }
     } else {
         if (strcmp(operator_str, "-") == 0) {
@@ -559,12 +562,20 @@ static node_t* parse_assignment(node_t* lhs_node) {
     return ret;
 }
 
-static node_t* parse_operator_assignment(node_t* lhs_node) {
+// For when there is <something> <operator> <something>
+// as a block statement
+static node_t* parse_block_operation(node_t* lhs_node) {
     token_t operator_token = peek_expect_advance(LEX_OPERATOR);
 
     char* operator_str = lexer_substring(operator_token.begin_offset, operator_token.end_offset);
     operator_t op = parse_operator_str(operator_str, true);
     free(operator_str);
+
+    if (op == BINARY_SCOPE_RES) {
+        return parse_scope_resolution(lhs_node);
+    }
+    
+    // For now: assume this is a += or similar
 
     node_t* assignment_node = node_create(ASSIGNMENT_STATEMENT);
     da_append(assignment_node->children, lhs_node);
@@ -599,6 +610,34 @@ static node_t* parse_operator_assignment(node_t* lhs_node) {
 
     da_append(assignment_node->children, operator_node);
     return assignment_node;
+}
+
+static node_t* parse_scope_resolution(node_t* lhs_node) {
+    token_t token = lexer_peek();
+    if (token.type != LEX_IDENTIFIER) 
+        fail_token_expected(token, LEX_IDENTIFIER);
+
+    node_t* identifier = node_create_leaf(IDENTIFIER, token);
+    identifier->data.identifier_str = lexer_substring(token.begin_offset, token.end_offset);
+
+    lexer_advance();
+
+    node_t* merged = node_create(SCOPE_RESOLUTION);
+    da_append(merged->children, lhs_node);
+    da_append(merged->children, identifier);
+
+    token = lexer_peek();
+
+    switch (token.type) {
+        case LEX_LPAREN:
+            return parse_function_call(merged);
+        case LEX_OPERATOR:
+            return parse_block_operation(merged);
+        default:
+            fail_token(token);
+    }
+
+    assert(false); // unreachable
 }
 
 static node_t* parse_array_indexing(node_t* identifier_node) {

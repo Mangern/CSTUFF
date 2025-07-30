@@ -26,6 +26,7 @@ const int OPERATOR_PRECEDENCE[] = {
     6,  // BINARY_LEQ,
     7,  // BINARY_EQ,
     7,  // BINARY_NEQ,
+    1,  // BINARY_SCOPE_RES
     2,  // UNARY_SUB,
     2   // UNARY_NEG,
 };
@@ -51,7 +52,8 @@ char* NODE_TYPE_NAMES[] = {
     "IF_STATEMENT",
     "WHILE_STATEMENT",
     "ARRAY_INDEXING",
-    "BREAK_STATEMENT"
+    "BREAK_STATEMENT",
+    "SCOPE_RESOLUTION"
 };
 
 char* OPERATOR_TYPE_NAMES[] = {
@@ -71,6 +73,7 @@ char* OPERATOR_TYPE_NAMES[] = {
     "binary_leq",
     "binary_eq",
     "binary_neq",
+    "binary_scope_res",
     "unary_sub",
     "unary_neg"
 };

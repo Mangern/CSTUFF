@@ -20,17 +20,18 @@ typedef enum {
     STRING_LITERAL,
     BOOL_LITERAL,         // leaf
     PARENTHESIZED_EXPRESSION, // children: [expression | parenthesized_expression]
-    FUNCTION_CALL,            // children: [identifier, list[expression]]
+    FUNCTION_CALL,            // children: [identifier, list[expression]] | [scope_resolution, list[expression]]
     RETURN_STATEMENT,      // children: [expression]
     ASSIGNMENT_STATEMENT,  // children: [identifier, expression] | [array_indexing, expression]
     CAST_EXPRESSION,       // children: [typename, expression]
     IF_STATEMENT,           // children: [expression, block] | [expression, block, block]
     WHILE_STATEMENT,
     ARRAY_INDEXING,         // children: [identifier, list[expression]]
-    BREAK_STATEMENT
+    BREAK_STATEMENT,
+    SCOPE_RESOLUTION // children: [scope resolution, identifier] | [identifier, identifier]
 } node_type_t;
 
-enum operator_t {
+typedef enum operator_t {
     BINARY_ADD = 0,
     BINARY_SUB,
     BINARY_MUL,
@@ -47,9 +48,10 @@ enum operator_t {
     BINARY_LEQ,
     BINARY_EQ, 
     BINARY_NEQ,
+    BINARY_SCOPE_RES,
     UNARY_SUB, 
     UNARY_NEG, 
-};
+} operator_t;
 
 extern const int OPERATOR_PRECEDENCE[];
 extern char* NODE_TYPE_NAMES[];

@@ -16,6 +16,7 @@ static void insert_builtin_functions();
 static void create_function_tables(node_t*);
 static void create_insert_variable_declaration(symbol_table_t*, symbol_type_t, node_t*);
 static void bind_references(symbol_table_t*, node_t*);
+static symbol_t* symbol_resolve_scope(symbol_table_t*, node_t*);
 
 char* SYMBOL_TYPE_NAMES[] = {
     "GLOBAL_VAR",
@@ -176,18 +177,24 @@ static void bind_references(symbol_table_t* local_symbols, node_t* node) {
             break;
         case FUNCTION_CALL:
             {
-                node_t* identifier_node = node->children[0];
-                symbol_t* symbol_definition = symbol_hashmap_lookup(local_symbols->hashmap, identifier_node->data.identifier_str);
+                node_t* lhs_node = node->children[0];
+
+                symbol_t* symbol_definition = 0;
+                if (lhs_node->type == IDENTIFIER) {
+                    symbol_definition = symbol_hashmap_lookup(local_symbols->hashmap, lhs_node->data.identifier_str);
+                } else {
+                    symbol_definition = symbol_resolve_scope(local_symbols, lhs_node);
+                }
                 if (symbol_definition == NULL) {
-                    fail_node(node->children[0], "Error: Unknown function reference '%s'", identifier_node->data.identifier_str);
+                    fail_node(node->children[0], "Error: Unknown function reference '%s'", lhs_node->data.identifier_str);
                 } 
 
                 if (symbol_definition->type != SYMBOL_FUNCTION) {
                     // TODO: Note
-                    fail_node(identifier_node, "Error: '%s' is not a function", symbol_definition->name);
+                    fail_node(lhs_node, "Error: '%s' is not a function", symbol_definition->name);
                 }
 
-                identifier_node->symbol = symbol_definition;
+                lhs_node->symbol = symbol_definition;
                 node_t* list_node = node->children[1];
 
                 for (size_t i = 0; i < da_size(list_node->children); ++i) {
@@ -209,4 +216,17 @@ static void bind_references(symbol_table_t* local_symbols, node_t* node) {
                 exit(EXIT_FAILURE);
             }
     }
+}
+
+// resolve scope resolution
+static symbol_t* symbol_resolve_scope(symbol_table_t* local_symbols, node_t* scope_resolution_node) {
+
+    node_t* lhs_node = scope_resolution_node->children[0];
+
+    if (lhs_node->type == IDENTIFIER) {
+        symbol_t* symbol_definition = symbol_hashmap_lookup(local_symbols->hashmap, lhs_node->data.identifier_str);
+        (void)symbol_definition;
+    }
+
+    assert(false && "Not done");
 }
