@@ -5,7 +5,7 @@ Just a compiler, designed with one goal in mind: trying out compiler constructio
 ## Hello World
 
 ```ts
-main := () -> void {
+main: () -> void = {
     println("Hello World!");
 }
 ```
@@ -15,40 +15,47 @@ main := () -> void {
 ```ts
 // Project Euler Problem 3: 
 // - Find the largest prime factor of 600851475143
-main := () -> void {
-    int num := 600851475143;
+main: () -> void = {
+    num := 600851475143;
 
-    int i := 2;
-
-    int ans := num;
-    while (!(i * i > num)) {
+    i := 2;
+    while (i * i <= num) {
         while (num % i == 0) {
             if (i == num) {
                 break;
             }
-            num := num / i;
+            num /= i;
         }
-        i := i + 1;
+        i += 1;
     }
 
-    println(num);
+    println(num); // 6857
 }
 ```
 
 # Build and run
 
 ## Build
+
+Please be on x86_64 linux and make sure you have `gcc` and `make`.
+
 ```bash
 make
+
+# Test
+make test
 ```
 
-## Compile to assembly
+## Usage (currently requires gcc in `$PATH`)
+
+I use gcc as the assembler+linker.
+
 ```bash
-./langc -a ./test-files/sieve.lang > out.S
+./langc ./example-files/rule110.lang
 ```
 
-## Compile the assembly
+## Run the compiled program
 
 ```bash
-gcc out.S
+./a.out
 ```
