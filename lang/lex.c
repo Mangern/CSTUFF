@@ -8,11 +8,10 @@
 #include <stdbool.h>
 
 char* TOKEN_TYPE_NAMES[] = {
-    "typename",
     "identifier",
     ";",
     ":",
-    ":=",
+    "=",
     "->",
     "{",
     "}",
@@ -48,7 +47,6 @@ static void skip_whitespace();
 static void skip_comments();
 static bool isidentifierchar(char c);
 static bool matches_prefix_word(char* pref);
-static size_t matches_typename();
 static size_t matches_identifier();
 static size_t matches_integer();
 static size_t matches_real();
@@ -104,18 +102,12 @@ token_t lexer_peek() {
     } else if (matches_prefix_word("break")) {
         current_token.type = LEX_BREAK;
         current_token.end_offset = content_ptr + 5;
-    } else if ((match_len = matches_typename())) {
-        current_token.type = LEX_TYPENAME;
-        current_token.end_offset = content_ptr + match_len;
     } else if ((match_len = matches_identifier())) {
         current_token.type = LEX_IDENTIFIER;
         current_token.end_offset = content_ptr + match_len;
     } else if (content[content_ptr] == ';') {
         current_token.type = LEX_SEMICOLON;
         current_token.end_offset = content_ptr + 1;
-    } else if (content_ptr + 1 < content_size && content[content_ptr] == ':' && content[content_ptr+1] == '=') {
-        current_token.type = LEX_WALRUS;
-        current_token.end_offset = content_ptr + 2;
     } else if (content_ptr + 1 < content_size && content[content_ptr] == '-' && content[content_ptr+1] == '>') {
         current_token.type = LEX_ARROW;
         current_token.end_offset = content_ptr + 2;
@@ -140,6 +132,9 @@ token_t lexer_peek() {
     } else if (content[content_ptr] == ',') {
         current_token.type = LEX_COMMA;
         current_token.end_offset = content_ptr + 1;
+    } else if (content[content_ptr] == ':') {
+        current_token.type = LEX_COLON;
+        current_token.end_offset = content_ptr + 1;
     } else if ((match_len = matches_integer())) {
         current_token.type = LEX_INTEGER;
         current_token.end_offset = content_ptr + match_len;
@@ -152,6 +147,9 @@ token_t lexer_peek() {
     } else if ((match_len = matches_operator())) {
         current_token.type = LEX_OPERATOR;
         current_token.end_offset = content_ptr + match_len;
+    } else if (content[content_ptr] == '=') {
+        current_token.type = LEX_EQUAL;
+        current_token.end_offset = content_ptr + 1;
     } else {
         // TODO: line number information
         fprintf(stderr, "%s: Unexpected character '%c'\n", location_str(lexer_offset_location(content_ptr)), content[content_ptr]);
@@ -203,16 +201,6 @@ static bool matches_prefix_word(char* pref) {
     int len = strlen(pref);
     if (strncmp(&content[content_ptr], pref, len)) return false;
     return content_ptr+len >= content_size || !isidentifierchar(content[content_ptr+len]);
-}
-
-static size_t matches_typename() {
-    if (matches_prefix_word("int")) return 3;
-    if (matches_prefix_word("real")) return 4;
-    if (matches_prefix_word("void")) return 4;
-    if (matches_prefix_word("bool")) return 4;
-    if (matches_prefix_word("char")) return 4;
-    if (matches_prefix_word("string")) return 6;
-    return 0;
 }
 
 static size_t matches_identifier() {

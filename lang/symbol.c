@@ -10,6 +10,7 @@
 #include "tree.h"
 #include "da.h"
 #include "fail.h"
+#include "type.h"
 
 
 static void insert_builtin_functions();
@@ -36,13 +37,24 @@ void create_symbol_tables() {
 
     for (size_t i = 0; i < da_size(root->children); ++i) {
         node_t* node = root->children[i];
-        if (node->type == FUNCTION_DECLARATION) {
-            create_function_tables(node);
-        } else if (node->type == VARIABLE_DECLARATION) {
-            create_insert_variable_declaration(global_symbol_table, SYMBOL_GLOBAL_VAR, node);
+        if (node->type == DECLARATION) {
+            node_t* identifier = node->children[0];
+            node_t* typenode = node->children[1];
+            if (typenode->data.type_class == TC_FUNCTION) {
+                create_function_tables(node);
+            } else {
+                create_insert_variable_declaration(global_symbol_table, SYMBOL_GLOBAL_VAR, node);
+            }
         } else {
             assert(false && "Unexpected node type in global statement list");
         }
+
+        //if (node->type == FUNCTION_DECLARATION) {
+        //    create_function_tables(node);
+        //} else if (node->type == VARIABLE_DECLARATION) {
+        //    create_insert_variable_declaration(global_symbol_table, SYMBOL_GLOBAL_VAR, node);
+        //} else {
+        //}
     }
 }
 
@@ -69,10 +81,12 @@ static void create_function_tables(node_t* function_declaration_node) {
     function_symtable->hashmap->backup = global_symbol_table->hashmap;
 
     node_t* identifier_node = function_declaration_node->children[0];
-    node_t* parameter_list = function_declaration_node->children[1];
+    node_t* func_type_node = function_declaration_node->children[1];
 
-    for (size_t i = 0; i < da_size(parameter_list->children); ++i) {
-        node_t* param_declaration = parameter_list->children[i];
+    node_t* param_declaration_list = func_type_node->children[0];
+
+    for (size_t i = 0; i < da_size(param_declaration_list->children); ++i) {
+        node_t* param_declaration = param_declaration_list->children[i];
         create_insert_variable_declaration(function_symtable, SYMBOL_PARAMETER, param_declaration);
     }
 
@@ -88,20 +102,21 @@ static void create_function_tables(node_t* function_declaration_node) {
         fail_node(identifier_node, "Error: Redefinition of function '%s'", function_symbol->name);
     }
 
-    bind_references(function_symtable, function_declaration_node->children[3]);
+    bind_references(function_symtable, function_declaration_node->children[2]);
 }
 
 static void create_insert_variable_declaration(symbol_table_t* symtable, symbol_type_t symbol_type, node_t* declaration_node) {
     symbol_t* symbol = malloc(sizeof(symbol_t));
-    assert((declaration_node->children[1]->type == IDENTIFIER) && "Expected identifier_node");
-    symbol->name = declaration_node->children[1]->data.identifier_str;
+    node_t* identifier_node = declaration_node->children[0];
+    assert((identifier_node->type == IDENTIFIER) && "Expected identifier_node");
+    symbol->name = identifier_node->data.identifier_str;
     symbol->type = symbol_type;
-    symbol->node = declaration_node->children[1];
+    symbol->node = identifier_node;
     symbol->function_symtable = NULL;
     symbol->node->symbol = symbol;
     if (symbol_table_insert(symtable, symbol) == INSERT_COLLISION) {
         // TODO: Node:
-        fail_node(declaration_node->children[1], "Error: Redefinition of variable '%s'", symbol->name);
+        fail_node(identifier_node, "Error: Redefinition of variable '%s'", symbol->name);
     }
 }
 
@@ -133,7 +148,7 @@ static void bind_references(symbol_table_t* local_symbols, node_t* node) {
         case PARENTHESIZED_EXPRESSION:
         case ASSIGNMENT_STATEMENT:
         case CAST_EXPRESSION:
-        case TYPENAME:
+        case TYPE:
         case IF_STATEMENT:
         case WHILE_STATEMENT:
         case ARRAY_INDEXING:
@@ -146,21 +161,22 @@ static void bind_references(symbol_table_t* local_symbols, node_t* node) {
                 }
             }
             break;
-        case VARIABLE_DECLARATION:
+        case DECLARATION:
             {
                 // type, identifier, expression?
                 if (da_size(node->children) == 3) {
                     bind_references(local_symbols, node->children[2]);
                 }
                 symbol_t* symbol = malloc(sizeof(symbol_t));
-                assert((node->children[1]->type == IDENTIFIER) && "Expected identifier_node");
-                symbol->name = node->children[1]->data.identifier_str;
+                node_t* identifier = node->children[0];
+                assert((identifier->type == IDENTIFIER) && "Expected identifier_node");
+                symbol->name = identifier->data.identifier_str;
                 symbol->type = SYMBOL_LOCAL_VAR;
-                symbol->node = node->children[1];
+                symbol->node = identifier;
                 symbol->function_symtable = local_symbols;
                 symbol->node->symbol = symbol;
                 if (symbol_table_insert(local_symbols, symbol) == INSERT_COLLISION) {
-                    fail_node(node->children[1], "Error: Redefinition of variable '%s'", symbol->name);
+                    fail_node(identifier, "Error: Redefinition of variable '%s'", symbol->name);
                 }
             }
             break;

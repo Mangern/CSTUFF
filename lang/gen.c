@@ -5,6 +5,7 @@
 
 #include "gen.h"
 #include "da.h"
+#include "fail.h"
 #include "langc.h"
 #include "symbol.h"
 #include "symbol_table.h"
@@ -16,6 +17,9 @@ FILE *gen_outfile = 0;
 
 #define NUM_REGISTER_PARAMS 6
 static const char* REGISTER_PARAMS[6] = {RDI, RSI, RDX, RCX, R8, R9};
+
+// node** : 
+#define FUNCTION_ARGS(func) ((func)->node->children[1]->children[0]->children)
 
 static void generate_stringtable();
 static void generate_global_variables();
@@ -132,14 +136,13 @@ static void generate_function(function_code_t func_code) {
     size_t local_space = 0;
     size_t home_space = 0;
 
-    for (size_t i = 0; i < da_size(current_function->node->children[1]->children) && i < NUM_REGISTER_PARAMS; ++i) {
+    for (size_t i = 0; i < da_size(FUNCTION_ARGS(current_function)) && i < NUM_REGISTER_PARAMS; ++i) {
         // lol
-        EMIT("pushq %s // %s", REGISTER_PARAMS[i], current_function->node->children[1]->children[i]->children[1]->symbol->name);
+        EMIT("pushq %s // %s", REGISTER_PARAMS[i], FUNCTION_ARGS(current_function)[i]->children[0]->symbol->name);
         home_space += 8;
     }
 
     preprocess_tac_list(func_code.tac_list);
-
 
     for (size_t i = 0; i < da_size(current_used_addrs); ++i) {
         addr_t addr = addr_list[current_used_addrs[i]];
@@ -208,7 +211,7 @@ static long get_addr_rbp_offset(size_t addr_idx) {
         return -offs;
     }
     long offs = 0;
-    size_t n_params = da_size(current_function->node->children[1]->children);
+    size_t n_params = da_size(FUNCTION_ARGS(current_function));
     if (n_params > NUM_REGISTER_PARAMS)n_params = NUM_REGISTER_PARAMS;
     offs = n_params + 1;
 
@@ -287,6 +290,7 @@ static const char* generate_addr_access(size_t addr_idx) {
 static void generate_tac(tac_t tac) {
     switch (tac.instr) {
     case TAC_NOP:
+    case TAC_DECLARE_PARAM:
         return;
     case TAC_RETURN:
         {
@@ -649,7 +653,6 @@ static void generate_tac(tac_t tac) {
             MOVQ(RAX, generate_addr_access(tac.dst));
         }
         break;
-
     default:
         assert(false && "not implemented");
     }

@@ -31,6 +31,7 @@ enum instruction_t {
     TAC_LOCOF, // store location of src1 into dst
     TAC_LOAD, // load src1[src2] -> dst. src1: location
     TAC_STORE, // store src1 -> src2[dst]. src2: location
+    TAC_DECLARE_PARAM // declare src1 as an addr param
 };
 
 enum addr_type_t {

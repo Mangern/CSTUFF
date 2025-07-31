@@ -5,11 +5,10 @@
 #include "langc.h"
 
 typedef enum {
-    LEX_TYPENAME,
     LEX_IDENTIFIER,
     LEX_SEMICOLON,
     LEX_COLON,
-    LEX_WALRUS,
+    LEX_EQUAL,
     LEX_ARROW,
     LEX_LBRACE,
     LEX_RBRACE,

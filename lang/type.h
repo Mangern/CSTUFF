@@ -14,13 +14,14 @@ enum basic_type_t {
     TYPE_STRING
 };
 
-enum type_class_t {
+typedef enum {
     TC_BASIC,
     TC_ARRAY,
     TC_STRUCT,
     TC_TUPLE,
-    TC_FUNCTION
-};
+    TC_FUNCTION,
+    TC_UNKNOWN
+} type_class_t;
 
 struct type_info_t {
     type_class_t type_class;
@@ -28,7 +29,7 @@ struct type_info_t {
         type_array_t* info_array;
         basic_type_t info_basic;
         type_struct_t* info_struct;
-        type_tuple_t* info_tuple;
+        struct type_tuple_t* info_tuple;
         type_function_t* info_function;
     } info;
 };
@@ -47,9 +48,9 @@ struct type_struct_t {
     type_named_t** fields;
 };
 
-struct type_tuple_t {
+typedef struct type_tuple_t {
     type_info_t** elems;
-};
+} type_tuple_t;
 
 struct type_function_t {
     type_tuple_t* arg_types;

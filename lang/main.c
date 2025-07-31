@@ -115,6 +115,8 @@ int main(int argc, char** argv) {
 
     create_symbol_tables();
 
+    print_tree(root);
+
     gettimeofday(&t_create_symbols, NULL);
 
     register_types();

@@ -1,5 +1,18 @@
-main : () -> void = {
+func: (x: int) -> int = {
+    y: int = 1234;
+    return y;
+}
+
+add: (x: int, y: int) -> int = {
+    return x + y;
+}
+
+main: () -> void = {
   x: int = 5;
 
-  x = 19;
+  x = x + 19;
+
+  println(x);
+  println(func(123));
+  println(add(34, 35));
 }

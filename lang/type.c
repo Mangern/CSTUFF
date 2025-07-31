@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
@@ -32,6 +33,7 @@ static type_info_t* create_basic(basic_type_t basic_type);
 static type_info_t* create_type_function();
 static type_info_t* create_type_array(type_info_t*, node_t*);
 static type_tuple_t* create_tuple();
+static basic_type_t is_basic_type(const char* identifier_str);
 
 
 void register_types() {
@@ -40,21 +42,33 @@ void register_types() {
     }
 }
 
-node_t* current_function_node = NULL;
+// Points to the DECLARATION of the curr function
+node_t* current_function_type_node = NULL;
+
 static void register_type_node(node_t* node) {
     if (node->type_info != NULL) return;
 
     switch (node->type) {
-        case VARIABLE_DECLARATION:
+        case DECLARATION:
             {
-                // Typename node
-                register_type_node(node->children[0]);
+                // Type node
+                register_type_node(node->children[1]);
+                node_t* old_function_node = current_function_type_node;
+
                 if (da_size(node->children) == 3) {
-                    // type identifier := expression
+                    bool is_function = node->children[1]->type == TYPE 
+                        && node->children[1]->data.type_class == TC_FUNCTION;
+                    if (is_function) {
+                        old_function_node = current_function_type_node;
+                        current_function_type_node = node->children[1];
+                    }
+
+                    // identifier: type = expression
                     // Check if expression has same type as declared
                     register_type_node(node->children[2]);
 
-                    if (!types_equivalent(node->children[0]->type_info, node->children[2]->type_info)) {
+                    if (!is_function && !types_equivalent(node->children[1]->type_info, node->children[2]->type_info)) {
+                        // TODO: better error
                         fprintf(stderr, "Cannot assign %s of type ", node->children[1]->data.identifier_str);
                         type_print(stderr, node->children[0]->type_info);
                         fprintf(stderr, " to expression of type ");
@@ -63,28 +77,46 @@ static void register_type_node(node_t* node) {
                         exit(EXIT_FAILURE);
                     }
                 }
-                node->type_info = node->children[0]->type_info;
-                node->children[1]->type_info = node->type_info;
+                node->type_info = node->children[1]->type_info;
+                node->children[0]->type_info = node->type_info;
+
+                current_function_type_node = old_function_node;
                 return;
             }
             break;
-        case TYPENAME:
+        case TYPE:
             {
-                char* type_str = node->data.typename_str;
-                if (strcmp(type_str, "int") == 0) {
-                    node->type_info = create_basic(TYPE_INT);
-                } else if (strcmp(type_str, "real") == 0) {
-                    node->type_info = create_basic(TYPE_REAL);
-                } else if (strcmp(type_str, "void") == 0) {
-                    node->type_info = create_basic(TYPE_VOID);
-                } else if (strcmp(type_str, "bool") == 0) {
-                    node->type_info = create_basic(TYPE_BOOL);
-                } else if (strcmp(type_str, "char") == 0) {
-                    node->type_info = create_basic(TYPE_CHAR);
-                } else if (strcmp(type_str, "string") == 0) {
-                    node->type_info = create_basic(TYPE_STRING);
+                if (node->data.type_class == TC_FUNCTION) {
+                    for (size_t i = 0; i < da_size(node->children); ++i) {
+                        register_type_node(node->children[i]);
+                    }
+
+                    node->type_info = create_type_function();
+                    node->type_info->info.info_function->return_type 
+                        = node->children[1]->type_info;
+
+                    for (size_t i = 0; i < da_size(node->children[0]->children); ++i) {
+                        da_append(
+                            node->type_info->info.info_function->arg_types->elems,
+                            node->children[0]->children[i]->type_info
+                        );
+                    }
+                    // TODO: arg types
+                    return;
+                } else if (node->data.type_class == TC_UNKNOWN) {
+                    assert(da_size(node->children) == 1);
+
+                    node_t* identifier = node->children[0];
+                    assert(identifier->type == IDENTIFIER);
+
+                    basic_type_t basic_type = is_basic_type(identifier->data.identifier_str);
+                    if ((basic_type >= 0)) {
+                        node->type_info = create_basic(basic_type);
+                    } else {
+                        fail_node(identifier, "Unknown type %s", identifier->data.identifier_str);
+                    }
                 } else {
-                    fail("Unhandled type name %s", type_str);
+                    assert(false && "Unhandled type class from parsing stage");
                 }
 
                 return;
@@ -122,32 +154,13 @@ static void register_type_node(node_t* node) {
                 return;
             }
             break;
-        case FUNCTION_DECLARATION:
+        case DECLARATION_LIST:
             {
-                // Return type
-                register_type_node(node->children[2]);
-
-                node_t* old_function_node = current_function_node;
-                current_function_node = node;
-
-                // Is it sketchy to save before everything has been computed
-                // Infinite loop if not, i think
-                node->type_info = create_type_function();
-                node->type_info->info.info_function->return_type = node->children[2]->type_info;
-
-                // Declarations in arg_list
-                for (size_t i = 0; i < da_size(node->children[1]->children); ++i) {
-                    register_type_node(node->children[1]->children[i]);
-                    da_append(node->type_info->info.info_function->arg_types->elems, node->children[1]->children[i]->type_info);
+                for (size_t i = 0; i < da_size(node->children); ++i) {
+                    register_type_node(node->children[i]);
                 }
-
-                // Block
-                register_type_node(node->children[3]);
-
-                // TODO: Check return statement type
-
-                current_function_node = old_function_node;
-
+                // TODO
+                node->type_info = create_basic(TYPE_VOID);
                 return;
             }
             break;
@@ -168,12 +181,12 @@ static void register_type_node(node_t* node) {
                 } else {
                     node->type_info = create_basic(TYPE_VOID);
                 }
-                if (current_function_node == NULL) {
+                if (current_function_type_node == NULL) {
                     fail("Return statement not allowed outside function");
                 }
-                type_info_t* required_return_type = current_function_node->type_info->info.info_function->return_type;
+                type_info_t* required_return_type = current_function_type_node->type_info->info.info_function->return_type;
                 if (!types_equivalent(node->type_info, required_return_type)) {
-                    fprintf(stderr, "Function '%s', with return type '", current_function_node->children[0]->data.identifier_str);
+                    fprintf(stderr, "Function '%s', with return type '", current_function_type_node->children[0]->data.identifier_str);
                     type_print(stderr, required_return_type);
                     fprintf(stderr, "', cannot return '");
                     type_print(stderr, node->type_info);
@@ -269,6 +282,9 @@ static void register_type_node(node_t* node) {
             break;
         case IDENTIFIER:
             {
+                if (node->symbol == NULL)
+                    fail_node(node, "bind ref fail");
+
                 assert(node->symbol != NULL && "Bind references has not succeeded");
                 node_t* symbol_definition_node = node->symbol->node;
                 assert(symbol_definition_node->type_info != NULL);
@@ -575,4 +591,21 @@ void type_print(FILE* stream, type_info_t* type) {
             }
             break;
     }
+}
+
+static basic_type_t is_basic_type(const char* identifier_str) {
+    if (strcmp(identifier_str, "int") == 0) {
+        return TYPE_INT;
+    } else if (strcmp(identifier_str, "real") == 0) {
+        return TYPE_REAL;
+    } else if (strcmp(identifier_str, "void") == 0) {
+        return TYPE_VOID;
+    } else if (strcmp(identifier_str, "bool") == 0) {
+        return TYPE_BOOL;
+    } else if (strcmp(identifier_str, "char") == 0) {
+        return TYPE_CHAR;
+    } else if (strcmp(identifier_str, "string") == 0) {
+        return TYPE_STRING;
+    }
+    return -1;
 }

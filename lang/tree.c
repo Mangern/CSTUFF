@@ -33,11 +33,11 @@ const int OPERATOR_PRECEDENCE[] = {
 
 char* NODE_TYPE_NAMES[] = {
     "LIST",
-    "VARIABLE_DECLARATION",
-    "TYPENAME",
+    "DECLARATION",
+    "TYPE",
     "ARRAY_TYPE",
     "IDENTIFIER",
-    "FUNCTION_DECLARATION",
+    "DECLARATION_LIST",
     "BLOCK",
     "OPERATOR",
     "INTEGER_LITERAL",
@@ -115,8 +115,6 @@ static void print_tree_impl(node_t* node, int indent) {
         }
     } else if (node->type == BOOL_LITERAL) {
         printf(" (%s)", node->data.bool_literal_value ? "true" : "false");
-    } else if (node->type == TYPENAME) {
-        printf(" (%s)", node->data.typename_str);
     }
 
     if (node->symbol != NULL) {

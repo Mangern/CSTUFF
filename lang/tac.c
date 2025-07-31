@@ -38,9 +38,11 @@ static char* TAC_INSTRUCTION_NAMES[] = {
     "LOCOF", 
     "LOAD", 
     "STORE", 
+    "DECLARARE_PARAM",
 };
 
 static function_code_t generate_function_code(symbol_t* function_symbol);
+static void generate_param_decls(tac_t** list, node_t* function_node);
 static void generate_node_code(tac_t** list, node_t* node);
 // returns addr where return value is stored
 static size_t generate_valued_code(tac_t** list, node_t* node);
@@ -85,13 +87,30 @@ static function_code_t generate_function_code(symbol_t* function_symbol) {
         .function_symbol = function_symbol,
     };
     ret.tac_list = 0;
-    // child idx 3 is BLOCK
+    // child idx 2 is BLOCK
+    // Register all symbols in this functions symbol table as addrs,
+    // that is, put them in the global addr_list
     for (size_t i = 0; i < function_symbol->function_symtable->n_symbols; ++i) {
         symbol_t* local_symbol = function_symbol->function_symtable->symbols[i];
         get_symbol_addr(local_symbol);
     }
-    generate_node_code(&ret.tac_list, function_symbol->node->children[3]);
+    generate_param_decls(&ret.tac_list, function_symbol->node);
+    generate_node_code(&ret.tac_list, function_symbol->node->children[2]);
     return ret;
+}
+
+// generate DECLARARE_PARAM instructions,
+// which are essentially no-ops that will assist in gode gen
+static void generate_param_decls(tac_t** list, node_t* function_node) {
+    node_t* decl_list = function_node->children[1]->children[0];
+    assert(decl_list->type == DECLARATION_LIST);
+
+    for (size_t i = 0; i < da_size(decl_list->children); ++i) {
+        node_t* identifier = decl_list->children[i]->children[0];
+        assert(identifier->type == IDENTIFIER);
+        size_t addr = get_symbol_addr(identifier->symbol);
+        tac_emit(list, TAC_DECLARE_PARAM, addr, 0, 0);
+    }
 }
 
 static void generate_function_call_setup(tac_t** list, node_t* node, size_t* addr_function, size_t* addr_arg_list) {
@@ -132,14 +151,14 @@ static void generate_node_code(tac_t** list, node_t* node) {
                 tac_emit(list, TAC_CALL_VOID, addr_function, addr_arg_list, 0);
             }
             break;
-        case VARIABLE_DECLARATION:
+        case DECLARATION:
             {
                 // Does nothing at this point
                 if (da_size(node->children) <= 2) return;
 
                 size_t assigned_addr = generate_valued_code(list, node->children[2]);
-                assert(node->children[1]->type == IDENTIFIER);
-                tac_emit(list, TAC_COPY, assigned_addr, 0, get_symbol_addr(node->children[1]->symbol));
+                assert(node->children[0]->type == IDENTIFIER);
+                tac_emit(list, TAC_COPY, assigned_addr, 0, get_symbol_addr(node->children[0]->symbol));
             }
             break;
         case ASSIGNMENT_STATEMENT:

@@ -8,11 +8,11 @@
 
 typedef enum {
     LIST,
-    VARIABLE_DECLARATION, // children: [typename, identifier] | [typename, identifier, expression]
-    TYPENAME,             // leaf
+    DECLARATION, //  children: [identifier, type] | [identifier, type, block] | [identifier, type, expression]
+    TYPE,             // children: [identifier] | [declaration_list, type]
     ARRAY_TYPE,           // children: [typename, list[int_literal]]
     IDENTIFIER,
-    FUNCTION_DECLARATION, // children: [identifier, list[variable_declaration], typename, block]
+    DECLARATION_LIST, // children [declaration ...]
     BLOCK,                // children: [block | return_statement | function_call | variable_declaration]
     OPERATOR,             // children: [expression] | [expression, expression]
     INTEGER_LITERAL,      // leaf
@@ -74,6 +74,7 @@ struct node_t {
         char* identifier_str;
         char* typename_str;
         operator_t operator;
+        type_class_t type_class;
     } data;
 
     bool leaf;
