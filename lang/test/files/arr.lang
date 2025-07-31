@@ -1,14 +1,15 @@
-int x;
-int[5] foo;
-main := () -> void {
-    int i := 0;
+x: int;
+foo: int[5];
+
+main: () -> void = {
+    i: int = 0;
 
     while (i < 5) {
-        foo[i] := i;
+        foo[i] = i;
         i += 1;
     }
 
-    i := 0;
+    i = 0;
     while (i < 5) {
         print(foo[i]);
         if (i < 4) {

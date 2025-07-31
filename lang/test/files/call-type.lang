@@ -1,7 +1,7 @@
-func := (int x) -> int {
+func: (x: int) -> int = {
     return x * x;
 }
 
-main := () -> void {
+main: () -> void = {
     func(69.0);
 }

@@ -1,9 +1,9 @@
-main := () -> void {
-    int n := 0;
-    int i := 0;
+main: () -> void = {
+    n: int = 0;
+    i: int = 0;
 
     while (i < 10) {
-        int m := 0;
+        m: int = 0;
 
         while (m <= i) {
             m += 1;

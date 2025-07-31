@@ -1,14 +1,15 @@
-main := () -> void {
-    int x;
-    int y := 69;
-    x := 12;
+main: () -> void = {
+    x: int;
+    y: int = 69;
+
+    x = 12;
 
     if (x > 10) {
         if (x > 20) {
-            y := 11;
+            y = 11;
         }
     } else {
-        y := 21;
+        y = 21;
     }
     println(y);
 }

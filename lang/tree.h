@@ -10,7 +10,6 @@ typedef enum {
     LIST,
     DECLARATION, //  children: [identifier, type] | [identifier, type, block] | [identifier, type, expression]
     TYPE,             // children: [identifier] | [declaration_list, type]
-    ARRAY_TYPE,           // children: [typename, list[int_literal]]
     IDENTIFIER,
     DECLARATION_LIST, // children [declaration ...]
     BLOCK,                // children: [block | return_statement | function_call | variable_declaration]

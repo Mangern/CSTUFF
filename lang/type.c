@@ -63,14 +63,20 @@ static void register_type_node(node_t* node) {
                         current_function_type_node = node->children[1];
                     }
 
+                    // we need to save it here because if we have a 
+                    // recursive function, we need to 'memoize' the type info
+                    // so that we don't recurse infinitely
+                    node->type_info = node->children[1]->type_info;
+                    node->children[0]->type_info = node->type_info;
+
                     // identifier: type = expression
                     // Check if expression has same type as declared
                     register_type_node(node->children[2]);
 
                     if (!is_function && !types_equivalent(node->children[1]->type_info, node->children[2]->type_info)) {
                         // TODO: better error
-                        fprintf(stderr, "Cannot assign %s of type ", node->children[1]->data.identifier_str);
-                        type_print(stderr, node->children[0]->type_info);
+                        fprintf(stderr, "Cannot assign %s of type ", node->children[0]->data.identifier_str);
+                        type_print(stderr, node->children[1]->type_info);
                         fprintf(stderr, " to expression of type ");
                         type_print(stderr, node->children[2]->type_info);
                         fprintf(stderr, "\n");
@@ -115,19 +121,16 @@ static void register_type_node(node_t* node) {
                     } else {
                         fail_node(identifier, "Unknown type %s", identifier->data.identifier_str);
                     }
+                } else if (node->data.type_class == TC_ARRAY) {
+                    // first child: (sybtype, second: list)
+                    register_type_node(node->children[0]);
+                    register_type_node(node->children[1]);
+                    node->type_info = create_type_array(node->children[0]->type_info, node->children[1]);
                 } else {
                     assert(false && "Unhandled type class from parsing stage");
                 }
 
                 return;
-            }
-            break;
-        case ARRAY_TYPE:
-            {
-                register_type_node(node->children[0]);
-                register_type_node(node->children[1]);
-
-                node->type_info = create_type_array(node->children[0]->type_info, node->children[1]);
             }
             break;
         case INTEGER_LITERAL:
@@ -590,6 +593,11 @@ void type_print(FILE* stream, type_info_t* type) {
                 type_print(stream, type->info.info_function->return_type);
             }
             break;
+        case TC_UNKNOWN:
+            {
+                fprintf(stream, "unknown");
+                break;
+            }
     }
 }
 

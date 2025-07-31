@@ -1,13 +1,13 @@
-int global_var;
+global_var: int;
 
-sum := (int x, int y) -> int {
-    global_var := global_var + 1;
+sum: (x: int, y: int) -> int = {
+    global_var = global_var + 1;
     return x + y;
 }
 
-main := () -> void {
-    int x := 34;
-    int y := 35;
+main: () -> void = {
+    x: int = 34;
+    y: int = 35;
     println(sum(x, y));
     println(global_var);
 }

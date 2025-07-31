@@ -36,6 +36,18 @@ void parse() {
         node = parse_global_statement();
         if (!node) break;
         da_append(root->children, node);
+
+        token_t token;
+        for (;;) {
+            token = lexer_peek();
+            if (token.type == LEX_END) {
+                return;
+            } else if (token.type == LEX_SEMICOLON) {
+                lexer_advance();
+                continue;
+            }
+            break;
+        }
     }
 }
 
@@ -44,8 +56,6 @@ static node_t* parse_global_statement() {
 
     if (token.type == LEX_IDENTIFIER) {
         return parse_declaration(NULL);
-    } else if (token.type == LEX_END) {
-        return NULL;
     }
 
     fail_token(token);
@@ -196,21 +206,22 @@ static node_t* parse_block() {
                 da_append(block_node->children, parse_block_operation(identifier_node));
                 peek_expect_advance(LEX_SEMICOLON);
             } else if (token.type == LEX_LBRACKET) {
-                assert(false);
                 node_t* indexing_node = parse_array_indexing(identifier_node);
                 token = lexer_peek();
 
-                //if (token.type == LEX_WALRUS) {
-                //    da_append(block_node->children, parse_assignment(indexing_node));
-                //    peek_expect_advance(LEX_SEMICOLON);
-                //} else if (token.type == LEX_OPERATOR) {
-                //    da_append(block_node->children, parse_block_operation(indexing_node));
-                //    peek_expect_advance(LEX_SEMICOLON);
-                //} else if (token.type == LEX_SEMICOLON) {
-                //    lexer_advance();
-                //} else {
-                //    fail_token(token);
-                //}
+                if (token.type == LEX_EQUAL) {
+                   da_append(block_node->children, parse_assignment(indexing_node));
+                   peek_expect_advance(LEX_SEMICOLON);
+
+                } else if (token.type == LEX_OPERATOR) {
+                   da_append(block_node->children, parse_block_operation(indexing_node));
+                   peek_expect_advance(LEX_SEMICOLON);
+
+                } else if (token.type == LEX_SEMICOLON) {
+                   lexer_advance();
+                } else {
+                   fail_token(token);
+                }
             } else if (token.type == LEX_COLON) {
                 da_append(block_node->children, parse_declaration(identifier_node));
                 peek_expect_advance(LEX_SEMICOLON);
@@ -319,10 +330,11 @@ static node_t* parse_type() {
 
     // TODO: Array type.
     if (lexer_peek().type == LEX_LBRACKET) {
-        assert(false && "Not implemented");
         lexer_advance();
 
-        node_t* array_type_node = node_create(ARRAY_TYPE);
+        node_t* array_type_node = node_create(TYPE);
+        array_type_node->data.type_class = TC_ARRAY;
+
         da_append(array_type_node->children, type_node);
         node_t* dim_list = node_create(LIST);
 
@@ -747,4 +759,3 @@ static token_t peek_expect_advance(token_type_t expected) {
     lexer_advance();
     return token;
 }
-

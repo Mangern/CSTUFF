@@ -1,12 +1,12 @@
-main := () -> int {
+main: () -> int = {
     println(420.0);
     println(1, 2, 3, 69.0);
 
-    real a := 34.0;
-    real b := 2.0 * 17.0 + 1.0;
+    a: real = 34.0;
+    b: real = 2.0 * 17.0 + 1.0;
     println(a+b);
 
-    real pi := 3.141592653589793;
+    pi: real = 3.141592653589793;
 
     println(pi);
 

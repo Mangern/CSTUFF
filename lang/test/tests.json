@@ -67,7 +67,7 @@
     },
     {
         "file": "err.lang",
-        "expect-stderr": "./test/files/err.lang:2:14: Error: Unknown reference 'nothing'\n    2 |     int x := nothing + foo;\n      |              ^~~~~~~\n"
+        "expect-stderr": "./test/files/err.lang:2:14: Error: Unknown reference 'nothing'\n    2 |     x: int = nothing + foo;\n      |              ^~~~~~~\n"
 
     }
 ]

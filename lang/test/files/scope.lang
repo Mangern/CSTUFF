@@ -1,11 +1,11 @@
-main := () -> void {
-    int x := 1;
+main: () -> void = {
+    x: int = 1;
 
     {
-        int x := 2;
+        x: int = 2;
 
         {
-            int x := 3;
+            x: int = 3;
             println(x);
         }
 
