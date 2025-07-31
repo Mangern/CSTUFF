@@ -47,6 +47,6 @@ for test in tests:
     )
 
     if success:
-        print(f"OK  : {fn}")
+        print(f"\x1b[1;32m[OK]: {fn}\x1b[0m")
     else:
-        print(f"FAIL: {fn}")
+        print(f"\x1b[1;31m[FAIL]: {fn}\x1b[0m")
