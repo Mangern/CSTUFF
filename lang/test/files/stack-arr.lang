@@ -1,0 +1,7 @@
+main: () -> void = {
+    i: int = 69;
+    arr: int[6];
+    arr[1] = 123;
+    println(i); // should print 69 but doesn't
+    println(arr[1]);
+}
