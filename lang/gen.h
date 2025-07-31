@@ -82,7 +82,7 @@ extern FILE * gen_outfile;
 // Do something else on Apple
 #define ASM_BSS_SECTION ".bss"
 #define ASM_STRING_SECTION ".rodata"
-#define ASM_DECLARE_SYMBOLS ".global main"
+#define ASM_DECLARE_MAIN ".global main"
 
 void generate_program(void);
 

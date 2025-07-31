@@ -79,6 +79,7 @@ static void generate_global_variables() {
         switch (type->type_class) {
             case TC_BASIC:
                 {
+                    // TODO: Initial value
                     size_t size = 8;
                     DIRECTIVE(".%s: .zero %zu", sym->name, size);
                 }
@@ -751,5 +752,5 @@ static void generate_main_function() {
     generate_safe_printf();
     generate_safe_putchar();
 
-    DIRECTIVE("%s", ASM_DECLARE_SYMBOLS);
+    DIRECTIVE("%s", ASM_DECLARE_MAIN);
 }

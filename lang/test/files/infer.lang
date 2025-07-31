@@ -1,0 +1,8 @@
+x := 123;
+main: () -> void = {
+    var := 123;
+    foo := -54;
+    bar := var - foo - 177;
+    var += bar;
+    println(var + foo);
+}

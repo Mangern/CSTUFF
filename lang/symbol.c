@@ -39,9 +39,16 @@ void create_symbol_tables() {
         node_t* node = root->children[i];
         if (node->type == DECLARATION) {
             node_t* typenode = node->children[1];
-            if (typenode->data.type_class == TC_FUNCTION) {
-                create_function_tables(node);
+            if (typenode->type == TYPE) {
+                if (typenode->data.type_class == TC_FUNCTION) {
+                    create_function_tables(node);
+                } else {
+                    create_insert_variable_declaration(global_symbol_table, SYMBOL_GLOBAL_VAR, node);
+                }
+            } else if (typenode->type == BLOCK) {
+                fail_node(node, "Cannot infer type of %s", node->children[0]->data.identifier_str);
             } else {
+                // expression
                 create_insert_variable_declaration(global_symbol_table, SYMBOL_GLOBAL_VAR, node);
             }
         } else {
@@ -155,9 +162,11 @@ static void bind_references(symbol_table_t* local_symbols, node_t* node) {
             break;
         case DECLARATION:
             {
-                // type, identifier, expression?
+                // identifier, type, expression?
                 if (da_size(node->children) == 3) {
                     bind_references(local_symbols, node->children[2]);
+                } else if (da_size(node->children) == 2 && node->children[1]->type != TYPE) {
+                    bind_references(local_symbols, node->children[1]);
                 }
                 symbol_t* symbol = malloc(sizeof(symbol_t));
                 node_t* identifier = node->children[0];

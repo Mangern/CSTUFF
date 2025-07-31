@@ -1,9 +1,7 @@
 import json
-import os
 import subprocess
 
 def test_file(filename: str, expected_stdout: str, expected_stderr: str):
-
     def compare_output(stdout: str, stderr: str):
         if stdout != expected_stdout:
             print(f"Expected: '{expected_stdout}', got '{stdout}'")

@@ -154,9 +154,16 @@ static void generate_node_code(tac_t** list, node_t* node) {
         case DECLARATION:
             {
                 // Does nothing at this point
-                if (da_size(node->children) <= 2) return;
+                node_t* rhs;
+                if (da_size(node->children) <= 2) {
+                    if (node->children[1]->type == TYPE)
+                        return;
+                    rhs = node->children[1];
+                } else {
+                    rhs = node->children[2];
+                }
 
-                size_t assigned_addr = generate_valued_code(list, node->children[2]);
+                size_t assigned_addr = generate_valued_code(list, rhs);
                 assert(node->children[0]->type == IDENTIFIER);
                 tac_emit(list, TAC_COPY, assigned_addr, 0, get_symbol_addr(node->children[0]->symbol));
             }

@@ -68,6 +68,10 @@
         "file": "euler3.lang",
         "expect-stdout": "6857\n"
     },
+    {
+        "file": "infer.lang",
+        "expect-stdout": "69\n"
+    },
 
 
     {

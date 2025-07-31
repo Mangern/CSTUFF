@@ -76,10 +76,33 @@ static node_t* parse_declaration(node_t* identifier) {
 
     peek_expect_advance(LEX_COLON);
 
-    node_t* type_node = parse_type();
 
     node_t* declaration = node_create(DECLARATION);
     da_append(declaration->children, identifier);
+
+    token = lexer_peek();
+    if (token.type == LEX_EQUAL) {
+        lexer_advance();
+
+        // type inference type situation
+
+        token = lexer_peek();
+
+        node_t* rhs;
+        if (token.type == LEX_LBRACE) {
+            // assign to function??
+            rhs = parse_block();
+            peek_expect_advance(LEX_RBRACE);
+        } else {
+            rhs = parse_expression();
+        }
+
+        da_append(declaration->children, rhs);
+
+        return declaration;
+    }
+
+    node_t* type_node = parse_type();
     da_append(declaration->children, type_node);
 
     token = lexer_peek();

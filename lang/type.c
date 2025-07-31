@@ -66,6 +66,10 @@ static void register_type_node(node_t* node) {
                     // we need to save it here because if we have a 
                     // recursive function, we need to 'memoize' the type info
                     // so that we don't recurse infinitely
+
+                    assert(node->children[1]->type == TYPE 
+                            && "When declaration has three children I expect middle one to be type");
+
                     node->type_info = node->children[1]->type_info;
                     node->children[0]->type_info = node->type_info;
 
@@ -81,6 +85,12 @@ static void register_type_node(node_t* node) {
                         type_print(stderr, node->children[2]->type_info);
                         fprintf(stderr, "\n");
                         exit(EXIT_FAILURE);
+                    }
+                }
+
+                if (node->children[1]->type != TYPE) {
+                    if (node->children[1]->type_info == NULL) {
+                        fail_node(node->children[1], "Could not infer type of expression.")
                     }
                 }
                 node->type_info = node->children[1]->type_info;
