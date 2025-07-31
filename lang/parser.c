@@ -14,9 +14,7 @@ static token_t peek_expect_advance(token_type_t);
 static node_t* parse_global_statement();
 static node_t* parse_declaration_list();
 static node_t* parse_type();
-static node_t* parse_variable_declaration();
 static node_t* parse_declaration(node_t*);
-static node_t* parse_arg_list();
 static node_t* parse_block();
 static node_t* parse_function_type();
 static node_t* parse_expression();
@@ -61,33 +59,6 @@ static node_t* parse_global_statement() {
     fail_token(token);
     // unreachable
     assert(false && "Unreachable");
-}
-
-// Note: does not parse trailing ';'
-static node_t* parse_variable_declaration() {
-    assert(false);
-    // Advance through typename
-    node_t* typename_node = parse_type();
-
-    node_t* ret = node_create(DECLARATION);
-    da_append(ret->children, typename_node);
-
-    token_t token = peek_expect_advance(LEX_IDENTIFIER);
-
-    node_t* child = node_create_leaf(IDENTIFIER, token);
-    child->data.identifier_str = lexer_substring(token.begin_offset, token.end_offset);
-
-    da_append(ret->children, child);
-
-    token = lexer_peek();
-
-    assert(false && "Complete this!");
-    //if (token.type == LEX_WALRUS) {
-    //    lexer_advance();
-    //    da_append(ret->children, parse_expression());
-    //}
-
-    return ret;
 }
 
 // If identifier is not NULL, expects IDENTIFIER token to be consumed
@@ -139,24 +110,6 @@ static node_t* parse_declaration(node_t* identifier) {
     da_append(declaration->children, rhs);
 
     return declaration;
-}
-
-static node_t* parse_arg_list() {
-    token_t token = peek_expect_advance(LEX_LPAREN);
-
-    node_t* ret = node_create(LIST);
-    token = lexer_peek();
-
-    while (token.type != LEX_RPAREN) {
-        da_append(ret->children, parse_variable_declaration());
-        token = lexer_peek();
-        if (token.type == LEX_RPAREN) break;
-        if (token.type != LEX_COMMA)
-            fail_token_expected(token, LEX_COMMA);
-        lexer_advance();
-    }
-    lexer_advance();
-    return ret;
 }
 
 static node_t* parse_block() {
@@ -366,8 +319,6 @@ static node_t* parse_type() {
 static node_t* parse_function_type() {
     // (DECLARATION_LIST) -> type
     peek_expect_advance(LEX_LPAREN);
-
-    token_t token = {0};
 
     node_t* declaration_list = parse_declaration_list();
 

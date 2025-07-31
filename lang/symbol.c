@@ -38,7 +38,6 @@ void create_symbol_tables() {
     for (size_t i = 0; i < da_size(root->children); ++i) {
         node_t* node = root->children[i];
         if (node->type == DECLARATION) {
-            node_t* identifier = node->children[0];
             node_t* typenode = node->children[1];
             if (typenode->data.type_class == TC_FUNCTION) {
                 create_function_tables(node);
@@ -48,13 +47,6 @@ void create_symbol_tables() {
         } else {
             assert(false && "Unexpected node type in global statement list");
         }
-
-        //if (node->type == FUNCTION_DECLARATION) {
-        //    create_function_tables(node);
-        //} else if (node->type == VARIABLE_DECLARATION) {
-        //    create_insert_variable_declaration(global_symbol_table, SYMBOL_GLOBAL_VAR, node);
-        //} else {
-        //}
     }
 }
 
