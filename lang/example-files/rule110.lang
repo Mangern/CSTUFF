@@ -1,27 +1,27 @@
-int[50] pat;
-int[50] npat;
+pat: int[50];
+npat: int[50];
 
-int[8] TABLE;
+TABLE: int[8];
 
-main := () -> void {
-    TABLE[0] := 0;
-    TABLE[1] := 1;
-    TABLE[2] := 1;
-    TABLE[3] := 1;
-    TABLE[4] := 0;
-    TABLE[5] := 1;
-    TABLE[6] := 1;
-    TABLE[7] := 0;
+main: () -> void = {
+    TABLE[0] = 0;
+    TABLE[1] = 1;
+    TABLE[2] = 1;
+    TABLE[3] = 1;
+    TABLE[4] = 0;
+    TABLE[5] = 1;
+    TABLE[6] = 1;
+    TABLE[7] = 0;
 
-    int size := 50;
-    int NUM_ITER := size;
+    size: int = 50;
+    NUM_ITER: int = size;
 
-    pat[size-1] := 1;
+    pat[size-1] = 1;
 
-    int iter := 0;
+    iter: int = 0;
 
     while (iter < NUM_ITER) {
-        int i := 0;
+        i: int = 0;
         while (i < size) {
             if (pat[i] > 0) {
                 print("#");
@@ -32,27 +32,27 @@ main := () -> void {
         }
         println();
 
-        i := 0;
+        i = 0;
 
         while (i < size) {
-            int lft := 0;
+            lft: int = 0;
             if (i > 0) {
-                lft := pat[i-1];
+                lft = pat[i-1];
             }
-            int mid := pat[i];
-            int rgt := 0;
+            mid: int = pat[i];
+            rgt: int = 0;
             if (i < size - 1) {
-                rgt := pat[i+1];
+                rgt = pat[i+1];
             }
 
-            npat[i] := TABLE[4 * lft + 2 * mid + rgt];
+            npat[i] = TABLE[4 * lft + 2 * mid + rgt];
             i += 1;
         }
 
-        i := 0;
+        i = 0;
 
         while (i < size) {
-            pat[i] := npat[i];
+            pat[i] = npat[i];
             i += 1;
         }
 
