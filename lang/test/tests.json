@@ -36,6 +36,10 @@
         "expect-stdout": "420.000000\n1 2 3 69.000000\n69.000000\n3.141593\n"
     },
     {
+        "file": "many-args.lang",
+        "expect-stdout": "55\n55\n"
+    },
+    {
         "file": "sorting.lang",
         "expect-stdout": "2841809\n"
     },
