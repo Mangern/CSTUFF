@@ -7,23 +7,21 @@ quick_sort: (l: int, r: int) -> void = {
         return;
     }
 
-    p: int = arr[r];
-
-    i: int = l - 1;
-
-    j: int = l;
+    p := arr[r];
+    i := l - 1;
+    j := l;
 
     while (j < r) {
         if (arr[j] <= p) {
             i += 1;
-            t: int = arr[j];
+            t := arr[j];
             arr[j] = arr[i];
             arr[i] = t;
         }
         j += 1;
     }
 
-    t: int = arr[i+1];
+    t := arr[i+1];
     arr[i+1] = arr[r];
     arr[r] = t;
 
@@ -32,16 +30,16 @@ quick_sort: (l: int, r: int) -> void = {
 }
 
 main: () -> void = {
-    n: int = 1000000;
-    a: int = 501234;
-    b: int = 15432;
-    c: int = 1251532;
-    x: int = 757387;
-    y: int = 3712091;
+    n := 1000000;
+    a := 501234;
+    b := 15432;
+    c := 1251532;
+    x := 757387;
+    y := 3712091;
 
     // ANSWER: 2841809
 
-    i: int = 1;
+    i := 1;
 
     arr[0] = a;
 
