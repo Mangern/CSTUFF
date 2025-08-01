@@ -1,7 +1,22 @@
 main: () -> void = {
-    i: int = 69;
+    x := 69;
     arr: int[6];
-    arr[1] = 123;
-    println(i); // should print 69 but doesn't
-    println(arr[1]);
+
+    i := 0;
+    while (i < 6) {
+        arr[i] = 8 * i;
+        i += 1;
+    }
+
+    println(x); // should print 69 but it prints 123
+
+    i = 0;
+    while (i < 6) {
+        if (i > 0) {
+            print(" ");
+        }
+        print(arr[i]);
+        i += 1;
+    }
+    println("");
 }

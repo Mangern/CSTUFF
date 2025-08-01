@@ -627,3 +627,20 @@ static basic_type_t is_basic_type(const char* identifier_str) {
     }
     return -1;
 }
+
+size_t type_sizeof(type_info_t* type) {
+    // TODO: may be benefitial to store alongside the type info?
+
+    if (type->type_class == TC_BASIC) {
+        return 8;
+    } else if (type->type_class == TC_ARRAY) {
+        size_t total_size = 1;
+        for (size_t j = 0; j < da_size(type->info.info_array->dims); ++j) {
+            total_size *= type->info.info_array->dims[j];
+        }
+        total_size *= 8;
+        return total_size;
+    } else {
+        assert(false && "Not implemented");
+    }
+}

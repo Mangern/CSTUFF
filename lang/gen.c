@@ -31,6 +31,8 @@ static void generate_safe_putchar();
 static void generate_safe_printf();
 static void generate_main_function();
 
+static size_t* addr_frame_location;
+
 void generate_program() {
     if (gen_outfile == 0) {
         gen_outfile = stdout;
@@ -42,6 +44,8 @@ void generate_program() {
     generate_global_variables();
 
     DIRECTIVE(".text");
+
+    addr_frame_location = malloc(sizeof(size_t) * da_size(addr_list));
 
     for (size_t i = 0; i < da_size(function_codes); ++i) {
         generate_function(function_codes[i]);
@@ -76,28 +80,8 @@ static void generate_global_variables() {
         type_info_t* type = sym->node->type_info;
         assert(type != NULL);
 
-        switch (type->type_class) {
-            case TC_BASIC:
-                {
-                    // TODO: Initial value
-                    size_t size = 8;
-                    DIRECTIVE(".%s: .zero %zu", sym->name, size);
-                }
-                break;
-            case TC_ARRAY:
-                {
-                    size_t total_size = 1;
-                    for (size_t j = 0; j < da_size(type->info.info_array->dims); ++j) {
-                        total_size *= type->info.info_array->dims[j];
-                    }
-                    total_size *= 8;
-                    DIRECTIVE(".%s: .zero %zu", sym->name, total_size);
-                }
-                break;
-            default:
-                assert(false && "Not implemented");
-        }
-
+        // TODO: Currently no initial values
+        DIRECTIVE(".%s: .zero %zu", sym->name, type_sizeof(type));
     }
 }
 
@@ -125,6 +109,7 @@ static void generate_constants() {
 static symbol_t* current_function;
 static size_t* current_used_addrs = 0;
 static int* is_jmp_dst = 0; // true if label is used as a jump destination
+
 static void generate_function(function_code_t func_code) {
     current_function = func_code.function_symbol;
 
@@ -151,16 +136,20 @@ static void generate_function(function_code_t func_code) {
         case ADDR_SYMBOL:
             {
                 symbol_t* sym = addr.data.symbol;
+                
                 if (sym->type == SYMBOL_LOCAL_VAR) {
-                    EMIT("pushq $0 // %s", sym->name);
-                    local_space += 8;
+                    assert(sym->node != NULL);
+                    assert(sym->node->type_info != NULL);
+                    local_space += type_sizeof(sym->node->type_info);
+                    addr_frame_location[current_used_addrs[i]] = local_space + home_space;
                 }
             }
             break;
         case ADDR_TEMP:
             {
-                EMIT("pushq $0 // t%ld", addr.data.temp_id);
+                // TODO: temporary with other size?
                 local_space += 8;
+                addr_frame_location[current_used_addrs[i]] = local_space + home_space;
             }
             break;
         case ADDR_ARG_LIST:
@@ -180,9 +169,11 @@ static void generate_function(function_code_t func_code) {
     size_t frame_space = local_space + home_space;
 
     if (frame_space & 0xF) {
-        // align
-        PUSHQ("$0");
+        frame_space += 8;
     }
+
+    EMIT("subq $%zu, %s", frame_space - home_space, RSP);
+
 
     for (size_t i = 0; i < da_size(func_code.tac_list); ++i) {
         tac_t tac = func_code.tac_list[i];
@@ -211,29 +202,8 @@ static long get_addr_rbp_offset(size_t addr_idx) {
         offs *= 8;
         return -offs;
     }
-    long offs = 0;
-    size_t n_params = da_size(FUNCTION_ARGS(current_function));
-    if (n_params > NUM_REGISTER_PARAMS)n_params = NUM_REGISTER_PARAMS;
-    offs = n_params + 1;
 
-
-    for (size_t i = n_params; i < da_size(current_used_addrs); ++i) {
-        if (current_used_addrs[i] == addr_idx) return -(8*offs);
-        addr_t curr_addr = addr_list[current_used_addrs[i]];
-        switch (curr_addr.type) {
-            case ADDR_SYMBOL:
-                if (curr_addr.data.symbol->type == SYMBOL_LOCAL_VAR) {
-                    ++offs;
-                }
-                break;
-            case ADDR_TEMP:
-                ++offs;
-                break;
-            default:
-                break;
-        }
-    }
-    assert(false);
+    return -(long)addr_frame_location[addr_idx];
 }
 
 static const char* generate_addr_access(size_t addr_idx) {

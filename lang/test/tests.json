@@ -72,6 +72,10 @@
         "file": "infer.lang",
         "expect-stdout": "69\n"
     },
+    {
+        "file": "stack-arr.lang",
+        "expect-stdout": "69\n0 8 16 24 32 40\n"
+    },
 
 
     {
