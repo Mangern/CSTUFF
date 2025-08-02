@@ -9,12 +9,12 @@
 #include <stdio.h>
 
 void nfa_init(nfa_t *nfa) {
-    nfa->nodes = da_init(nfa_node_t*);
+    nfa->nodes = 0;
 }
 
 void nfa_deinit(nfa_t *nfa) {
     // NOTE: does not free up nodes. Only the local node pointer storage
-    da_deinit(&nfa->nodes);
+    da_deinit(nfa->nodes);
 }
 
 void nfa_free_nodes(nfa_t *nfa) {
@@ -27,18 +27,18 @@ void nfa_free_nodes(nfa_t *nfa) {
 }
 
 void nfa_node_init(nfa_node_t* node) {
-    node->transitions = da_init(transition_t);
+    node->transitions = 0;
 }
 
 void nfa_node_free(nfa_node_t* node) {
-    da_deinit(&node->transitions);
+    da_deinit(node->transitions);
     free(node);
 }
 
 
 void nfa_node_add_transition(nfa_node_t* node, char c, nfa_node_t* next) {
     transition_t trans = {c, next};
-    da_append(&node->transitions, trans);
+    da_append(node->transitions, trans);
 }
 
 
@@ -72,7 +72,7 @@ void nfa_node_transition(nfa_node_t* node, char c, nfa_node_t*** result) {
 
         transition_t trans = node->transitions[i];
         if (trans.c == c) {
-            da_append(result, trans.next_node);
+            da_append(*result, trans.next_node);
         }
     }
 }
@@ -80,24 +80,24 @@ void nfa_node_transition(nfa_node_t* node, char c, nfa_node_t*** result) {
 int* regex_paren_match(char* regex_string, size_t size) {
     int* paren_match = malloc(size * sizeof(int));
     memset(paren_match, -1, size * sizeof(int));
-    int* paren_stack = da_init(int);
+    int* paren_stack = 0;
 
     for (int i = 0; i < size; ++i) {
         if (regex_string[i] == '(') {
-            da_append(&paren_stack, i);
+            da_append(paren_stack, i);
         } else if (regex_string[i] == ')') {
             assert(da_size(paren_stack) > 0); // Else, unmatched rparen
 
             int loc = paren_stack[da_size(paren_stack) - 1];
             paren_match[loc] = i;
             paren_match[i] = loc;
-            da_pop(&paren_stack);
+            da_pop(paren_stack);
         }
     }
 
 
     assert(da_size(paren_stack) == 0); // unmatched lparen
-    da_deinit(&paren_stack);
+    da_deinit(paren_stack);
     return paren_match;
 }
 
@@ -109,7 +109,7 @@ nfa_t* concat_nfas(nfa_t** concat_list) {
         ret->accepting_state = cur->accepting_state;
 
         for (int j = 0; j < da_size(cur->nodes); ++j) {
-            da_append(&ret->nodes, cur->nodes[j]);
+            da_append(ret->nodes, cur->nodes[j]);
         }
         nfa_deinit(cur);
         free(cur);
@@ -130,8 +130,8 @@ void nfa_from_regex_handle_regop(regex_symbol_t* symbol, nfa_t*** union_list, nf
                 nfa_node_t* kleene_exit  = malloc(sizeof(nfa_node_t));
                 nfa_node_init(kleene_exit);
 
-                da_append(&last->nodes, kleene_enter);
-                da_append(&last->nodes, kleene_exit);
+                da_append(last->nodes, kleene_enter);
+                da_append(last->nodes, kleene_exit);
 
                 nfa_node_add_transition(kleene_enter, NFA_TRANS_EPS, last->initial_state);
                 nfa_node_add_transition(kleene_enter, NFA_TRANS_EPS, kleene_exit);
@@ -150,7 +150,7 @@ void nfa_from_regex_handle_regop(regex_symbol_t* symbol, nfa_t*** union_list, nf
                 nfa_node_t* plus_exit = malloc(sizeof(nfa_node_t));
                 nfa_node_init(plus_exit);
 
-                da_append(&last->nodes, plus_exit);
+                da_append(last->nodes, plus_exit);
 
                 nfa_node_add_transition(last->accepting_state, NFA_TRANS_EPS, last->initial_state);
                 nfa_node_add_transition(last->accepting_state, NFA_TRANS_EPS, plus_exit);
@@ -163,8 +163,8 @@ void nfa_from_regex_handle_regop(regex_symbol_t* symbol, nfa_t*** union_list, nf
                 assert(da_size(*concat_list) > 0);
                 // TODO: handle (|...). Empty string nfa
                 nfa_t* merged = concat_nfas(*concat_list);
-                da_append(union_list, merged);
-                da_clear(concat_list);
+                da_append(*union_list, merged);
+                da_clear(*concat_list);
             }
             break;
         case '?':
@@ -174,7 +174,7 @@ void nfa_from_regex_handle_regop(regex_symbol_t* symbol, nfa_t*** union_list, nf
 
                 nfa_node_t* quest_exit = malloc(sizeof(nfa_node_t));
                 nfa_node_init(quest_exit);
-                da_append(&last->nodes, quest_exit);
+                da_append(last->nodes, quest_exit);
 
                 // Question mark is simply an epsilon bypassing the subexpression
                 nfa_node_add_transition(last->accepting_state, NFA_TRANS_EPS, quest_exit);
@@ -195,9 +195,9 @@ void nfa_from_regex_impl(regex_t regex, size_t start, size_t end, nfa_t* nfa) {
     // a.k.a. a pretty obvious method of going from regex to nfa.
 
     // List of expressions that are supposed to be unioned together
-    nfa_t** union_list = da_init(nfa_t*);
+    nfa_t** union_list = 0;
     // List of expressions that are supposed to be concatenated
-    nfa_t** concat_list = da_init(nfa_t*);
+    nfa_t** concat_list = 0;
 
     for (int i = start; i < end; ) {
         regex_symbol_t symbol = regex_symbol_at(&regex, i);
@@ -215,13 +215,13 @@ void nfa_from_regex_impl(regex_t regex, size_t start, size_t end, nfa_t* nfa) {
                     }
                     nfa_t* nfa = malloc(sizeof(nfa_t));
                     nfa_init(nfa);
-                    da_append(&nfa->nodes, node_a);
-                    da_append(&nfa->nodes, node_b);
+                    da_append(nfa->nodes, node_a);
+                    da_append(nfa->nodes, node_b);
 
                     nfa->initial_state = node_a;
                     nfa->accepting_state = node_b;
 
-                    da_append(&concat_list, nfa);
+                    da_append(concat_list, nfa);
                     ++i;
                 }
                 break;
@@ -232,7 +232,7 @@ void nfa_from_regex_impl(regex_t regex, size_t start, size_t end, nfa_t* nfa) {
                     nfa_t* sub_nfa = malloc(sizeof(nfa_t));
                     nfa_init(sub_nfa);
                     nfa_from_regex_impl(regex, i + 1, loc, sub_nfa);
-                    da_append(&concat_list, sub_nfa);
+                    da_append(concat_list, sub_nfa);
                     i = loc + 1;
                 }
                 break;
@@ -252,7 +252,7 @@ void nfa_from_regex_impl(regex_t regex, size_t start, size_t end, nfa_t* nfa) {
 
     if (da_size(concat_list) > 0) {
         nfa_t* merged = concat_nfas(concat_list);
-        da_append(&union_list, merged);
+        da_append(union_list, merged);
     }
 
     assert(da_size(union_list) > 0);
@@ -274,11 +274,11 @@ void nfa_from_regex_impl(regex_t regex, size_t start, size_t end, nfa_t* nfa) {
         nfa_node_add_transition(ret->accepting_state, NFA_TRANS_EPS, union_exit);
         nfa_node_add_transition(cur->accepting_state, NFA_TRANS_EPS, union_exit);
 
-        da_append(&ret->nodes, union_enter);
-        da_append(&ret->nodes, union_exit);
+        da_append(ret->nodes, union_enter);
+        da_append(ret->nodes, union_exit);
 
         for (int j = 0; j < da_size(cur->nodes); ++j) {
-            da_append(&ret->nodes, cur->nodes[j]);
+            da_append(ret->nodes, cur->nodes[j]);
         }
         nfa_deinit(cur);
         free(cur);
@@ -287,8 +287,8 @@ void nfa_from_regex_impl(regex_t regex, size_t start, size_t end, nfa_t* nfa) {
         ret->accepting_state = union_exit;
     }
 
-    da_deinit(&concat_list);
-    da_deinit(&union_list);
+    da_deinit(concat_list);
+    da_deinit(union_list);
 
     // Move ret into nfa
     // TODO: how to make the interface the same while avoiding this weird a.f. stuff

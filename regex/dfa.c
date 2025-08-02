@@ -23,12 +23,12 @@ int node_ptr_cmp(const void* node_ptr_a, const void* node_ptr_b) {
 
 node_subset_t* make_subset() {
     node_subset_t* subset = malloc(sizeof(node_subset_t));
-    subset->nodes = da_init(nfa_node_t*);
+    subset->nodes = 0;
     return subset;
 }
 
 void subset_deinit(node_subset_t* subset) {
-    da_deinit(&subset->nodes);
+    da_deinit(subset->nodes);
     free(subset);
 }
 
@@ -42,7 +42,7 @@ int node_subset_contains(node_subset_t* subset, nfa_node_t* node) {
 }
 
 void node_subset_add(node_subset_t* subset, nfa_node_t* node) {
-    da_append(&subset->nodes, node);
+    da_append(subset->nodes, node);
     // Stay sorted
     qsort(subset->nodes, da_size(subset->nodes), sizeof(nfa_node_t*), node_ptr_cmp);
 }
@@ -94,19 +94,19 @@ dfa_t* dfa_from_nfa(nfa_t* nfa) {
         node_empty->trans[i] = node_empty;
     }
 
-    node_subset_t** subset_nodes = da_init(node_subset_t*);
-    da_append(&subset_nodes, node_empty);
+    node_subset_t** subset_nodes = 0;
+    da_append(subset_nodes, node_empty);
 
     node_subset_t* node_init = make_subset();
     // Default is to go to empty
     for (int i = 0; i < 256; ++i) {
         node_init->trans[i] = node_empty;
     }
-    da_append(&subset_nodes, node_init);
+    da_append(subset_nodes, node_init);
 
     epsilon_closure(nfa->initial_state, node_init);
 
-    nfa_node_t** next_set = da_init(nfa_node_t*);
+    nfa_node_t** next_set = 0;
 
     for (int i = 1; i < da_size(subset_nodes); ++i) {
         node_subset_t* cur_subset = subset_nodes[i];
@@ -140,7 +140,7 @@ dfa_t* dfa_from_nfa(nfa_t* nfa) {
                 }
             }
             if (next_subset == NULL) {
-                da_append(&subset_nodes, next_subset_cand);
+                da_append(subset_nodes, next_subset_cand);
                 next_subset = next_subset_cand;
             } else {
                 subset_deinit(next_subset_cand);
@@ -149,7 +149,7 @@ dfa_t* dfa_from_nfa(nfa_t* nfa) {
             cur_subset->trans[c] = next_subset;
         }
     }
-    da_deinit(&next_set);
+    da_deinit(next_set);
 
     dfa_t* dfa = malloc(sizeof(dfa_t));
     dfa->num_nodes = da_size(subset_nodes);
@@ -180,7 +180,7 @@ dfa_t* dfa_from_nfa(nfa_t* nfa) {
         subset_deinit(cur_subset);
     }
 
-    da_deinit(&subset_nodes);
+    da_deinit(subset_nodes);
 
     return dfa;
 }
