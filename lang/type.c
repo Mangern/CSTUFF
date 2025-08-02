@@ -22,7 +22,8 @@ char* BASIC_TYPE_NAMES[] = {
     "real",
     "char",
     "bool",
-    "string"
+    "string",
+    "size"
 };
 
 static void register_type_node(node_t*);
@@ -32,6 +33,7 @@ static bool can_cast(type_info_t* type_dst, type_info_t* type_src);
 static type_info_t* create_basic(basic_type_t basic_type);
 static type_info_t* create_type_function();
 static type_info_t* create_type_array(type_info_t*, node_t*);
+static type_info_t* create_type_pointer(type_info_t*);
 static type_tuple_t* create_tuple();
 static basic_type_t is_basic_type(const char* identifier_str);
 
@@ -136,6 +138,10 @@ static void register_type_node(node_t* node) {
                     register_type_node(node->children[0]);
                     register_type_node(node->children[1]);
                     node->type_info = create_type_array(node->children[0]->type_info, node->children[1]);
+                } else if (node->data.type_class == TC_POINTER) {
+                    // only child: subtype
+                    register_type_node(node->children[0]);
+                    node->type_info = create_type_pointer(node->children[0]->type_info);
                 } else {
                     assert(false && "Unhandled type class from parsing stage");
                 }
@@ -285,6 +291,23 @@ static void register_type_node(node_t* node) {
                             return;
                         }
                         break;
+                    case UNARY_DEREF:
+                        {
+                            node_t* inner = node->children[0];
+                            if (inner->type_info->type_class != TC_POINTER) {
+                                fail_node(node, "Cannot dereference this");
+                            }
+
+                            node->type_info = inner->type_info->info.info_pointer->inner;
+                            return;
+                        }
+                        break;
+                    case UNARY_STAR:
+                        {
+                            node_t* inner = node->children[0];
+                            node->type_info = create_type_pointer(inner->type_info);
+                            return;
+                        }
                     default:
                         {
                             fail("Not implemented operator type check: %s", OPERATOR_TYPE_NAMES[node->data.operator]);
@@ -495,6 +518,11 @@ static bool types_equivalent(type_info_t* type_a, type_info_t* type_b) {
             if (array_a->dims[i] != array_b->dims[i]) return false;
         }
         return types_equivalent(array_a->subtype, array_b->subtype);
+    } else if (type_class == TC_POINTER) {
+        return types_equivalent(
+            type_a->info.info_pointer->inner,
+            type_b->info.info_pointer->inner
+        );
     } else {
         fprintf(stderr, "Not implemented type class equivalency:\n");
         type_print(stderr, type_a);
@@ -543,6 +571,14 @@ static type_info_t* create_type_array(type_info_t* subtype, node_t* dim_list_nod
         da_append(type_info->info.info_array->dims, (size_t)dim_list_node->children[i]->data.int_literal_value);
     }
     type_info->info.info_array->subtype = subtype;
+    return type_info;
+}
+
+static type_info_t* create_type_pointer(type_info_t* subtype) {
+    type_info_t *type_info = malloc(sizeof(type_info_t));
+    type_info->type_class = TC_POINTER;
+    type_info->info.info_pointer = malloc(sizeof(type_pointer_t));
+    type_info->info.info_pointer->inner = subtype;
     return type_info;
 }
 
@@ -603,6 +639,12 @@ void type_print(FILE* stream, type_info_t* type) {
                 type_print(stream, type->info.info_function->return_type);
             }
             break;
+        case TC_POINTER:
+            {
+                fprintf(stream, "*");
+                type_print(stream, type->info.info_pointer->inner);
+            }
+            break;
         case TC_UNKNOWN:
             {
                 fprintf(stream, "unknown");
@@ -640,6 +682,8 @@ size_t type_sizeof(type_info_t* type) {
         }
         total_size *= 8;
         return total_size;
+    } else if (type->type_class == TC_POINTER) {
+        return 8;
     } else {
         assert(false && "Not implemented");
     }

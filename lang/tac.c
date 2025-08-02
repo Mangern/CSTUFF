@@ -5,6 +5,7 @@
 #include "tac.h"
 #include "da.h"
 #include "fail.h"
+#include "langc.h"
 #include "symbol.h"
 #include "symbol_table.h"
 #include "tree.h"
@@ -55,6 +56,7 @@ static size_t tac_emit(tac_t**, instruction_t, size_t, size_t, size_t);
 
 static size_t new_temp(basic_type_t);
 static size_t new_int_const(long);
+static size_t new_size_const(size_t);
 static size_t new_real_const(double);
 static size_t new_string_idx_const(size_t);
 static size_t new_bool_const(bool);
@@ -190,6 +192,19 @@ static void generate_node_code(tac_t** list, node_t* node) {
                     size_t index_addr = generate_indexing(list, indexing_node);
                     tac_emit(list, TAC_LOCOF, arr_addr, 0, loc_addr);
                     tac_emit(list, TAC_STORE, src_addr, loc_addr, index_addr);
+                } else if (node->children[0]->type == OPERATOR) {
+
+                    if (node->children[0]->data.operator != UNARY_DEREF) {
+                        fail_node(node, "I cannot have this on LHS (yet?)");
+                    }
+
+                    // child 0: operator deref
+                    // it should take its child
+                    size_t inside = generate_valued_code(list, node->children[0]->children[0]);
+
+                    size_t src_addr = generate_valued_code(list, node->children[1]);
+
+                    tac_emit(list, TAC_STORE, src_addr, inside, new_size_const(0));
                 } else {
                     fprintf(stderr, "generate_node_code: Unhandled assignment LHS type %s\n", NODE_TYPE_NAMES[node->children[0]->type]);
                     exit(EXIT_FAILURE);
@@ -320,7 +335,19 @@ static size_t generate_valued_code(tac_t** list, node_t* node) {
                 if (da_size(node->children) == 1) {
                     // Unary
                     size_t src1_addr = generate_valued_code(list, node->children[0]);
-                    size_t dst_addr = new_temp(node->type_info->info.info_basic);
+
+                    basic_type_t dst_type;
+
+                    if (node->type_info->type_class == TC_BASIC) {
+                        dst_type = node->type_info->info.info_basic;
+                    } else if (node->type_info->type_class == TC_POINTER) {
+                        dst_type = TYPE_SIZE;
+                    } else {
+                        assert(false && "Not implemented");
+                    }
+
+                    size_t dst_addr = new_temp(dst_type);
+
                     tac_emit(list, instr_from_node_operator(node->data.operator), src1_addr, 0, dst_addr);
                     return dst_addr;
                 } else {
@@ -436,6 +463,17 @@ static size_t new_bool_const(bool value) {
     return idx;
 }
 
+static size_t new_size_const(size_t value) {
+    size_t idx = da_size(addr_list);
+    addr_t addr = (addr_t){
+        .type = ADDR_SIZE_CONST,
+        .type_info = TYPE_SIZE,
+        .data.size_const = value
+    };
+    da_append(addr_list, addr);
+    return idx;
+}
+
 static size_t new_label_ref(size_t label) {
     size_t idx = da_size(addr_list);
     addr_t addr = (addr_t) {
@@ -471,6 +509,8 @@ static instruction_t instr_from_node_operator(operator_t op) {
         case BINARY_NEQ: return TAC_BINARY_NEQ;
         case UNARY_SUB: return TAC_UNARY_SUB;
         case UNARY_NEG: return TAC_UNARY_NEG;
+        case UNARY_STAR: return TAC_LOCOF;
+        case UNARY_DEREF: return TAC_LOAD;
         default:
             {
                 fprintf(stderr, "Instr from node operator unexpected operator %s\n", OPERATOR_TYPE_NAMES[op]);
@@ -500,6 +540,8 @@ static size_t get_symbol_addr(symbol_t* symbol) {
         if (symbol->node->type_info->type_class == TC_ARRAY) {
             assert(symbol->node->type_info->info.info_array->subtype->type_class == TC_BASIC);
             addr.type_info = symbol->node->type_info->info.info_array->subtype->info.info_basic;
+        } else if (symbol->node->type_info->type_class == TC_POINTER) {
+            addr.type_info = TYPE_SIZE;
         } else {
             assert((symbol->node->type_info->type_class == TC_BASIC) && "Can only process basic type");
             addr.type_info = symbol->node->type_info->info.info_basic;
@@ -579,6 +621,11 @@ void print_tac_addr(size_t addr_idx) {
                 printf("#%ld", addr.data.int_const);
             }
             break;
+        case ADDR_SIZE_CONST:
+            {
+                printf("#%zu", addr.data.size_const);
+            }
+            break;
         case ADDR_REAL_CONST:
             {
                 printf("#%lf", addr.data.real_const);
@@ -629,7 +676,11 @@ static void print_tac_impl(tac_t tac) {
 void print_tac() {
     printf("=== NAMES ===\n");
     for (size_t i = 0; i < da_size(addr_list); ++i) {
-        printf("%3zu: %s ", i, BASIC_TYPE_NAMES[addr_list[i].type_info]);
+
+        if (addr_list[i].type_info < 7)
+            printf("%3zu: %s ", i, BASIC_TYPE_NAMES[addr_list[i].type_info]);
+        else
+            printf("%3zu: WTF", i);
         print_tac_addr(i);
         puts("");
     }

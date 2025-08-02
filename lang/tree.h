@@ -27,7 +27,8 @@ typedef enum {
     WHILE_STATEMENT,
     ARRAY_INDEXING,         // children: [identifier, list[expression]]
     BREAK_STATEMENT,
-    SCOPE_RESOLUTION // children: [scope resolution, identifier] | [identifier, identifier]
+    SCOPE_RESOLUTION, // children: [scope resolution, identifier] | [identifier, identifier]
+    DOT_ACCESS
 } node_type_t;
 
 typedef enum operator_t {
@@ -48,8 +49,11 @@ typedef enum operator_t {
     BINARY_EQ, 
     BINARY_NEQ,
     BINARY_SCOPE_RES,
+    BINARY_DOT,
     UNARY_SUB, 
     UNARY_NEG, 
+    UNARY_STAR,
+    UNARY_DEREF // .*
 } operator_t;
 
 extern const int OPERATOR_PRECEDENCE[];

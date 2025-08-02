@@ -38,6 +38,7 @@ enum addr_type_t {
     ADDR_UNUSED,
     ADDR_SYMBOL,
     ADDR_INT_CONST,
+    ADDR_SIZE_CONST,
     ADDR_REAL_CONST,
     ADDR_STRING_CONST,
     ADDR_BOOL_CONST,
@@ -54,6 +55,7 @@ struct addr_t {
         long int_const;
         double real_const;
         size_t string_idx_const;
+        size_t size_const;
         bool bool_const;
         long temp_id;
         size_t label;

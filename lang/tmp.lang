@@ -1,7 +1,5 @@
-// Doesn't work
-apply_twice: (func: (x: int) -> int, x: int) -> int = {
-    return func(func(x));
-}
-
 main: () -> void = {
+    arr: int[5];
+
+    arr[0] = 1;
 }

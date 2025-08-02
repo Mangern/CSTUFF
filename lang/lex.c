@@ -306,6 +306,13 @@ static size_t matches_operator() {
                 if (content[content_ptr + 1] == c) return 2;
                 return 0;
             }
+        // something else
+        case '.':
+            {
+                if (content_ptr + 1 >= content_size) return 1;
+                if (content[content_ptr + 1] == '*') return 2;
+                return 1;
+            }
         default:
             return 0;
     }

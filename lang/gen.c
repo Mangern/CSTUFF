@@ -101,6 +101,7 @@ static void generate_constants() {
             case ADDR_LABEL:
             case ADDR_TEMP:
             case ADDR_ARG_LIST:
+            case ADDR_SIZE_CONST:
                 break;
         }
     }
@@ -159,6 +160,7 @@ static void generate_function(function_code_t func_code) {
         case ADDR_LABEL:
         case ADDR_UNUSED:
         case ADDR_INT_CONST:
+        case ADDR_SIZE_CONST:
         case ADDR_REAL_CONST:
         case ADDR_STRING_CONST:
         case ADDR_BOOL_CONST:
@@ -214,6 +216,11 @@ static const char* generate_addr_access(size_t addr_idx) {
         case ADDR_INT_CONST:
             {
                 snprintf(result, sizeof result, "$%ld", addr.data.int_const);
+            }
+            break;
+        case ADDR_SIZE_CONST:
+            {
+                snprintf(result, sizeof result, "$%zu", addr.data.size_const);
             }
             break;
         case ADDR_BOOL_CONST:
@@ -462,7 +469,7 @@ static void generate_tac(tac_t tac) {
                     if (arg.type_info == TYPE_CHAR) {
                         EMIT("leaq %s, %s", generate_addr_access(arg_idx), RAX);
                         PUSHQ(RAX);
-                    } else if (arg.type_info == TYPE_INT) {
+                    } else if (arg.type_info == TYPE_INT || arg.type_info == TYPE_SIZE) {
                         MOVQ(generate_addr_access(arg_idx), RAX);
                         PUSHQ(RAX);
                     } else if (arg.type_info == TYPE_REAL) {
@@ -595,7 +602,12 @@ static void generate_tac(tac_t tac) {
             MOVQ(generate_addr_access(tac.src1), RAX);
 
             // Load index
-            MOVQ(generate_addr_access(tac.src2), RCX);
+
+            if (tac.src2 > 0) {
+                MOVQ(generate_addr_access(tac.src2), RCX);
+            } else {
+                MOVQ("$0", RCX);
+            }
 
             // store exact location
             EMIT("leaq (%s, %s, 8), %s", RAX, RCX, RAX);

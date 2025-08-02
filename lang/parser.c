@@ -23,6 +23,8 @@ static node_t* parse_cast();
 static node_t* parse_assignment(node_t*);
 static node_t* parse_block_operation(node_t*);
 static node_t* parse_scope_resolution(node_t*);
+static node_t* parse_dot_access(node_t*);
+static node_t* parse_deref(node_t*);
 static node_t* parse_array_indexing(node_t*);
 static operator_t parse_operator_str(char* operator_str, bool);
 
@@ -294,7 +296,33 @@ static node_t* parse_type() {
         return parse_function_type();
     }
 
-    token = peek_expect_advance(LEX_IDENTIFIER);
+    token = lexer_peek();
+
+    if (token.type == LEX_OPERATOR) {
+        // pointer type
+        char * operator_str = lexer_substring(token.begin_offset, token.end_offset);
+        operator_t op = parse_operator_str(operator_str, false);
+        free(operator_str);
+
+        if (op != UNARY_STAR) {
+            fail_token(token);
+        }
+
+        lexer_advance();
+
+        node_t* inner_type = parse_type();
+
+        node_t* ptr_type = node_create(TYPE);
+        ptr_type->data.type_class = TC_POINTER;
+        da_append(ptr_type->children, inner_type);
+        return ptr_type;
+    }
+
+    if (token.type != LEX_IDENTIFIER) {
+        fail_token_expected(token, LEX_IDENTIFIER);
+    }
+
+    lexer_advance();
 
     node_t* identifier_node = node_create_leaf(IDENTIFIER, token);
     identifier_node->data.identifier_str = lexer_substring(token.begin_offset, token.end_offset);
@@ -418,12 +446,20 @@ static operator_t parse_operator_str(char* operator_str, bool binary) {
             return BINARY_NEQ;
         } else if (strcmp(operator_str, "::") == 0) {
             return BINARY_SCOPE_RES;
+        } else if (strcmp(operator_str, ".") == 0) {
+            return BINARY_DOT;
+        } else if (strcmp(operator_str, ".*") == 0) { // eeeeh
+            return UNARY_DEREF;
         }
     } else {
         if (strcmp(operator_str, "-") == 0) {
             return UNARY_SUB;
         } else if (strcmp(operator_str, "!") == 0) {
             return UNARY_NEG;
+        } else if (strcmp(operator_str, "*") == 0) {
+            return UNARY_STAR;
+        } else if (strcmp(operator_str, ".*") == 0) {
+            return UNARY_DEREF;
         }
     }
     fprintf(stderr, "Parse operator str unhandled: %s, %d\n", operator_str, binary);
@@ -635,6 +671,10 @@ static node_t* parse_block_operation(node_t* lhs_node) {
 
     if (op == BINARY_SCOPE_RES) {
         return parse_scope_resolution(lhs_node);
+    } else if (op == BINARY_DOT) {
+        return parse_dot_access(lhs_node);
+    } else if (op == UNARY_DEREF) {
+        return parse_deref(lhs_node);
     }
     
     // For now: assume this is a += or similar
@@ -699,6 +739,63 @@ static node_t* parse_scope_resolution(node_t* lhs_node) {
             fail_token(token);
     }
 
+    assert(false); // unreachable
+}
+
+static node_t* parse_dot_access(node_t* lhs_node) {
+    token_t token = lexer_peek();
+
+    if (token.type != LEX_IDENTIFIER && token.type != LEX_OPERATOR) {
+        fail_token(token);
+    }
+    
+    char* image = lexer_substring(token.begin_offset, token.end_offset);
+    if (token.type == LEX_OPERATOR) {
+        if (parse_operator_str(image, true) != BINARY_MUL) {
+            fail_token(token);
+        }
+        // from here pretend it is an identifier
+    }
+
+    node_t* identifier = node_create_leaf(IDENTIFIER, token);
+    identifier->data.identifier_str = image;
+    lexer_advance();
+
+    node_t* merged = node_create(DOT_ACCESS);
+    da_append(merged->children, lhs_node);
+    da_append(merged->children, identifier);
+
+    token = lexer_peek();
+
+    switch (token.type) {
+        case LEX_OPERATOR:
+            return parse_block_operation(merged);
+        case LEX_SEMICOLON:
+            return merged;
+        default:
+            fail_token(token);
+    }
+
+    assert(false); // unreachable
+}
+
+static node_t* parse_deref(node_t* lhs_node) {
+    node_t* deref_node = node_create(OPERATOR);
+    deref_node->data.operator = UNARY_DEREF;
+    da_append(deref_node->children, lhs_node);
+
+    token_t token = lexer_peek();
+
+    switch (token.type) {
+        case LEX_OPERATOR:
+            return parse_block_operation(deref_node);
+        case LEX_SEMICOLON:
+            return deref_node;
+        case LEX_EQUAL:
+            return parse_assignment(deref_node);
+        default:
+            fail_token(token);
+    }
     assert(false); // unreachable
 }
 

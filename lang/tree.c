@@ -27,8 +27,11 @@ const int OPERATOR_PRECEDENCE[] = {
     7,  // BINARY_EQ,
     7,  // BINARY_NEQ,
     1,  // BINARY_SCOPE_RES
+    1,  // BINARY_DOT
     2,  // UNARY_SUB,
-    2   // UNARY_NEG,
+    2,  // UNARY_NEG
+    3,  // UNARY_STAR,
+    1,  // UNARY_DEREF TODO: don't know precedence
 };
 
 char* NODE_TYPE_NAMES[] = {
@@ -52,7 +55,8 @@ char* NODE_TYPE_NAMES[] = {
     "WHILE_STATEMENT",
     "ARRAY_INDEXING",
     "BREAK_STATEMENT",
-    "SCOPE_RESOLUTION"
+    "SCOPE_RESOLUTION",
+    "DOT_ACCESS"
 };
 
 char* OPERATOR_TYPE_NAMES[] = {
@@ -73,8 +77,11 @@ char* OPERATOR_TYPE_NAMES[] = {
     "binary_eq",
     "binary_neq",
     "binary_scope_res",
+    "binary_dot",
     "unary_sub",
-    "unary_neg"
+    "unary_neg",
+    "unary_star",
+    "unary_deref"
 };
 
 node_t* node_create(node_type_t type) {

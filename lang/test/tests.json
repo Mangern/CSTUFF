@@ -80,6 +80,10 @@
         "file": "arr-2d.lang",
         "expect-stdout": "0 0 0 0 0\n0 1 2 3 4\n0 2 4 6 8\n0 3 6 9 12\n0 4 8 12 16\n"
     },
+    {
+        "file": "pointer.lang",
+        "expect-stdout": "123456789\n"
+    },
 
 
     {

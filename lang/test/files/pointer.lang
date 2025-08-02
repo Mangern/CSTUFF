@@ -1,0 +1,21 @@
+modifier: (ptr: *int) -> void = {
+    ptr.* = 789;
+}
+
+main: () -> void = {
+    x := 123;
+
+    print(x); // 123
+
+    // take address
+    ptr := *x;
+
+    // deref pointer
+    ptr.* = 456;
+
+    print(x); // 456
+
+    modifier(*x);
+
+    println(x); // 789
+}

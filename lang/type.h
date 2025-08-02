@@ -11,11 +11,13 @@ enum basic_type_t {
     TYPE_REAL,
     TYPE_CHAR,
     TYPE_BOOL,
-    TYPE_STRING
+    TYPE_STRING,
+    TYPE_SIZE // something like an unsigned int
 };
 
 typedef enum {
     TC_BASIC,
+    TC_POINTER,
     TC_ARRAY,
     TC_STRUCT,
     TC_TUPLE,
@@ -26,13 +28,18 @@ typedef enum {
 struct type_info_t {
     type_class_t type_class;
     union {
-        type_array_t* info_array;
         basic_type_t info_basic;
-        type_struct_t* info_struct;
+        struct type_array_t* info_array;
+        struct type_struct_t* info_struct;
         struct type_tuple_t* info_tuple;
-        type_function_t* info_function;
+        struct type_function_t* info_function;
+        struct type_pointer_t* info_pointer;
     } info;
 };
+
+struct type_pointer_t {
+    type_info_t* inner;
+} ;
 
 struct type_array_t {
     type_info_t* subtype;
