@@ -3,6 +3,8 @@ project(regex)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+set(CMAKE_BUILD_TYPE RelWithDebInfo)
+
 add_executable(preprocess_test
     preprocess.c
     preprocess_test.c

@@ -1,6 +1,7 @@
 #ifndef NFA_H
 #define NFA_H
 
+#include "preprocess.h"
 #include <stddef.h>
 
 typedef struct nfa_node_t nfa_node_t;
@@ -34,5 +35,6 @@ int nfa_accepts(nfa_t* nfa, char* string, size_t size);
 void nfa_node_transition(nfa_node_t* node, char c, nfa_node_t*** result);
 
 void nfa_from_regex(char* regex_string, size_t size, nfa_t* nfa);
+void nfa_from_regex_impl(regex_t regex, size_t start, size_t end, nfa_t* nfa);
 
 #endif // NFA_H

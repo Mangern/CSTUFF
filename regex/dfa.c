@@ -117,7 +117,7 @@ dfa_t* dfa_from_nfa(nfa_t* nfa) {
                 continue;
             }
             // Transition all nodes in current subset on character c
-            da_clear(&next_set);
+            da_clear(next_set);
             for (int j = 0; j < da_size(cur_subset->nodes); ++j) {
                 nfa_node_t* cur_node = cur_subset->nodes[j];
                 nfa_node_transition(cur_node, c, &next_set);

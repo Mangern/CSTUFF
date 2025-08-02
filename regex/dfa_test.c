@@ -1,6 +1,7 @@
 #include "dfa.h"
 #include "nfa.h"
 #include "da.h"
+#include "preprocess.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -373,7 +374,7 @@ float time_dfa_init(char* regex) {
     size_t size = strlen(regex);
     struct timeval t_start, t_end;
 
-    const int NUM_ITERATIONS = 1000;
+    const int NUM_ITERATIONS = 200;
 
     float total_time_secs = 0.0;
 
@@ -426,6 +427,56 @@ void dfa_linear_test() {
     }
 }
 
+void dfa_timing_test() {
+    char * regex_string = "(z*)u*|((a+i)*hz*)*(2|13*)*4|(z|a)*u+(a+c)b*|(oc)*|(a*)b?|((a|b)*cd?)*(a|hf*)*8|(y|p)+i?(x|z)b*|cab*|(a*)b?|((u|i)*cd*)*(a|bf*)*z|(k|l)?u+(h|4)b*|(p2)*|(a*)b?|((a|b)*cd?)*(a|ef*)*8|(y|p)+i?(u|o)b*|cb*";
+    size_t size = strlen(regex_string);
+    struct timeval t_start, t_end;
+    gettimeofday ( &t_start, NULL );
+
+    nfa_t nfa;
+
+    nfa_init(&nfa);
+
+    regex_t regex;
+    regex_init(&regex);
+
+    regex_preprocess(regex_string, size, &regex);
+
+    gettimeofday ( &t_end, NULL );
+
+    printf("Preprocessing: %f\n", WALLTIME(t_end) - WALLTIME(t_start));
+
+    gettimeofday ( &t_start, NULL );
+
+
+    nfa_from_regex_impl(regex, 0, da_size(regex.symbols), &nfa);
+
+    gettimeofday ( &t_end, NULL );
+
+    printf("NFA from regex: %f\n", WALLTIME(t_end) - WALLTIME(t_start));
+
+    regex_deinit(&regex);
+
+    dfa_t* dfa = dfa_from_nfa(&nfa);
+
+    gettimeofday(&t_end, NULL);
+
+    printf("DFA from NFA: %f\n", WALLTIME(t_end) - WALLTIME(t_start));
+
+    gettimeofday(&t_start, NULL);
+
+
+    dfa_minimize(dfa);
+
+    gettimeofday(&t_end, NULL);
+
+    printf("dfa_minimize: %f\n", WALLTIME(t_end) - WALLTIME(t_start));
+
+    nfa_free_nodes(&nfa);
+
+    nfa_deinit(&nfa);
+}
+
 void dfa_match_test() {
     dfa_t* dfa = dfa_from_regex("[a-zA-Z_][0-9a-zA-Z]*", strlen("[a-zA-Z_][0-9a-zA-Z]*"));
     DFA_MATCH_TEST(dfa, "aaa0099", (size_t)7);
@@ -456,4 +507,5 @@ int main(int argc, char** argv) {
     dfa_fat_test();
     dfa_linear_test();
     dfa_match_test();
+    dfa_timing_test();
 }

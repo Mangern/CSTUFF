@@ -20,6 +20,7 @@ struct dfa_t {
 
 dfa_t* dfa_from_nfa(nfa_t* nfa);
 dfa_t* dfa_from_regex(char* regex_string, size_t size);
+void dfa_minimize(dfa_t* dfa);
 int    dfa_accepts(dfa_t* dfa, char* string, size_t size);
 // Match maximal prefix of string. Return the length of the match.
 size_t dfa_match(dfa_t* dfa, char* string, size_t max_len);
