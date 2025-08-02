@@ -60,6 +60,7 @@ static void generate_stringtable() {
     DIRECTIVE("intout: .asciz \"%s\"", "%ld");
     DIRECTIVE("strout: .asciz \"%s\"", "%s");
     DIRECTIVE("realout: .asciz \"%s\"", "%f");
+    DIRECTIVE("sizeout: .asciz \"%s\"", "%zu");
     // This string is used by the entry point-wrapper
     DIRECTIVE("errout: .asciz \"%s\"", "Wrong number of arguments");
 
@@ -432,6 +433,9 @@ static void generate_tac(tac_t tac) {
                         } else if (arg.type_info == TYPE_BOOL) {
                             MOVQ(generate_addr_access(arg_idx), RSI);
                             EMIT("leaq intout(%s), %s", RIP, RDI);
+                        } else if (arg.type_info == TYPE_SIZE) {
+                            MOVQ(generate_addr_access(arg_idx), RSI);
+                            EMIT("leaq sizeout(%s), %s", RIP, RDI);
                         } else {
                             assert(false && "Not implemented");
                         }

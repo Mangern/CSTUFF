@@ -323,11 +323,17 @@ static size_t generate_valued_code(tac_t** list, node_t* node) {
                     exit(EXIT_FAILURE);
                 }
 
-                assert((node->type_info->type_class == TC_BASIC) && "Can only process basic type");
-
-                size_t ret_addr = new_temp(node->type_info->info.info_basic);
-                tac_emit(list, TAC_CALL, addr_function, addr_arg_list, ret_addr);
-                return ret_addr;
+                if (node->type_info->type_class == TC_BASIC) {
+                    size_t ret_addr = new_temp(node->type_info->info.info_basic);
+                    tac_emit(list, TAC_CALL, addr_function, addr_arg_list, ret_addr);
+                    return ret_addr;
+                } else if (node->type_info->type_class == TC_POINTER) {
+                    size_t ret_addr = new_temp(TYPE_SIZE);
+                    tac_emit(list, TAC_CALL, addr_function, addr_arg_list, ret_addr);
+                    return ret_addr;
+                } else {
+                    assert(false && "Not implemented return type");
+                }
             }
             break;
         case OPERATOR:

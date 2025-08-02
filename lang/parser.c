@@ -484,20 +484,42 @@ static node_t* merge_unary_op(token_t operator_token, node_t* rhs) {
     return rhs;
 }
 
-static node_t* expression_continuation(token_t operator_token, node_t* lhs) {
-    // TODO: post operators
-    node_t* rhs = parse_expression();
-
-    return merge_subtrees(operator_token, lhs, rhs);
-}
-
 inline static bool token_is_expression_end(token_t token) {
     return token.type == LEX_SEMICOLON
         || token.type == LEX_COMMA
         || token.type == LEX_RPAREN
         || token.type == LEX_RBRACKET;
-        
 }
+
+static node_t* expression_continuation(token_t operator_token, node_t* lhs) {
+    char *operator_str = lexer_substring(operator_token.begin_offset, operator_token.end_offset);
+    operator_t operator = parse_operator_str(operator_str, true);
+    free(operator_str);
+
+    // TODO: more post operators
+    if (operator == UNARY_DEREF) {
+        node_t* new = node_create(OPERATOR);
+        new->data.operator = operator;
+        da_append(new->children, lhs);
+
+        token_t nxt = lexer_peek();
+        if (token_is_expression_end(nxt)) {
+            return new;
+        }
+
+        if (nxt.type == LEX_OPERATOR) {
+            lexer_advance();
+            return expression_continuation(nxt, new);
+        } else {
+            fail_token_expected(nxt, LEX_OPERATOR);
+        }
+    }
+
+    node_t* rhs = parse_expression();
+
+    return merge_subtrees(operator_token, lhs, rhs);
+}
+
 
 static node_t* parse_expression() {
     // Expression: Numeric_literal
@@ -789,10 +811,11 @@ static node_t* parse_deref(node_t* lhs_node) {
     switch (token.type) {
         case LEX_OPERATOR:
             return parse_block_operation(deref_node);
-        case LEX_SEMICOLON:
-            return deref_node;
         case LEX_EQUAL:
             return parse_assignment(deref_node);
+        case LEX_SEMICOLON:
+        case LEX_RPAREN:
+            return deref_node;
         default:
             fail_token(token);
     }
