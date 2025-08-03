@@ -33,6 +33,7 @@ char* TOKEN_TYPE_NAMES[] = {
     "true",
     "false",
     "break",
+    "struct",
     "EOF"
 };
 
@@ -102,6 +103,9 @@ token_t lexer_peek() {
     } else if (matches_prefix_word("break")) {
         current_token.type = LEX_BREAK;
         current_token.end_offset = content_ptr + 5;
+    } else if (matches_prefix_word("struct")) {
+        current_token.type = LEX_STRUCT;
+        current_token.end_offset = content_ptr+ 6;
     } else if ((match_len = matches_identifier())) {
         current_token.type = LEX_IDENTIFIER;
         current_token.end_offset = content_ptr + match_len;

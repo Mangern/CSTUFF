@@ -1,5 +1,5 @@
 main: () -> void = {
-    arr: int[5];
-
-    arr[0] = 1;
+    p: struct { x: int; };
+    p.x = 69;
+    println(p.x);
 }

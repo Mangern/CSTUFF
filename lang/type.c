@@ -34,6 +34,7 @@ static type_info_t* create_basic(basic_type_t basic_type);
 static type_info_t* create_type_function();
 static type_info_t* create_type_array(type_info_t*, node_t*);
 static type_info_t* create_type_pointer(type_info_t*);
+static type_info_t* create_type_struct(node_t*);
 static type_tuple_t* create_tuple();
 static basic_type_t is_basic_type(const char* identifier_str);
 
@@ -142,6 +143,8 @@ static void register_type_node(node_t* node) {
                     // only child: subtype
                     register_type_node(node->children[0]);
                     node->type_info = create_type_pointer(node->children[0]->type_info);
+                } else if (node->data.type_class == TC_STRUCT) {
+                    node->type_info = create_type_struct(node);
                 } else {
                     assert(false && "Unhandled type class from parsing stage");
                 }
@@ -318,11 +321,12 @@ static void register_type_node(node_t* node) {
             break;
         case IDENTIFIER:
             {
-                if (node->symbol == NULL)
-                    fail_node(node, "bind ref fail");
-
                 assert(node->symbol != NULL && "Bind references has not succeeded");
                 node_t* symbol_definition_node = node->symbol->node;
+
+                if (symbol_definition_node->type_info == NULL) {
+                    fprintf(stderr, "%s\n", node->data.identifier_str);
+                }
                 assert(symbol_definition_node->type_info != NULL);
                 node->type_info = symbol_definition_node->type_info;
             }
@@ -483,6 +487,13 @@ static void register_type_node(node_t* node) {
                 node->type_info = create_basic(TYPE_VOID);
             }
             break;
+        case DOT_ACCESS:
+            {
+                register_type_node(node->children[0]);
+                register_type_node(node->children[1]);
+                node->type_info = node->children[1]->type_info;
+            }
+            break;
         default:
             fail("Not implemented type check: %s", NODE_TYPE_NAMES[node->type]);
     }
@@ -588,6 +599,40 @@ static type_tuple_t* create_tuple() {
     return tuple;
 }
 
+static type_info_t* create_type_struct(node_t* type_node) {
+    type_info_t *type_info = malloc(sizeof(type_info_t));
+    type_info->type_class = TC_STRUCT;
+    type_info->info.info_struct = malloc(sizeof(type_struct_t));
+    type_info->info.info_struct->fields = 0;
+
+    node_t* decl_list = type_node->children[0];
+
+    size_t offset = 0;
+    for (size_t i = 0; i < da_size(decl_list->children); ++i) {
+        node_t* decl = decl_list->children[i];
+        char* identifier = decl->children[0]->data.identifier_str;
+        assert(decl->children[1]->type == TYPE);
+        register_type_node(decl->children[1]);
+        assert(decl->children[1]->type_info != NULL);
+
+        decl->children[0]->type_info = decl->children[1]->type_info;
+
+        type_struct_field_t *field_type = malloc(sizeof(type_struct_field_t));
+        field_type->name = identifier;
+        field_type->type = decl->children[1]->type_info;
+        field_type->offset = offset;
+
+        decl->type_info = malloc(sizeof(type_info_t));
+        decl->type_info->type_class = TC_STRUCT_FIELD;
+        decl->type_info->info.info_struct_field = field_type;
+
+        da_append(type_info->info.info_struct->fields, field_type);
+
+        offset += type_sizeof(field_type->type);
+    }
+    return type_info;
+}
+
 void type_print(FILE* stream, type_info_t* type) {
     switch (type->type_class) {
         case TC_BASIC:
@@ -611,11 +656,18 @@ void type_print(FILE* stream, type_info_t* type) {
                     if (i > 0)
                         fprintf(stream, ", ");
 
-                    type_named_t* field = type->info.info_struct->fields[i];
+                    type_struct_field_t* field = type->info.info_struct->fields[i];
+                    fprintf(stream, "%s: ", field->name);
                     type_print(stream, field->type);
-                    fprintf(stream, " %s", field->name);
                 }
                 fprintf(stream, " }");
+            }
+            break;
+        case TC_STRUCT_FIELD:
+            {
+                fprintf(stream, ".%s: ", type->info.info_struct_field->name);
+                type_print(stream, type->info.info_struct_field->type);
+                fprintf(stream, " [offs: %zu]", type->info.info_struct_field->offset);
             }
             break;
         case TC_TUPLE:
@@ -684,6 +736,13 @@ size_t type_sizeof(type_info_t* type) {
         return total_size;
     } else if (type->type_class == TC_POINTER) {
         return 8;
+    } else if (type->type_class == TC_STRUCT) {
+        // TODO: padding?
+        size_t total_size = 0;
+        for (size_t i = 0; i < da_size(type->info.info_struct->fields); ++i) {
+            total_size += type_sizeof(type->info.info_struct->fields[i]->type);
+        }
+        return total_size;
     } else {
         assert(false && "Not implemented");
     }

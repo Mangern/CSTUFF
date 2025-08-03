@@ -20,6 +20,7 @@ typedef enum {
     TC_POINTER,
     TC_ARRAY,
     TC_STRUCT,
+    TC_STRUCT_FIELD,
     TC_TUPLE,
     TC_FUNCTION,
     TC_UNKNOWN
@@ -31,6 +32,7 @@ struct type_info_t {
         basic_type_t info_basic;
         struct type_array_t* info_array;
         struct type_struct_t* info_struct;
+        struct type_struct_field_t* info_struct_field;
         struct type_tuple_t* info_tuple;
         struct type_function_t* info_function;
         struct type_pointer_t* info_pointer;
@@ -46,13 +48,14 @@ struct type_array_t {
     size_t* dims;
 };
 
-struct type_named_t {
+struct type_struct_field_t {
     char* name;
     type_info_t* type;
+    size_t offset;
 };
 
 struct type_struct_t {
-    type_named_t** fields;
+    type_struct_field_t** fields;
 };
 
 typedef struct type_tuple_t {

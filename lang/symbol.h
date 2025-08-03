@@ -11,6 +11,8 @@ enum symbol_type_t {
     SYMBOL_FUNCTION,
     SYMBOL_PARAMETER,
     SYMBOL_LOCAL_VAR,
+    SYMBOL_GLOBAL_STRUCT,
+    SYMBOL_LOCAL_STRUCT,
     SYMBOL_NAMESPACE
 };
 
@@ -28,11 +30,16 @@ struct symbol_t {
         long int_value;
         double real_value;
         char* string_value;
+        struct struct_info_t* struct_info;
     } data;
 
     // Only if local, param or function
     // if function, points to its own
     symbol_table_t* function_symtable;
+};
+
+struct struct_info_t {
+    struct symbol_table_t *fields;
 };
 
 extern symbol_table_t* global_symbol_table;

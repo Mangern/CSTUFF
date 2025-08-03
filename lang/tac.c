@@ -50,6 +50,7 @@ static size_t generate_valued_code(tac_t** list, node_t* node);
 static void generate_function_call_setup(tac_t**, node_t*, size_t*, size_t*);
 static void generate_cast_expr(tac_t** list, type_info_t* info_src, size_t addr_src, type_info_t* info_dst, size_t addr_dst);
 static size_t generate_indexing(tac_t**, node_t*);
+static void get_struct_addr_offset(node_t*, size_t*, size_t*);
 
 static size_t TAC_NEXT_LABEL = 0;
 static size_t tac_emit(tac_t**, instruction_t, size_t, size_t, size_t);
@@ -205,6 +206,17 @@ static void generate_node_code(tac_t** list, node_t* node) {
                     size_t src_addr = generate_valued_code(list, node->children[1]);
 
                     tac_emit(list, TAC_STORE, src_addr, inside, new_size_const(0));
+                } else if (node->children[0]->type == DOT_ACCESS) {
+                    size_t struct_addr = 0;
+                    size_t offset = 0;
+                    get_struct_addr_offset(node->children[0], &struct_addr, &offset);
+
+                    size_t src_addr = generate_valued_code(list, node->children[1]);
+
+                    size_t ptr_addr = new_temp(TYPE_SIZE);
+
+                    tac_emit(list, TAC_LOCOF, struct_addr, 0, ptr_addr);
+                    tac_emit(list, TAC_STORE, src_addr, ptr_addr, new_size_const(offset));
                 } else {
                     fprintf(stderr, "generate_node_code: Unhandled assignment LHS type %s\n", NODE_TYPE_NAMES[node->children[0]->type]);
                     exit(EXIT_FAILURE);
@@ -394,10 +406,50 @@ static size_t generate_valued_code(tac_t** list, node_t* node) {
                 return dst_addr;
             }
             break;
+        case DOT_ACCESS:
+            {
+                size_t struct_addr;
+                size_t offset;
+                get_struct_addr_offset(node, &struct_addr, &offset);
+                node_t* last = node->children[1];
+                assert(last->type_info->type_class == TC_BASIC && "Unhandled result type");
+                size_t dst_addr = new_temp(last->type_info->info.info_basic);
+                size_t loc_addr = new_temp(TYPE_SIZE);
+                tac_emit(list, TAC_LOCOF, struct_addr, 0, loc_addr);
+                tac_emit(list, TAC_LOAD, loc_addr, new_size_const(offset), dst_addr);
+                return dst_addr;
+            }
+            break;
         default:
             fprintf(stderr, "generate_valued_code: Unhandled node type: %s\n", NODE_TYPE_NAMES[node->type]);
             exit(EXIT_FAILURE);
     }
+}
+
+symbol_t* foo(node_t* node, size_t* struct_addr, size_t* offset) {
+    if (node->type != DOT_ACCESS) {
+        assert(node->symbol != NULL);
+        *struct_addr = get_symbol_addr(node->symbol);
+        return node->symbol;
+    }
+
+    symbol_t *prev = foo(node->children[0], struct_addr, offset);
+
+    node_t* access_node = node->children[1];
+    assert(access_node->symbol != NULL);
+
+    node_t* definition = access_node->symbol->node;
+    assert(prev->node->type_info->type_class == TC_STRUCT);
+    node_t* field_decl = definition->parent;
+    assert(field_decl->type_info->type_class == TC_STRUCT_FIELD);
+    *offset += field_decl->type_info->info.info_struct_field->offset;
+    return definition->symbol;
+}
+
+// retrieve the offset of the accessed field as well as the addr for the struct variable
+static void get_struct_addr_offset(node_t* dot_access, size_t *struct_addr, size_t *offset) {
+    *offset = 0;
+    foo(dot_access, struct_addr, offset);
 }
 
 static size_t tac_emit(tac_t** list, instruction_t instr, size_t src1, size_t src2, size_t dst) {
@@ -548,8 +600,10 @@ static size_t get_symbol_addr(symbol_t* symbol) {
             addr.type_info = symbol->node->type_info->info.info_array->subtype->info.info_basic;
         } else if (symbol->node->type_info->type_class == TC_POINTER) {
             addr.type_info = TYPE_SIZE;
+        } else if (symbol->node->type_info->type_class == TC_STRUCT) {
+            addr.type_info = TYPE_SIZE; // TODO: wtf?
         } else {
-            assert((symbol->node->type_info->type_class == TC_BASIC) && "Can only process basic type");
+            assert((symbol->node->type_info->type_class == TC_BASIC) && "Unhandled type class in get_symbol_addr");
             addr.type_info = symbol->node->type_info->info.info_basic;
         }
     }
@@ -604,8 +658,13 @@ static size_t generate_indexing(tac_t** list, node_t* array_indexing) {
         }
         mul *= array_info->dims[i];
     }
+
     assert(prev_idx != -1);
-    return prev_idx;
+    long res_idx = new_temp(TYPE_INT);
+    long multiplier = type_sizeof(array_info->subtype);
+    tac_emit(list, TAC_BINARY_MUL, prev_idx, new_int_const(multiplier), res_idx);
+
+    return res_idx;
 }
 
 void print_tac_addr(size_t addr_idx) {

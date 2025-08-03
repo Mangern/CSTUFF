@@ -92,6 +92,17 @@ int assemble_and_link() {
     return 1;
 }
 
+void rec(node_t* node) {
+    if (node->type_info != NULL) {
+        type_print(stdout, node->type_info);
+        printf("\n");
+    }
+
+    for (size_t i = 0; i < da_size(node->children); ++i) {
+        rec(node->children[i]);
+    }
+}
+
 int main(int argc, char** argv) {
     struct timeval t_start, t_parse, t_create_symbols, t_types, t_ir, t_gen, t_gcc, t_end;
 

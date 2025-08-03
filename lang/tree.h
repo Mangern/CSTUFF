@@ -8,7 +8,7 @@
 
 typedef enum {
     LIST,
-    DECLARATION, //  children: [identifier, type] | [identifier, type, block] | [identifier, type, expression]
+    DECLARATION, //  children: [identifier, type] | [identifier, type?, block] | [identifier, type?, expression]
     TYPE,             // children: [identifier] | [declaration_list, type]
     IDENTIFIER,
     DECLARATION_LIST, // children [declaration ...]
@@ -28,7 +28,7 @@ typedef enum {
     ARRAY_INDEXING,         // children: [identifier, list[expression]]
     BREAK_STATEMENT,
     SCOPE_RESOLUTION, // children: [scope resolution, identifier] | [identifier, identifier]
-    DOT_ACCESS
+    DOT_ACCESS, // children: [dot_access, identifier] | [identifier, identifier]
 } node_type_t;
 
 typedef enum operator_t {
@@ -64,6 +64,7 @@ struct node_t {
     node_type_t type;
 
     node_t** children;
+    node_t* parent;
 
     type_info_t* type_info;
 

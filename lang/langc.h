@@ -13,7 +13,7 @@ typedef enum basic_type_t basic_type_t;
 typedef struct type_array_t type_array_t;
 typedef struct type_struct_t type_struct_t;
 typedef struct type_info_t type_info_t;
-typedef struct type_named_t type_named_t;
+typedef struct type_struct_field_t type_struct_field_t;
 typedef struct type_function_t type_function_t;
 typedef struct type_pointer_t type_pointer_t;
 

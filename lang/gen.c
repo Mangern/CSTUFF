@@ -139,7 +139,7 @@ static void generate_function(function_code_t func_code) {
             {
                 symbol_t* sym = addr.data.symbol;
                 
-                if (sym->type == SYMBOL_LOCAL_VAR) {
+                if (sym->type == SYMBOL_LOCAL_VAR || sym->type == SYMBOL_LOCAL_STRUCT) {
                     assert(sym->node != NULL);
                     assert(sym->node->type_info != NULL);
                     local_space += type_sizeof(sym->node->type_info);
@@ -243,7 +243,7 @@ static const char* generate_addr_access(size_t addr_idx) {
             {
                 symbol_t* sym = addr.data.symbol;
 
-                if (sym->type == SYMBOL_LOCAL_VAR || sym->type == SYMBOL_PARAMETER) {
+                if (sym->type == SYMBOL_LOCAL_VAR || sym->type == SYMBOL_PARAMETER || sym->type == SYMBOL_LOCAL_STRUCT) {
                     long rbp_offset = get_addr_rbp_offset(addr_idx);
                     snprintf(result, sizeof result, "%ld(%s)", rbp_offset, RBP);
                 } else if (sym->type == SYMBOL_GLOBAL_VAR) {
@@ -590,8 +590,9 @@ static void generate_tac(tac_t tac) {
             MOVQ(generate_addr_access(tac.dst), RCX);
 
             // store exact memory location in rax
-            // TODO: size??
-            EMIT("leaq (%s, %s, 8), %s", RAX, RCX, RAX);
+            // TODO: preceding multiplication can be put in this
+            //       instruction
+            EMIT("leaq (%s, %s, 1), %s", RAX, RCX, RAX);
 
             // What we want to store
             MOVQ(generate_addr_access(tac.src1), RCX);
@@ -614,7 +615,7 @@ static void generate_tac(tac_t tac) {
             }
 
             // store exact location
-            EMIT("leaq (%s, %s, 8), %s", RAX, RCX, RAX);
+            EMIT("leaq (%s, %s, 1), %s", RAX, RCX, RAX);
 
             MOVQ(MEM(RAX), RCX);
 
