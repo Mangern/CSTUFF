@@ -174,9 +174,13 @@ static void generate_node_code(tac_t** list, node_t* node) {
         case ASSIGNMENT_STATEMENT:
             {
                 if (node->children[0]->type == IDENTIFIER) {
-                    size_t dst_addr = get_symbol_addr(node->children[0]->symbol);
-                    size_t src_addr = generate_valued_code(list, node->children[1]);
-                    tac_emit(list, TAC_COPY, src_addr, 0, dst_addr);
+                    if (node->children[0]->type_info->type_class == TC_BASIC) {
+                        size_t dst_addr = get_symbol_addr(node->children[0]->symbol);
+                        size_t src_addr = generate_valued_code(list, node->children[1]);
+                        tac_emit(list, TAC_COPY, src_addr, 0, dst_addr);
+                    } else {
+                        fail_node(node->children[0], "Not something we can assign to. Type is too complex :(");
+                    }
                 } else if (node->children[0]->type == ARRAY_INDEXING) {
                     size_t src_addr = generate_valued_code(list, node->children[1]);
 

@@ -534,6 +534,28 @@ static bool types_equivalent(type_info_t* type_a, type_info_t* type_b) {
             type_a->info.info_pointer->inner,
             type_b->info.info_pointer->inner
         );
+    } else if (type_class == TC_STRUCT) {
+        type_struct_t *struct_a = type_a->info.info_struct;
+        type_struct_t *struct_b = type_b->info.info_struct;
+
+        if (da_size(struct_a->fields) != da_size(struct_b->fields)) 
+            return false;
+
+        for (size_t i = 0; i < da_size(struct_a->fields); ++i) {
+            type_struct_field_t *field_a = struct_a->fields[i];
+            type_struct_field_t *field_b = struct_b->fields[i];
+
+            if (field_a->offset != field_b->offset)
+                return false;
+
+            if (!types_equivalent(field_a->type, field_b->type))
+                return false;
+
+            if (strcmp(field_a->name, field_b->name))
+                return false;
+        }
+
+        return true;
     } else {
         fprintf(stderr, "Not implemented type class equivalency:\n");
         type_print(stderr, type_a);
@@ -651,7 +673,7 @@ void type_print(FILE* stream, type_info_t* type) {
             break;
         case TC_STRUCT:
             {
-                fprintf(stream, "{ ");
+                fprintf(stream, "struct { ");
                 for (size_t i = 0; i < da_size(type->info.info_struct->fields); ++i) {
                     if (i > 0)
                         fprintf(stream, ", ");
