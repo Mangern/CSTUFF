@@ -372,7 +372,7 @@ static void register_type_node(node_t* node) {
                         fprintf(stderr, "', Got: '");
                         type_print(stderr, args_list->children[i]->type_info);
                         fprintf(stderr, "'\n");
-                        exit(EXIT_FAILURE);
+                        fail_node(args_list->children[i], "%s", "");
                     }
                 }
 

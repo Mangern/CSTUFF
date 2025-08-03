@@ -1,6 +1,14 @@
+func: (ptr: * struct { x: int; }) -> void = {
+    //ptr.x = 123;
+}
 main: () -> void = {
-    x: void;
-    p: struct {x: int;};
-    p.x = 69;
+    p: struct {
+        x: int;
+    };
+
+    q := *p;
+
+    func(q);
+
     println(p.x);
 }

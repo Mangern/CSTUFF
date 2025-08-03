@@ -177,7 +177,9 @@ static void bind_references(symbol_table_t* local_symbols, node_t* node) {
                     bind_references(local_symbols, node->children[2]);
                 } else if (da_size(node->children) == 2 && node->children[1]->type != TYPE) {
                     bind_references(local_symbols, node->children[1]);
-                } else if (node->children[1]->type == TYPE && node->children[1]->data.type_class == TC_STRUCT) {
+                }
+
+                if (node->children[1]->type == TYPE && node->children[1]->data.type_class == TC_STRUCT) {
                     create_struct_symbol(local_symbols, node);
 
                     return;
