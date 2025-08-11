@@ -1,15 +1,13 @@
+magic: () -> *int = {
+    return alloc(int, 1 + 2 + 3);
+}
+
 main: () -> void = {
-    one_val := 1;
-    tmp1 := 1;
-    tmp2 := 2;
-    tmp3 := 3;
-    tmp4 := 4;
-    tmp5 := 5;
-    tmp6 := 6;
-    one: *int = *one_val/* = alloc(int)*/;
+    one: *int = alloc(int);
+    one.* = 69;
     // TODO: defer delete(one);
 
-    x: *int = *tmp6/* = alloc(int, 6)*/;
+    x: *int = magic();
     // TODO: defer delete(x);
 
     i := 0;

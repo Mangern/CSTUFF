@@ -28,11 +28,11 @@ void tree_transform(node_t* node) {
     }
 }
 
+// Sadly basically slower than IR gen ...
 static void transform_pointer_indexing(node_t* node) {
     assert(da_size(node->children[1]->children) == 1); // from type check
     assert(node->parent != NULL);
 
-    printf("Boutta transform\n");
     // change indexing [ identifier, list [ expression ]]
     // to     operator (deref) [ operator (add) [ identifier, operator (mul) [ expression, sizeof(ptr->inner) ] ] ]
     node_t* identifier_node = node->children[0];
@@ -65,8 +65,6 @@ static void transform_pointer_indexing(node_t* node) {
     deref_node->type_info = ptr_type->info.info_pointer->inner;
 
     long insert_idx = da_indexof(node->parent->children, &node);
-    printf("Node: %p\n", node);
-    printf("Parchild0: %p\n", node->parent->children[0]);
     assert(insert_idx >= 0);
     node->parent->children[insert_idx] = deref_node;
 

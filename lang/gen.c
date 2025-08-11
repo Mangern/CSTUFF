@@ -549,6 +549,13 @@ static void generate_tac(tac_t tac) {
             MOVQ(RAX, generate_addr_access(tac.dst));
         }
         break;
+    case TAC_ALLOC:
+        {
+            MOVQ(generate_addr_access(tac.src1), RDI);
+            EMIT("call safe_malloc");
+            MOVQ(RAX, generate_addr_access(tac.dst));
+        }
+        break;
     case TAC_COPY:
         {
             MOVQ(generate_addr_access(tac.src1), RAX);
@@ -720,6 +727,19 @@ static void generate_safe_printf(void)
     RET;
 }
 
+static void generate_safe_malloc(void)
+{
+    LABEL("safe_malloc");
+
+    PUSHQ(RBP);
+    MOVQ(RSP, RBP);
+    ANDQ("$-16", RSP);
+    EMIT("call malloc");
+    MOVQ(RBP, RSP);
+    POPQ(RBP);
+    RET;
+}
+
 static void generate_main_function() {
     LABEL("main");
 
@@ -738,6 +758,7 @@ static void generate_main_function() {
 
     generate_safe_printf();
     generate_safe_putchar();
+    generate_safe_malloc();
 
     DIRECTIVE("%s", ASM_DECLARE_MAIN);
 }

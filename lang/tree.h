@@ -29,7 +29,7 @@ typedef enum {
     BREAK_STATEMENT,
     SCOPE_RESOLUTION, // children: [scope resolution, identifier] | [identifier, identifier]
     DOT_ACCESS, // children: [dot_access, identifier] | [identifier, identifier]
-    ALLOC_EXPRESSION, // children: [type, expression]
+    ALLOC_EXPRESSION, // children: [type] | [type, expression]
 } node_type_t;
 
 typedef enum operator_t {

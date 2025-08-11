@@ -40,6 +40,7 @@ static char* TAC_INSTRUCTION_NAMES[] = {
     "LOAD", 
     "STORE", 
     "DECLARARE_PARAM",
+    "ALLOC"
 };
 
 static function_code_t generate_function_code(symbol_t* function_symbol);
@@ -421,6 +422,29 @@ static size_t generate_valued_code(tac_t** list, node_t* node) {
                 size_t loc_addr = new_temp(TYPE_SIZE);
                 tac_emit(list, TAC_LOCOF, struct_addr, 0, loc_addr);
                 tac_emit(list, TAC_LOAD, loc_addr, new_size_const(offset), dst_addr);
+                return dst_addr;
+            }
+            break;
+        case ALLOC_EXPRESSION:
+            {
+                type_info_t* allocate_type = node->children[0]->type_info;
+                size_t allocate_type_size = type_sizeof(allocate_type);
+                size_t type_size_addr = new_size_const(allocate_type_size);
+
+                size_t num_bytes_addr;
+
+                if (da_size(node->children) == 1) {
+                    // e.g. allocate(int)
+                    num_bytes_addr = type_size_addr;
+                } else {
+                    // e.g. allocate(int, 2 + 3)
+                    size_t num_els_addr = generate_valued_code(list, node->children[1]);
+                    num_bytes_addr = new_temp(TYPE_SIZE);
+                    tac_emit(list, TAC_BINARY_MUL, num_els_addr, type_size_addr, num_bytes_addr);
+                }
+
+                size_t dst_addr = new_temp(TYPE_SIZE);
+                tac_emit(list, TAC_ALLOC, num_bytes_addr, 0, dst_addr);
                 return dst_addr;
             }
             break;

@@ -88,6 +88,10 @@
         "file": "simple-struct.lang",
         "expect-stdout": "69 420\n123\n300.000000\n"
     },
+    {
+        "file": "memory.lang",
+        "expect-stdout": "69\n0 5\n"
+    },
 
 
     {
