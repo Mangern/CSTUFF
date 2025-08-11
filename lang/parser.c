@@ -27,8 +27,8 @@ static node_t* parse_scope_resolution(node_t*);
 static node_t* parse_dot_access(node_t*);
 static node_t* parse_deref(node_t*);
 static node_t* parse_array_indexing(node_t*);
+static node_t* parse_alloc();
 static operator_t parse_operator_str(char* operator_str, bool);
-static void add_child(node_t*, node_t*);
 
 void parse() {
     root = node_create(LIST);
@@ -37,7 +37,7 @@ void parse() {
     for (;;) {
         node = parse_global_statement();
         if (!node) break;
-        add_child(root, node);
+        node_add_child(root, node);
 
         token_t token;
         for (;;) {
@@ -82,7 +82,7 @@ static node_t* parse_declaration(node_t* identifier) {
 
 
     node_t* declaration = node_create(DECLARATION);
-    add_child(declaration, identifier);
+    node_add_child(declaration, identifier);
 
     token = lexer_peek();
     if (token.type == LEX_EQUAL) {
@@ -101,13 +101,13 @@ static node_t* parse_declaration(node_t* identifier) {
             rhs = parse_expression();
         }
 
-        add_child(declaration, rhs);
+        node_add_child(declaration, rhs);
 
         return declaration;
     }
 
     node_t* type_node = parse_type();
-    add_child(declaration, type_node);
+    node_add_child(declaration, type_node);
 
     token = lexer_peek();
 
@@ -128,13 +128,13 @@ static node_t* parse_declaration(node_t* identifier) {
             node_t* fake_return_node = node_create(RETURN_STATEMENT);
             // TODO: check if setting rbrace as location makes sense
             fake_return_node->pos = rbrace_token;
-            add_child(rhs, fake_return_node);
+            node_add_child(rhs, fake_return_node);
         }
     } else {
         rhs = parse_expression();
     }
     
-    add_child(declaration, rhs);
+    node_add_child(declaration, rhs);
 
     return declaration;
 }
@@ -152,13 +152,13 @@ static node_t* parse_block() {
             lexer_advance();
             node_t* return_node = node_create(RETURN_STATEMENT);
             if (lexer_peek().type != LEX_SEMICOLON) {
-                add_child(return_node, parse_expression());
+                node_add_child(return_node, parse_expression());
             }
-            add_child(block_node, return_node);
+            node_add_child(block_node, return_node);
             peek_expect_advance(LEX_SEMICOLON);
         } else if (token.type == LEX_LBRACE) {
             // '{' ... '}' -> BLOCK[...]
-            add_child(block_node, parse_block());
+            node_add_child(block_node, parse_block());
             peek_expect_advance(LEX_RBRACE);
         // TODO:
         //} else if (token.type == LEX_TYPENAME) {
@@ -176,25 +176,25 @@ static node_t* parse_block() {
 
             if (token.type == LEX_LPAREN) {
                 // FUNCTION_CALL[...]
-                add_child(block_node, parse_function_call(identifier_node));
+                node_add_child(block_node, parse_function_call(identifier_node));
                 // TODO: other things than semi?
                 peek_expect_advance(LEX_SEMICOLON);
             //} else if (token.type == LEX_WALRUS) {
             //    da_append(block_node->children, parse_assignment(identifier_node));
             //    peek_expect_advance(LEX_SEMICOLON);
             } else if (token.type == LEX_OPERATOR) {
-                add_child(block_node, parse_block_operation(identifier_node));
+                node_add_child(block_node, parse_block_operation(identifier_node));
                 peek_expect_advance(LEX_SEMICOLON);
             } else if (token.type == LEX_LBRACKET) {
                 node_t* indexing_node = parse_array_indexing(identifier_node);
                 token = lexer_peek();
 
                 if (token.type == LEX_EQUAL) {
-                   add_child(block_node, parse_assignment(indexing_node));
+                   node_add_child(block_node, parse_assignment(indexing_node));
                    peek_expect_advance(LEX_SEMICOLON);
 
                 } else if (token.type == LEX_OPERATOR) {
-                   add_child(block_node, parse_block_operation(indexing_node));
+                   node_add_child(block_node, parse_block_operation(indexing_node));
                    peek_expect_advance(LEX_SEMICOLON);
 
                 } else if (token.type == LEX_SEMICOLON) {
@@ -203,10 +203,10 @@ static node_t* parse_block() {
                    fail_token(token);
                 }
             } else if (token.type == LEX_COLON) {
-                add_child(block_node, parse_declaration(identifier_node));
+                node_add_child(block_node, parse_declaration(identifier_node));
                 peek_expect_advance(LEX_SEMICOLON);
             } else if (token.type == LEX_EQUAL) {
-                add_child(block_node, parse_assignment(identifier_node));
+                node_add_child(block_node, parse_assignment(identifier_node));
                 peek_expect_advance(LEX_SEMICOLON);
             } else {
                 fail_token(token);
@@ -218,10 +218,10 @@ static node_t* parse_block() {
             node_t* if_node = node_create(IF_STATEMENT);
 
             peek_expect_advance(LEX_LPAREN);
-            add_child(if_node, parse_expression());
+            node_add_child(if_node, parse_expression());
             peek_expect_advance(LEX_RPAREN);
 
-            add_child(if_node, parse_block());
+            node_add_child(if_node, parse_block());
 
             peek_expect_advance(LEX_RBRACE);
 
@@ -230,31 +230,31 @@ static node_t* parse_block() {
             if (token.type == LEX_ELSE) {
                 lexer_advance();
 
-                add_child(if_node, parse_block());
+                node_add_child(if_node, parse_block());
 
                 peek_expect_advance(LEX_RBRACE);
             }
 
-            add_child(block_node, if_node);
+            node_add_child(block_node, if_node);
         } else if (token.type == LEX_WHILE) {
             // while (expression) BLOCK
             lexer_advance();
             node_t* while_node = node_create(WHILE_STATEMENT);
             peek_expect_advance(LEX_LPAREN);
-            add_child(while_node, parse_expression());
+            node_add_child(while_node, parse_expression());
             peek_expect_advance(LEX_RPAREN);
 
-            add_child(while_node, parse_block());
+            node_add_child(while_node, parse_block());
 
             peek_expect_advance(LEX_RBRACE);
 
-            add_child(block_node, while_node);
+            node_add_child(block_node, while_node);
         } else if (token.type == LEX_BREAK) {
             lexer_advance();
 
             node_t* break_node = node_create(BREAK_STATEMENT);
 
-            add_child(block_node, break_node);
+            node_add_child(block_node, break_node);
 
             peek_expect_advance(LEX_SEMICOLON);
         } else {
@@ -274,7 +274,7 @@ static node_t* parse_declaration_list() {
         return decl_list;
     }
     node_t* decl = parse_declaration(NULL);
-    add_child(decl_list, decl);
+    node_add_child(decl_list, decl);
 
     // decl [, decl]*
     for (;;) {
@@ -286,7 +286,7 @@ static node_t* parse_declaration_list() {
 
         peek_expect_advance(LEX_COMMA);
         decl = parse_declaration(NULL);
-        add_child(decl_list, decl);
+        node_add_child(decl_list, decl);
     }
 }
 
@@ -316,7 +316,7 @@ static node_t* parse_type() {
 
         node_t* ptr_type = node_create(TYPE);
         ptr_type->data.type_class = TC_POINTER;
-        add_child(ptr_type, inner_type);
+        node_add_child(ptr_type, inner_type);
         return ptr_type;
     } else if (token.type == LEX_STRUCT) {
         lexer_advance();
@@ -325,7 +325,7 @@ static node_t* parse_type() {
         type_node->data.type_class = TC_STRUCT;
 
         node_t* struct_def = parse_struct_body();
-        add_child(type_node, struct_def);
+        node_add_child(type_node, struct_def);
 
         peek_expect_advance(LEX_RBRACE);
         return type_node;
@@ -343,7 +343,7 @@ static node_t* parse_type() {
     node_t* type_node = node_create(TYPE);
     type_node->data.type_class = TC_UNKNOWN;
 
-    add_child(type_node, identifier_node);
+    node_add_child(type_node, identifier_node);
 
     // TODO: Array type.
     if (lexer_peek().type == LEX_LBRACKET) {
@@ -352,7 +352,7 @@ static node_t* parse_type() {
         node_t* array_type_node = node_create(TYPE);
         array_type_node->data.type_class = TC_ARRAY;
 
-        add_child(array_type_node, type_node);
+        node_add_child(array_type_node, type_node);
         node_t* dim_list = node_create(LIST);
 
         for (;;) {
@@ -360,7 +360,7 @@ static node_t* parse_type() {
             char* literal_str = lexer_substring(literal_token.begin_offset, literal_token.end_offset);
             node_t* literal_node = node_create_leaf(INTEGER_LITERAL, literal_token);
             literal_node->data.int_literal_value = atol(literal_str);
-            add_child(dim_list, literal_node);
+            node_add_child(dim_list, literal_node);
             free(literal_str);
 
             token_t nxt = lexer_peek();
@@ -374,7 +374,7 @@ static node_t* parse_type() {
         }
         peek_expect_advance(LEX_RBRACKET);
 
-        add_child(array_type_node, dim_list);
+        node_add_child(array_type_node, dim_list);
         return array_type_node;
     }
     return type_node;
@@ -397,7 +397,7 @@ static node_t* parse_struct_body() {
             identifier->data.identifier_str = lexer_substring(token.begin_offset, token.end_offset);
             node_t* decl = parse_declaration(identifier);
             peek_expect_advance(LEX_SEMICOLON);
-            add_child(decls, decl);
+            node_add_child(decls, decl);
 
         } else {
             fail_token_expected(token, LEX_IDENTIFIER);
@@ -420,8 +420,8 @@ static node_t* parse_function_type() {
     node_t* function_type = node_create(TYPE);
     function_type->data.type_class = TC_FUNCTION;
 
-    add_child(function_type, declaration_list);
-    add_child(function_type, return_type);
+    node_add_child(function_type, declaration_list);
+    node_add_child(function_type, return_type);
 
     return function_type;
 }
@@ -449,8 +449,8 @@ static node_t* merge_subtrees(token_t operator_token, node_t* lhs, node_t* rhs) 
             operator_node = node_create(OPERATOR);
             operator_node->data.operator = lhs_operator;
         }
-        add_child(operator_node, lhs);
-        add_child(operator_node, rhs);
+        node_add_child(operator_node, lhs);
+        node_add_child(operator_node, rhs);
         return operator_node;
     }
 
@@ -525,7 +525,7 @@ static node_t* merge_unary_op(token_t operator_token, node_t* rhs) {
     if (rhs->type != OPERATOR || da_size(rhs->children) != 2 || has_precedence(rhs->data.operator, operator)) {
         node_t* operator_node = node_create(OPERATOR);
         operator_node->data.operator = operator;
-        add_child(operator_node, rhs);
+        node_add_child(operator_node, rhs);
 
         return operator_node;
     }
@@ -550,7 +550,7 @@ static node_t* expression_continuation(token_t operator_token, node_t* lhs) {
     if (operator == UNARY_DEREF) {
         node_t* new = node_create(OPERATOR);
         new->data.operator = operator;
-        add_child(new, lhs);
+        node_add_child(new, lhs);
 
         token_t nxt = lexer_peek();
         if (token_is_expression_end(nxt)) {
@@ -642,7 +642,7 @@ static node_t* parse_expression() {
         peek_expect_advance(LEX_RPAREN);
 
         node_t* ret = node_create(PARENTHESIZED_EXPRESSION);
-        add_child(ret, expr);
+        node_add_child(ret, expr);
 
         token = lexer_peek();
 
@@ -676,6 +676,17 @@ static node_t* parse_expression() {
         } else {
             fail_token(token);
         }
+    } else if (token.type == LEX_ALLOC) {
+        node_t* alloc_node = parse_alloc();
+        token = lexer_peek();
+        if (token.type == LEX_OPERATOR) {
+            lexer_advance();
+            return expression_continuation(token, alloc_node);
+        } else if (token_is_expression_end(token)) {
+            return alloc_node;
+        } else {
+            fail_token(token);
+        }
     } else {
         fail_token(token);
     }
@@ -687,20 +698,20 @@ static node_t* parse_function_call(node_t* identifier_node) {
     token_t token = peek_expect_advance(LEX_LPAREN);
 
     node_t* ret = node_create(FUNCTION_CALL);
-    add_child(ret, identifier_node);
+    node_add_child(ret, identifier_node);
 
     node_t* list_node = node_create(LIST);
 
     token = lexer_peek();
     while (token.type != LEX_RPAREN) {
-        add_child(list_node, parse_expression());
+        node_add_child(list_node, parse_expression());
         token = lexer_peek();
         if (token.type == LEX_RPAREN) break;
         token = peek_expect_advance(LEX_COMMA);
     }
     lexer_advance();
 
-    add_child(ret, list_node);
+    node_add_child(ret, list_node);
     return ret;
 }
 
@@ -710,8 +721,8 @@ static node_t* parse_cast() {
     peek_expect_advance(LEX_COMMA);
     node_t* expr_node = parse_expression();
     node_t* ret = node_create(CAST_EXPRESSION);
-    add_child(ret, typename_node);
-    add_child(ret, expr_node);
+    node_add_child(ret, typename_node);
+    node_add_child(ret, expr_node);
     return ret;
 }
 
@@ -719,7 +730,7 @@ static node_t* parse_cast() {
 static node_t* parse_assignment(node_t* lhs_node) {
     peek_expect_advance(LEX_EQUAL);
     node_t* ret = node_create(ASSIGNMENT_STATEMENT);
-    add_child(ret, lhs_node);
+    node_add_child(ret, lhs_node);
 
     token_t token = lexer_peek();
 
@@ -728,7 +739,7 @@ static node_t* parse_assignment(node_t* lhs_node) {
         fail_token(token);
     }
 
-    add_child(ret, parse_expression());
+    node_add_child(ret, parse_expression());
     return ret;
 }
 
@@ -752,14 +763,14 @@ static node_t* parse_block_operation(node_t* lhs_node) {
     // For now: assume this is a += or similar
 
     node_t* assignment_node = node_create(ASSIGNMENT_STATEMENT);
-    add_child(assignment_node, lhs_node);
+    node_add_child(assignment_node, lhs_node);
 
     node_t* rhs_node = parse_expression();
 
     node_t* operator_node = node_create(OPERATOR);
 
-    add_child(operator_node, lhs_node);
-    add_child(operator_node, rhs_node);
+    node_add_child(operator_node, lhs_node);
+    node_add_child(operator_node, rhs_node);
 
     switch(op) {
         case BINARY_ASS_ADD:
@@ -782,7 +793,7 @@ static node_t* parse_block_operation(node_t* lhs_node) {
             fail_token(operator_token);
     }
 
-    add_child(assignment_node, operator_node);
+    node_add_child(assignment_node, operator_node);
     return assignment_node;
 }
 
@@ -797,8 +808,8 @@ static node_t* parse_scope_resolution(node_t* lhs_node) {
     lexer_advance();
 
     node_t* merged = node_create(SCOPE_RESOLUTION);
-    add_child(merged, lhs_node);
-    add_child(merged, identifier);
+    node_add_child(merged, lhs_node);
+    node_add_child(merged, identifier);
 
     token = lexer_peek();
 
@@ -834,8 +845,8 @@ static node_t* parse_dot_access(node_t* lhs_node) {
     lexer_advance();
 
     node_t* merged = node_create(DOT_ACCESS);
-    add_child(merged, lhs_node);
-    add_child(merged, identifier);
+    node_add_child(merged, lhs_node);
+    node_add_child(merged, identifier);
 
     token = lexer_peek();
 
@@ -856,7 +867,7 @@ static node_t* parse_dot_access(node_t* lhs_node) {
 static node_t* parse_deref(node_t* lhs_node) {
     node_t* deref_node = node_create(OPERATOR);
     deref_node->data.operator = UNARY_DEREF;
-    add_child(deref_node, lhs_node);
+    node_add_child(deref_node, lhs_node);
 
     token_t token = lexer_peek();
 
@@ -877,13 +888,13 @@ static node_t* parse_deref(node_t* lhs_node) {
 static node_t* parse_array_indexing(node_t* identifier_node) {
     peek_expect_advance(LEX_LBRACKET);
     node_t* indexing = node_create(ARRAY_INDEXING);
-    add_child(indexing, identifier_node);
+    node_add_child(indexing, identifier_node);
 
     node_t* index_list = node_create(LIST);
 
     for (;;) {
         node_t* expr = parse_expression();
-        add_child(index_list, expr);
+        node_add_child(index_list, expr);
         token_t token = lexer_peek();
 
         if (token.type == LEX_COMMA) {
@@ -894,8 +905,24 @@ static node_t* parse_array_indexing(node_t* identifier_node) {
         fail_token(token);
     }
     peek_expect_advance(LEX_RBRACKET);
-    add_child(indexing, index_list);
+    node_add_child(indexing, index_list);
     return indexing;
+}
+
+static node_t* parse_alloc() {
+    peek_expect_advance(LEX_ALLOC);
+    peek_expect_advance(LEX_LPAREN);
+    node_t* type_node = parse_type();
+    token_t token = lexer_peek();
+    node_t* alloc_node = node_create(ALLOC_EXPRESSION);
+    node_add_child(alloc_node, type_node);
+    if (token.type == LEX_COMMA) {
+        lexer_advance();
+        node_t* count = parse_expression();
+        node_add_child(alloc_node, count);
+    }
+    peek_expect_advance(LEX_RPAREN);
+    return alloc_node;
 }
 
 static token_t peek_expect_advance(token_type_t expected) {
@@ -904,9 +931,4 @@ static token_t peek_expect_advance(token_type_t expected) {
         fail_token_expected(token, expected);
     lexer_advance();
     return token;
-}
-
-static void add_child(node_t* parent, node_t* child) {
-    da_append(parent->children, child);
-    child->parent = parent;
 }

@@ -71,8 +71,10 @@ extern char* BASIC_TYPE_NAMES[];
 
 void register_types();
 
-void type_print(FILE*, type_info_t*);
+type_info_t* type_create_basic(basic_type_t basic_type);
 
 size_t type_sizeof(type_info_t*);
+
+void type_print(FILE*, type_info_t*);
 
 #endif // TYPE_H

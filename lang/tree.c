@@ -56,7 +56,8 @@ char* NODE_TYPE_NAMES[] = {
     "ARRAY_INDEXING",
     "BREAK_STATEMENT",
     "SCOPE_RESOLUTION",
-    "DOT_ACCESS"
+    "DOT_ACCESS",
+    "ALLOC_EXPRESSION"
 };
 
 char* OPERATOR_TYPE_NAMES[] = {
@@ -152,4 +153,9 @@ void node_find_range(node_t* node, range_t* range) {
     range->start = lexer_offset_location(ptr_lft->pos.begin_offset);
     range->end   = lexer_offset_location(ptr_rgt->pos.end_offset - 1);
 
+}
+
+void node_add_child(node_t *parent, node_t *child) {
+    da_append(parent->children, child);
+    child->parent = parent;
 }

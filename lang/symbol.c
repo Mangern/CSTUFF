@@ -248,6 +248,13 @@ static void bind_references(symbol_table_t* local_symbols, node_t* node) {
                 resolve_struct_access(local_symbols, node);
             }
             break;
+        case ALLOC_EXPRESSION:
+            {
+                if (da_size(node->children) > 1) {
+                    bind_references(local_symbols, node->children[1]);
+                }
+            }
+            break;
         default:
             {
                 fprintf(stderr, "bind_references: Unexpected node type: %s\n", NODE_TYPE_NAMES[node->type]);

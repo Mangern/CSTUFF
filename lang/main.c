@@ -12,12 +12,14 @@
 #include "tree.h"
 #include "da.h"
 #include "symbol.h"
+#include "tree_transform.h"
 #include "type.h"
 
 #define BUFSIZE 1024
 
 static bool opt_print_tree = false;
 static bool opt_print_tac  = false;
+static bool opt_print_transformed_tree = false;
 
 void read_file(const char* file_path, char** content) {
     FILE* file = fopen(file_path, "r");
@@ -44,9 +46,12 @@ void read_file(const char* file_path, char** content) {
 
 static void options(int argc, char **argv) {
     for (;;) {
-        switch (getopt(argc, argv, "tpa")) {
+        switch (getopt(argc, argv, "tpT")) {
             case 't':
                 opt_print_tree = true;
+                break;
+            case 'T':
+                opt_print_transformed_tree = true;
                 break;
             case 'p':
                 opt_print_tac = true;
@@ -104,7 +109,7 @@ void rec(node_t* node) {
 }
 
 int main(int argc, char** argv) {
-    struct timeval t_start, t_parse, t_create_symbols, t_types, t_ir, t_gen, t_gcc, t_end;
+    struct timeval t_start, t_parse, t_create_symbols, t_types, t_transform, t_ir, t_gen, t_gcc, t_end;
 
     gettimeofday ( &t_start, NULL );
 
@@ -132,13 +137,21 @@ int main(int argc, char** argv) {
 
     gettimeofday(&t_types, NULL);
 
-    generate_function_codes();
-
-    gettimeofday(&t_ir, NULL);
-
     if (opt_print_tree) {
         print_tree(root);
     }
+
+    tree_transform(root);
+
+    gettimeofday(&t_transform, NULL);
+
+    if (opt_print_transformed_tree) {
+        print_tree(root);
+    }
+
+    generate_function_codes();
+
+    gettimeofday(&t_ir, NULL);
 
     if (opt_print_tac) {
         print_tac();
@@ -163,7 +176,8 @@ int main(int argc, char** argv) {
     printf("Parser        : %7.3f ms\n", WALLTIME(t_parse) - WALLTIME(t_start));
     printf("Symbol tables : %7.3f ms\n", WALLTIME(t_create_symbols) - WALLTIME(t_parse));
     printf("Type checking : %7.3f ms\n", WALLTIME(t_types) - WALLTIME(t_create_symbols));
-    printf("IR gen        : %7.3f ms\n", WALLTIME(t_ir) - WALLTIME(t_types));
+    printf("Transform tree: %7.3f ms\n", WALLTIME(t_transform) - WALLTIME(t_types));
+    printf("IR gen        : %7.3f ms\n", WALLTIME(t_ir) - WALLTIME(t_transform));
     printf("ASM gen       : %7.3f ms\n", WALLTIME(t_gen) - WALLTIME(t_ir));
     printf("GCC           : %7.3f ms\n", WALLTIME(t_gcc) - WALLTIME(t_gen));
     printf("Total time    : %7.3f ms\n", WALLTIME(t_end) - WALLTIME(t_start));

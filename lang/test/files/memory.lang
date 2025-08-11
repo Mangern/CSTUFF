@@ -1,0 +1,25 @@
+main: () -> void = {
+    one_val := 1;
+    tmp1 := 1;
+    tmp2 := 2;
+    tmp3 := 3;
+    tmp4 := 4;
+    tmp5 := 5;
+    tmp6 := 6;
+    one: *int = *one_val/* = alloc(int)*/;
+    // TODO: defer delete(one);
+
+    x: *int = *tmp6/* = alloc(int, 6)*/;
+    // TODO: defer delete(x);
+
+    i := 0;
+    while (i < 6) {
+      // (x + i * sizeof(int)).* = i;
+      x[i] = i;
+      i += 1;
+    }
+    println(one.*); // non-deterministic test incoming?
+    println(x[0], x[5]);
+    //delete(x);
+    //delete(one);
+}

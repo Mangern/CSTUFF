@@ -34,6 +34,7 @@ char* TOKEN_TYPE_NAMES[] = {
     "false",
     "break",
     "struct",
+    "alloc",
     "EOF"
 };
 
@@ -105,7 +106,10 @@ token_t lexer_peek() {
         current_token.end_offset = content_ptr + 5;
     } else if (matches_prefix_word("struct")) {
         current_token.type = LEX_STRUCT;
-        current_token.end_offset = content_ptr+ 6;
+        current_token.end_offset = content_ptr + 6;
+    } else if (matches_prefix_word("alloc")) {
+        current_token.type = LEX_ALLOC;
+        current_token.end_offset = content_ptr + 5;
     } else if ((match_len = matches_identifier())) {
         current_token.type = LEX_IDENTIFIER;
         current_token.end_offset = content_ptr + match_len;
@@ -136,6 +140,9 @@ token_t lexer_peek() {
     } else if (content[content_ptr] == ',') {
         current_token.type = LEX_COMMA;
         current_token.end_offset = content_ptr + 1;
+    } else if ((match_len = matches_operator())) {
+        current_token.type = LEX_OPERATOR;
+        current_token.end_offset = content_ptr + match_len;
     } else if (content[content_ptr] == ':') {
         current_token.type = LEX_COLON;
         current_token.end_offset = content_ptr + 1;
@@ -147,9 +154,6 @@ token_t lexer_peek() {
         current_token.end_offset = content_ptr + match_len;
     } else if ((match_len = matches_string())) {
         current_token.type = LEX_STRING;
-        current_token.end_offset = content_ptr + match_len;
-    } else if ((match_len = matches_operator())) {
-        current_token.type = LEX_OPERATOR;
         current_token.end_offset = content_ptr + match_len;
     } else if (content[content_ptr] == '=') {
         current_token.type = LEX_EQUAL;

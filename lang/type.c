@@ -30,7 +30,7 @@ static void register_type_node(node_t*);
 static type_info_t* get_builtin_function_type(symbol_t*);
 static bool types_equivalent(type_info_t* type_a, type_info_t* type_b);
 static bool can_cast(type_info_t* type_dst, type_info_t* type_src);
-static type_info_t* create_basic(basic_type_t basic_type);
+type_info_t* type_create_basic(basic_type_t basic_type);
 static type_info_t* create_type_function();
 static type_info_t* create_type_array(type_info_t*, node_t*);
 static type_info_t* create_type_pointer(type_info_t*);
@@ -130,7 +130,7 @@ static void register_type_node(node_t* node) {
 
                     basic_type_t basic_type = is_basic_type(identifier->data.identifier_str);
                     if ((basic_type >= 0)) {
-                        node->type_info = create_basic(basic_type);
+                        node->type_info = type_create_basic(basic_type);
                     } else {
                         fail_node(identifier, "Unknown type %s", identifier->data.identifier_str);
                     }
@@ -154,25 +154,25 @@ static void register_type_node(node_t* node) {
             break;
         case INTEGER_LITERAL:
             {
-                node->type_info = create_basic(TYPE_INT);
+                node->type_info = type_create_basic(TYPE_INT);
                 return;
             }
             break;
         case REAL_LITERAL:
             {
-                node->type_info = create_basic(TYPE_REAL);
+                node->type_info = type_create_basic(TYPE_REAL);
                 return;
             }
             break;
         case STRING_LITERAL:
             {
-                node->type_info = create_basic(TYPE_STRING);
+                node->type_info = type_create_basic(TYPE_STRING);
                 return;
             }
             break;
         case BOOL_LITERAL:
             {
-                node->type_info = create_basic(TYPE_BOOL);
+                node->type_info = type_create_basic(TYPE_BOOL);
                 return;
             }
             break;
@@ -182,7 +182,7 @@ static void register_type_node(node_t* node) {
                     register_type_node(node->children[i]);
                 }
                 // TODO
-                node->type_info = create_basic(TYPE_VOID);
+                node->type_info = type_create_basic(TYPE_VOID);
                 return;
             }
             break;
@@ -201,7 +201,7 @@ static void register_type_node(node_t* node) {
                     register_type_node(node->children[0]);
                     node->type_info = node->children[0]->type_info;
                 } else {
-                    node->type_info = create_basic(TYPE_VOID);
+                    node->type_info = type_create_basic(TYPE_VOID);
                 }
                 if (current_function_type_node == NULL) {
                     fail("Return statement not allowed outside function");
@@ -283,7 +283,7 @@ static void register_type_node(node_t* node) {
                                 exit(EXIT_FAILURE);
                             }
 
-                            node->type_info = create_basic(TYPE_BOOL);
+                            node->type_info = type_create_basic(TYPE_BOOL);
                             return;
                         }
                         break;
@@ -401,7 +401,7 @@ static void register_type_node(node_t* node) {
                 }
 
                 // Should it be void or type of assignment?
-                node->type_info = create_basic(TYPE_VOID);
+                node->type_info = type_create_basic(TYPE_VOID);
             }
             break;
         case CAST_EXPRESSION:
@@ -421,13 +421,21 @@ static void register_type_node(node_t* node) {
                 node->type_info = node->children[0]->type_info;
             }
             break;
+        case ALLOC_EXPRESSION:
+            {
+                for (size_t i = 0; i < da_size(node->children); ++i) {
+                    register_type_node(node->children[i]);
+                }
+                node->type_info = create_type_pointer(node->children[0]->type_info);
+            }
+            break;
         case LIST:
             {
                 for (size_t i = 0; i < da_size(node->children); ++i) {
                     register_type_node(node->children[i]);
                 }
                 // TODO: tuple type here in some cases?
-                node->type_info = create_basic(TYPE_VOID);
+                node->type_info = type_create_basic(TYPE_VOID);
             }
             break;
         case IF_STATEMENT:
@@ -441,7 +449,7 @@ static void register_type_node(node_t* node) {
                  || node->children[0]->type_info->info.info_basic != TYPE_BOOL) {
                     fail("Condition of if statement must be boolean.");
                 }
-                node->type_info = create_basic(TYPE_VOID);
+                node->type_info = type_create_basic(TYPE_VOID);
             }
             break;
         case ARRAY_INDEXING:
@@ -450,14 +458,20 @@ static void register_type_node(node_t* node) {
                 register_type_node(node->children[1]);
 
                 type_info_t* array_type = node->children[0]->type_info;
-                if (array_type->type_class != TC_ARRAY) {
-                    fail_node(node, "Attempt to index non-array");
-                }
-
                 node_t* dim_list = node->children[1];
 
-                if (da_size(dim_list->children) != da_size(array_type->info.info_array->dims)) {
-                    fail_node(node, "Wrong number of dimensions");
+                if (array_type->type_class == TC_ARRAY) {
+                    if (da_size(dim_list->children) != da_size(array_type->info.info_array->dims)) {
+                        fail_node(node, "Wrong number of dimensions");
+                    }
+                    node->type_info = node->children[0]->type_info->info.info_array->subtype;
+                } else if (array_type->type_class == TC_POINTER) {
+                    if (da_size(dim_list->children) != 1) {
+                        fail_node(node, "Indexing a pointer can only be done with exactly one dimension");
+                    }
+                    node->type_info = node->children[0]->type_info->info.info_pointer->inner;
+                } else {
+                    fail_node(node, "Attempt to index non-indexable");
                 }
 
                 for (size_t i = 0; i < da_size(dim_list->children); ++i) {
@@ -466,7 +480,6 @@ static void register_type_node(node_t* node) {
                     }
                 }
 
-                node->type_info = node->children[0]->type_info->info.info_array->subtype;
             }
             break;
         case WHILE_STATEMENT:
@@ -479,12 +492,12 @@ static void register_type_node(node_t* node) {
                  || node->children[0]->type_info->info.info_basic != TYPE_BOOL) {
                     fail("Condition of while statement must be boolean.");
                 }
-                node->type_info = create_basic(TYPE_VOID);
+                node->type_info = type_create_basic(TYPE_VOID);
             }
             break;
         case BREAK_STATEMENT:
             {
-                node->type_info = create_basic(TYPE_VOID);
+                node->type_info = type_create_basic(TYPE_VOID);
             }
             break;
         case DOT_ACCESS:
@@ -502,11 +515,11 @@ static void register_type_node(node_t* node) {
 static type_info_t* get_builtin_function_type(symbol_t* function_symbol) {
     if (strcmp(function_symbol->name, "println") == 0) {
         type_info_t* type_info = create_type_function();
-        type_info->info.info_function->return_type = create_basic(TYPE_VOID);
+        type_info->info.info_function->return_type = type_create_basic(TYPE_VOID);
         return type_info;
     } else if (strcmp(function_symbol->name, "print") == 0) {
         type_info_t* type_info = create_type_function();
-        type_info->info.info_function->return_type = create_basic(TYPE_VOID);
+        type_info->info.info_function->return_type = type_create_basic(TYPE_VOID);
         return type_info;
     } else {
         fail("Not implemented builtin function type: %s", function_symbol->name);
@@ -579,7 +592,7 @@ static bool can_cast(type_info_t* type_dst, type_info_t* type_src) {
     return true;
 }
 
-static type_info_t* create_basic(basic_type_t basic_type) {
+type_info_t* type_create_basic(basic_type_t basic_type) {
     type_info_t* type_info = malloc(sizeof(type_info_t));
     type_info->type_class = TC_BASIC;
     type_info->info.info_basic = basic_type;

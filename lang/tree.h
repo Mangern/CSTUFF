@@ -22,13 +22,14 @@ typedef enum {
     FUNCTION_CALL,            // children: [identifier, list[expression]] | [scope_resolution, list[expression]]
     RETURN_STATEMENT,      // children: [expression]
     ASSIGNMENT_STATEMENT,  // children: [identifier, expression] | [array_indexing, expression]
-    CAST_EXPRESSION,       // children: [typename, expression]
+    CAST_EXPRESSION,       // children: [type, expression]
     IF_STATEMENT,           // children: [expression, block] | [expression, block, block]
     WHILE_STATEMENT,
     ARRAY_INDEXING,         // children: [identifier, list[expression]]
     BREAK_STATEMENT,
     SCOPE_RESOLUTION, // children: [scope resolution, identifier] | [identifier, identifier]
     DOT_ACCESS, // children: [dot_access, identifier] | [identifier, identifier]
+    ALLOC_EXPRESSION, // children: [type, expression]
 } node_type_t;
 
 typedef enum operator_t {
@@ -93,6 +94,7 @@ extern node_t* root;
 
 node_t* node_create(node_type_t type);
 node_t* node_create_leaf(node_type_t type, token_t token);
+void node_add_child(node_t*, node_t*);
 
 // Returns INCLUSIVE range (first and last character)
 void node_find_range(node_t* node, range_t* range);
