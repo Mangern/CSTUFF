@@ -18,6 +18,6 @@ main: () -> void = {
     }
     println(one.*); // non-deterministic test incoming?
     println(x[0], x[5]);
-    //delete(x);
-    //delete(one);
+    delete(x);
+    delete(one);
 }

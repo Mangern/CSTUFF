@@ -27,7 +27,7 @@ char* BASIC_TYPE_NAMES[] = {
 };
 
 static void register_type_node(node_t*);
-static type_info_t* get_builtin_function_type(symbol_t*);
+static void handle_builtin_function_type(node_t*, symbol_t*);
 static bool types_equivalent(type_info_t* type_a, type_info_t* type_b);
 static bool can_cast(type_info_t* type_dst, type_info_t* type_src);
 type_info_t* type_create_basic(basic_type_t basic_type);
@@ -342,8 +342,7 @@ static void register_type_node(node_t* node) {
                 node_t *symbol_definition_node = function_symbol->node;
 
                 if (function_symbol->is_builtin) {
-                    // TODO: check signature of builtin
-                    node->type_info = get_builtin_function_type(function_symbol);
+                    handle_builtin_function_type(node, function_symbol);
                     return;
                 } 
 
@@ -512,19 +511,47 @@ static void register_type_node(node_t* node) {
     }
 }
 
-static type_info_t* get_builtin_function_type(symbol_t* function_symbol) {
+static void handle_builtin_function_type(node_t* node, symbol_t* function_symbol) {
     if (strcmp(function_symbol->name, "println") == 0) {
         type_info_t* type_info = create_type_function();
         type_info->info.info_function->return_type = type_create_basic(TYPE_VOID);
-        return type_info;
-    } else if (strcmp(function_symbol->name, "print") == 0) {
+        node->type_info = type_info;
+        return;
+    }
+
+    if (strcmp(function_symbol->name, "print") == 0) {
         type_info_t* type_info = create_type_function();
         type_info->info.info_function->return_type = type_create_basic(TYPE_VOID);
-        return type_info;
-    } else {
-        fail("Not implemented builtin function type: %s", function_symbol->name);
+        node->type_info = type_info;
+        return;
+    } 
+
+    if (strcmp(function_symbol->name, "delete") == 0) {
+        type_info_t* type_info = create_type_function();
+        type_info->info.info_function->return_type = type_create_basic(TYPE_VOID);
+        node->type_info = type_info;
+
+        node_t* args_list= node->children[1];
+
+        if (da_size(args_list->children) != 1) {
+            fail("Function %s requires exactly 1 argument, but was called with %zu\n",
+                function_symbol->name,
+                da_size(args_list->children)
+            );
+        }
+
+        if (args_list->children[0]->type_info->type_class != TC_POINTER) {
+            fail_node(node, "Attempt to delete non-pointer");
+        }
+
+        // we could in theory do some cool stuff like reaching definitions etc.
+        // to prevent some invalid deletes but yeah.
+        // .. later
+
+        return;
     }
-    assert(false);
+
+    fail("Not implemented builtin function type: %s", function_symbol->name);
 }
 
 static bool types_equivalent(type_info_t* type_a, type_info_t* type_b) {

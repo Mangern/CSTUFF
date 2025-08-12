@@ -447,6 +447,11 @@ static void generate_tac(tac_t tac) {
                         MOVQ("$'\\n'", RDI);
                         EMIT("call safe_putchar");
                     }
+                } else if (strcmp(called_func->name, "delete") == 0) {
+                    addr_t addr_arg_list = addr_list[tac.src2];
+                    size_t arg_idx = addr_arg_list.data.arg_addr_list[0];
+                    MOVQ(generate_addr_access(arg_idx), RDI);
+                    EMIT("call safe_free");
                 } else {
                     assert(false && "Not implemented");
                 }
@@ -740,6 +745,19 @@ static void generate_safe_malloc(void)
     RET;
 }
 
+static void generate_safe_free(void)
+{
+    LABEL("safe_free");
+
+    PUSHQ(RBP);
+    MOVQ(RSP, RBP);
+    ANDQ("$-16", RSP);
+    EMIT("call free");
+    MOVQ(RBP, RSP);
+    POPQ(RBP);
+    RET;
+}
+
 static void generate_main_function() {
     LABEL("main");
 
@@ -754,11 +772,17 @@ static void generate_main_function() {
     POPQ(RBP);
 
     MOVQ("$0", RDI);
+    PUSHQ(RBP);
+    MOVQ(RSP, RBP);
+    ANDQ("$-16", RSP);
     EMIT("call exit");
 
+    // TODO: not sure if needed
+    //       if we do some stack alignment anyways
     generate_safe_printf();
     generate_safe_putchar();
     generate_safe_malloc();
+    generate_safe_free();
 
     DIRECTIVE("%s", ASM_DECLARE_MAIN);
 }

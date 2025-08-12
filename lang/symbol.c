@@ -80,6 +80,14 @@ static void insert_builtin_functions() {
         symbol->is_builtin = true;
         assert((symbol_table_insert(global_symbol_table, symbol) == INSERT_OK) && "Error when inserting builtin function");
     }
+
+    {
+        symbol_t* symbol = malloc(sizeof(symbol_t));
+        symbol->name = "delete";
+        symbol->type = SYMBOL_FUNCTION;
+        symbol->is_builtin = true;
+        assert((symbol_table_insert(global_symbol_table, symbol) == INSERT_OK) && "Error when inserting builtin function");
+    }
 }
 
 static void create_function_tables(node_t* function_declaration_node) {
