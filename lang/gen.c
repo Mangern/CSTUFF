@@ -61,6 +61,7 @@ static void generate_stringtable() {
     DIRECTIVE("strout: .asciz \"%s\"", "%s");
     DIRECTIVE("realout: .asciz \"%s\"", "%f");
     DIRECTIVE("sizeout: .asciz \"%s\"", "%zu");
+    DIRECTIVE("charout: .asciz \"%s\"", "%c");
     // This string is used by the entry point-wrapper
     DIRECTIVE("errout: .asciz \"%s\"", "Wrong number of arguments");
 
@@ -103,6 +104,7 @@ static void generate_constants() {
             case ADDR_TEMP:
             case ADDR_ARG_LIST:
             case ADDR_SIZE_CONST:
+            case ADDR_CHAR_CONST:
                 break;
         }
     }
@@ -165,6 +167,7 @@ static void generate_function(function_code_t func_code) {
         case ADDR_REAL_CONST:
         case ADDR_STRING_CONST:
         case ADDR_BOOL_CONST:
+        case ADDR_CHAR_CONST:
           break;
         }
     }
@@ -227,6 +230,11 @@ static const char* generate_addr_access(size_t addr_idx) {
         case ADDR_BOOL_CONST:
             {
                 snprintf(result, sizeof result, "$%d", addr.data.bool_const);
+            }
+            break;
+        case ADDR_CHAR_CONST:
+            {
+                snprintf(result, sizeof result, "$'%c'", addr.data.char_const);
             }
             break;
         case ADDR_REAL_CONST:
@@ -436,6 +444,9 @@ static void generate_tac(tac_t tac) {
                         } else if (arg.type_info == TYPE_SIZE) {
                             MOVQ(generate_addr_access(arg_idx), RSI);
                             EMIT("leaq sizeout(%s), %s", RIP, RDI);
+                        } else if (arg.type_info == TYPE_CHAR) {
+                            MOVQ(generate_addr_access(arg_idx), RSI);
+                            EMIT("leaq charout(%s), %s", RIP, RDI);
                         } else {
                             assert(false && "Not implemented");
                         }

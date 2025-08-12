@@ -92,6 +92,10 @@
         "file": "memory.lang",
         "expect-stdout": "69\n0 5\n"
     },
+    {
+        "file": "charlit.lang",
+        "expect-stdout": "Hello World!\n"
+    },
 
 
     {

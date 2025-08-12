@@ -129,7 +129,7 @@ static void register_type_node(node_t* node) {
                     assert(identifier->type == IDENTIFIER);
 
                     basic_type_t basic_type = is_basic_type(identifier->data.identifier_str);
-                    if ((basic_type >= 0)) {
+                    if (((int)(basic_type) >= 0)) {
                         node->type_info = type_create_basic(basic_type);
                     } else {
                         fail_node(identifier, "Unknown type %s", identifier->data.identifier_str);
@@ -173,6 +173,12 @@ static void register_type_node(node_t* node) {
         case BOOL_LITERAL:
             {
                 node->type_info = type_create_basic(TYPE_BOOL);
+                return;
+            }
+            break;
+        case CHAR_LITERAL:
+            {
+                node->type_info = type_create_basic(TYPE_CHAR);
                 return;
             }
             break;
@@ -785,9 +791,12 @@ static basic_type_t is_basic_type(const char* identifier_str) {
 }
 
 size_t type_sizeof(type_info_t* type) {
-    // TODO: may be benefitial to store alongside the type info?
+    // TODO: may be beneficial to store alongside the type info?
 
     if (type->type_class == TC_BASIC) {
+        if (type->info.info_basic == TYPE_CHAR) {
+            return 1;
+        }
         return 8;
     } else if (type->type_class == TC_ARRAY) {
         size_t total_size = 1;

@@ -570,6 +570,32 @@ static node_t* expression_continuation(token_t operator_token, node_t* lhs) {
     return merge_subtrees(operator_token, lhs, rhs);
 }
 
+static bool token_is_literal(token_t token) {
+    return 
+        token.type == LEX_INTEGER 
+     || token.type == LEX_REAL 
+     || token.type == LEX_STRING 
+     || token.type == LEX_TRUE 
+     || token.type == LEX_FALSE
+     || token.type == LEX_CHAR;
+}
+
+static char parse_char_escaped(const char *s) {
+    if (s[0] == '\\') {
+        switch (s[1]) {
+            case 'n':  return '\n';
+            case 't':  return '\t';
+            case 'r':  return '\r';
+            case '\\': return '\\';
+            case '\'': return '\'';
+            case '\"': return '\"';
+            case '0':  return '\0';
+            default:   return s[1]; // unknown escape
+        }
+    }
+    return s[0];
+}
+
 
 static node_t* parse_expression() {
     // Expression: Numeric_literal
@@ -600,7 +626,7 @@ static node_t* parse_expression() {
         } else {
             fail_token(token);
         }
-    } else if (token.type == LEX_INTEGER || token.type == LEX_REAL || token.type == LEX_STRING || token.type == LEX_TRUE || token.type == LEX_FALSE) {
+    } else if (token_is_literal(token)) {
         node_t* node = node_create_leaf(INTEGER_LITERAL, token);
         // TODO: unnecessary malloc
         if (token.type == LEX_INTEGER) {
@@ -621,6 +647,11 @@ static node_t* parse_expression() {
         } else if (token.type == LEX_FALSE) {
             node->type = BOOL_LITERAL;
             node->data.bool_literal_value = false;
+        } else if (token.type == LEX_CHAR) {
+            node->type = CHAR_LITERAL;
+            char* substr = lexer_substring(token.begin_offset + 1, token.end_offset - 1);
+            node->data.char_literal_value = parse_char_escaped(substr);
+            free(substr);
         } else {
             assert(false && "Not implemented");
         }

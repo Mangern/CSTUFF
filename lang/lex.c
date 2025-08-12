@@ -53,6 +53,7 @@ static size_t matches_identifier();
 static size_t matches_integer();
 static size_t matches_real();
 static size_t matches_string();
+static size_t matches_char();
 static size_t matches_operator();
 static void catchup_lines(size_t);
 
@@ -154,6 +155,9 @@ token_t lexer_peek() {
         current_token.end_offset = content_ptr + match_len;
     } else if ((match_len = matches_string())) {
         current_token.type = LEX_STRING;
+        current_token.end_offset = content_ptr + match_len;
+    } else if ((match_len = matches_char())) {
+        current_token.type = LEX_CHAR;
         current_token.end_offset = content_ptr + match_len;
     } else if (content[content_ptr] == '=') {
         current_token.type = LEX_EQUAL;
@@ -260,24 +264,36 @@ static size_t matches_string() {
     return ptr - content_ptr;
 }
 
-/*
 static size_t matches_char() {
-    if (content[content_ptr] != '\'')return 0;
+    if (content[content_ptr] != '\'') return 0;
     int ptr = content_ptr + 1;
-    while (ptr < content_size && content[ptr] != '\'') {
-        if (content[ptr] == '\\')
-            ptr += 2;
-        else
-            ptr += 1;
-    }
+
     if (ptr >= content_size) {
         fprintf(stderr, "Unexpected EOF when parsing char literal\n");
         exit(EXIT_FAILURE);
     }
+
+    if (content[ptr] == '\\') {
+        ++ptr;
+        if (ptr >= content_size) {
+            fprintf(stderr, "Unexpected EOF when parsing char literal\n");
+            exit(EXIT_FAILURE);
+        }
+    }
+    ++ptr;
+    if (ptr >= content_size) {
+        fprintf(stderr, "Unexpected EOF when parsing char literal\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if (content[ptr] != '\'') {
+        fprintf(stderr, "Unclosed char literal\n");
+        exit(EXIT_FAILURE);
+    }
+
     ++ptr;
     return ptr - content_ptr;
 }
-*/
 
 static size_t matches_operator() {
     // TODO: *=, **

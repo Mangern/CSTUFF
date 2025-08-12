@@ -43,6 +43,7 @@ enum addr_type_t {
     ADDR_REAL_CONST,
     ADDR_STRING_CONST,
     ADDR_BOOL_CONST,
+    ADDR_CHAR_CONST,
     ADDR_LABEL,
     ADDR_TEMP,
     ADDR_ARG_LIST
@@ -58,6 +59,7 @@ struct addr_t {
         size_t string_idx_const;
         size_t size_const;
         bool bool_const;
+        char char_const;
         long temp_id;
         size_t label;
         size_t* arg_addr_list; // TODO: unsure if want to store types or values

@@ -162,6 +162,8 @@ static void bind_references(symbol_table_t* local_symbols, node_t* node) {
         case OPERATOR:
         case INTEGER_LITERAL:
         case REAL_LITERAL:
+        case CHAR_LITERAL:
+        case BOOL_LITERAL:
         case PARENTHESIZED_EXPRESSION:
         case ASSIGNMENT_STATEMENT:
         case CAST_EXPRESSION:
@@ -170,7 +172,6 @@ static void bind_references(symbol_table_t* local_symbols, node_t* node) {
         case WHILE_STATEMENT:
         case ARRAY_INDEXING:
         case LIST:
-        case BOOL_LITERAL:
         case BREAK_STATEMENT:
             {
                 for (size_t i = 0; i < da_size(node->children); ++i) {

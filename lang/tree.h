@@ -18,6 +18,7 @@ typedef enum {
     REAL_LITERAL,         // leaf
     STRING_LITERAL,
     BOOL_LITERAL,         // leaf
+    CHAR_LITERAL,         // leaf
     PARENTHESIZED_EXPRESSION, // children: [expression | parenthesized_expression]
     FUNCTION_CALL,            // children: [identifier, list[expression]] | [scope_resolution, list[expression]]
     RETURN_STATEMENT,      // children: [expression]
@@ -76,6 +77,7 @@ struct node_t {
         size_t string_literal_idx;
         double real_literal_value;
         bool bool_literal_value;
+        char char_literal_value;
         char* identifier_str;
         char* typename_str;
         operator_t operator;
