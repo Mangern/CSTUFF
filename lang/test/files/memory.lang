@@ -12,12 +12,12 @@ main: () -> void = {
 
     i := 0;
     while (i < 6) {
-      // (x + i * sizeof(int)).* = i;
       x[i] = i;
       i += 1;
     }
-    println(one.*); // non-deterministic test incoming?
+    println(one.*);
     println(x[0], x[5]);
+
     delete(x);
     delete(one);
 }
