@@ -33,6 +33,90 @@ static void generate_main_function();
 
 static size_t* addr_frame_location;
 
+char* REG64[18] = {
+    "%rax",
+    "%rbx",
+    "%rcx",
+    "%rdx",
+    "%rsi",
+    "%rdi",
+    "%rsp",
+    "%rbp",
+    "%r8",
+    "%r9",
+    "%r10",
+    "%r11",
+    "%r12",
+    "%r13",
+    "%r14",
+    "%r15",
+    "%xmm0",
+    "%xmm1",
+};
+
+char* REG32[18] = {
+    "%eax"
+    "%ebx"
+    "%ecx"
+    "%edx"
+    "%esi"
+    "%edi"
+    "%esp"
+    "%ebp"
+    "%r8d"
+    "%r9d"
+    "%r10d"
+    "%r11d"
+    "%r12d"
+    "%r13d"
+    "%r14d"
+    "%r15d"
+    "%xmm0",
+    "%xmm1",
+};
+
+char* REG16[18] = {
+    "%ax",
+    "%bx",
+    "%cx",
+    "%dx",
+    "%si",
+    "%di",
+    "%sp",
+    "%bp",
+    "%r8w",
+    "%r9w",
+    "%r10w",
+    "%r11w",
+    "%r12w",
+    "%r13w",
+    "%r14w",
+    "%r15w",
+    "%xmm0",
+    "%xmm1",
+};
+
+char* REG8[18] = {
+    "%al",
+    "%bl",
+    "%cl",
+    "%dl",
+    "%sil",
+    "%dil",
+    "%spl",
+    "%bpl",
+    "%r8b",
+    "%r9b",
+    "%r10b",
+    "%r11b",
+    "%r12b",
+    "%r13b",
+    "%r14b",
+    "%r15b",
+    "%xmm0",
+    "%xmm1",
+};
+
 void generate_program() {
     if (gen_outfile == 0) {
         gen_outfile = stdout;
@@ -174,9 +258,8 @@ static void generate_function(function_code_t func_code) {
 
     size_t frame_space = local_space + home_space;
 
-    if (frame_space & 0xF) {
-        frame_space += 8;
-    }
+    // align
+    frame_space = (frame_space + 15) & (~15);
 
     EMIT("subq $%zu, %s", frame_space - home_space, RSP);
 
@@ -274,6 +357,72 @@ static const char* generate_addr_access(size_t addr_idx) {
     return result;
 }
 
+static void emit_mov_addr_to_reg(size_t addr_idx, const char* reg) {
+    addr_t addr = addr_list[addr_idx];
+    switch (addr.type) {
+        case ADDR_INT_CONST:
+        case ADDR_SIZE_CONST:
+        case ADDR_BOOL_CONST:
+        case ADDR_CHAR_CONST:
+        case ADDR_REAL_CONST:
+        case ADDR_STRING_CONST:
+            {
+                EMIT("movq %s, %s", generate_addr_access(addr_idx), reg);
+            }
+            break;
+        case ADDR_SYMBOL:
+        case ADDR_TEMP:
+            {
+                char* size_suf = "q";
+                if (addr.type_info == TYPE_CHAR) {
+                    size_suf = "zbq";
+                } else if (addr.type_info == TYPE_REAL && reg[1] == 'x') { // UUH
+                    size_suf = "sd";
+                }
+
+                EMIT("mov%s %s, %s", size_suf, generate_addr_access(addr_idx), reg);
+            }
+            break;
+        default:
+            assert(false && "Not implemented");
+            break;
+    }
+}
+
+static void emit_mov_reg_to_addr(reg_t reg, size_t addr_idx) {
+    addr_t addr = addr_list[addr_idx];
+    switch (addr.type) {
+        case ADDR_INT_CONST:
+        case ADDR_SIZE_CONST:
+        case ADDR_BOOL_CONST:
+        case ADDR_CHAR_CONST:
+        case ADDR_REAL_CONST:
+        case ADDR_STRING_CONST:
+            {
+                EMIT("movq %s, %s", REG64[reg], generate_addr_access(addr_idx));
+            }
+            break;
+        case ADDR_SYMBOL:
+        case ADDR_TEMP:
+            {
+                char* size_suf = "q";
+                char* reg_str = REG64[reg];
+                if (addr.type_info == TYPE_CHAR) {
+                    size_suf = "b";
+                    reg_str = REG8[reg];
+                } else if (addr.type_info == TYPE_REAL && reg >= REG_XMM0) {
+                    size_suf = "sd";
+                }
+
+                EMIT("mov%s %s, %s", size_suf, reg_str, generate_addr_access(addr_idx));
+            }
+            break;
+        default:
+            assert(false && "Not implemented");
+            break;
+    }
+}
+
 static void generate_tac(tac_t tac) {
     switch (tac.instr) {
     case TAC_NOP:
@@ -299,22 +448,25 @@ static void generate_tac(tac_t tac) {
     case TAC_BINARY_EQ:
     case TAC_BINARY_NEQ:
         {
+            // TODO: clean up this mess
             char* SRC1_REG = RAX;
             char* SRC2_REG = RCX;
+            reg_t src1_reg_t = REG_RAX;
+            reg_t src2_reg_t = REG_RCX;
             char* TYPE_SUF = "q";
             bool is_float = 0;
 
             if (addr_list[tac.dst].type_info == TYPE_REAL) {
                 SRC1_REG = XMM0;
                 SRC2_REG = XMM1;
+                src1_reg_t = REG_XMM0;
+                src2_reg_t = REG_XMM1;
                 TYPE_SUF = "sd";
                 is_float = 1;
-                MOVSD(generate_addr_access(tac.src1), SRC1_REG);
-                MOVSD(generate_addr_access(tac.src2), SRC2_REG);
-            } else {
-                MOVQ(generate_addr_access(tac.src1), SRC1_REG);
-                MOVQ(generate_addr_access(tac.src2), SRC2_REG);
             }
+
+            emit_mov_addr_to_reg(tac.src1, SRC1_REG);
+            emit_mov_addr_to_reg(tac.src2, SRC2_REG);
 
 
             switch (tac.instr) {
@@ -407,7 +559,7 @@ static void generate_tac(tac_t tac) {
                     assert(false);
             }
 
-            MOVQ(SRC1_REG, generate_addr_access(tac.dst));
+            emit_mov_reg_to_addr(src1_reg_t, tac.dst);
         }
         break;
     case TAC_CALL_VOID:
@@ -433,11 +585,11 @@ static void generate_tac(tac_t tac) {
                             EMIT("leaq strout(%s), %s", RIP, RDI);
                             EMIT("leaq %s, %s", generate_addr_access(arg_idx), RSI);
                         } else if (arg.type_info == TYPE_INT) {
-                            MOVQ(generate_addr_access(arg_idx), RSI);
+                            emit_mov_addr_to_reg(arg_idx, RSI);
                             EMIT("leaq intout(%s), %s", RIP, RDI);
                         } else if (arg.type_info == TYPE_REAL) {
                             EMIT("leaq realout(%s), %s", RIP, RDI);
-                            MOVSD(generate_addr_access(arg_idx), XMM0);
+                            emit_mov_addr_to_reg(arg_idx, XMM0);
                         } else if (arg.type_info == TYPE_BOOL) {
                             MOVQ(generate_addr_access(arg_idx), RSI);
                             EMIT("leaq intout(%s), %s", RIP, RDI);
@@ -461,63 +613,73 @@ static void generate_tac(tac_t tac) {
                 } else if (strcmp(called_func->name, "delete") == 0) {
                     addr_t addr_arg_list = addr_list[tac.src2];
                     size_t arg_idx = addr_arg_list.data.arg_addr_list[0];
-                    MOVQ(generate_addr_access(arg_idx), RDI);
+                    emit_mov_addr_to_reg(arg_idx, RDI);
                     EMIT("call safe_free");
                 } else {
                     assert(false && "Not implemented");
                 }
-            } else {
-                symbol_t* function_symbol = addr_list[tac.src1].data.symbol;
-                addr_t addr_arg_list = addr_list[tac.src2];
+                break;
+            } 
+            symbol_t* function_symbol = addr_list[tac.src1].data.symbol;
+            addr_t addr_arg_list = addr_list[tac.src2];
 
-                long num_params = da_size(addr_arg_list.data.arg_addr_list);
+            long num_params = da_size(addr_arg_list.data.arg_addr_list);
 
-                size_t stack_arg_space = 0;
+            size_t stack_arg_space = 0;
 
-                if (num_params > NUM_REGISTER_PARAMS) {
-                    stack_arg_space = (num_params - NUM_REGISTER_PARAMS) * 8;
+            if (num_params > NUM_REGISTER_PARAMS) {
+                // TODO: calculate
+                stack_arg_space = (num_params - NUM_REGISTER_PARAMS) * 8;
+            }
+
+            if (stack_arg_space & 0xF) {
+                PUSHQ("$0");
+                stack_arg_space += 8;
+            }
+
+            for (long i = num_params - 1; i >= 0; --i) {
+                size_t arg_idx = addr_arg_list.data.arg_addr_list[i];
+                addr_t arg = addr_list[arg_idx];
+                if (arg.type_info == TYPE_CHAR) {
+                    EMIT("leaq %s, %s", generate_addr_access(arg_idx), RAX);
+                    PUSHQ(RAX);
+                } else if (arg.type_info == TYPE_INT || arg.type_info == TYPE_SIZE) {
+                    emit_mov_addr_to_reg(arg_idx, RAX);
+                    PUSHQ(RAX);
+                } else if (arg.type_info == TYPE_REAL) {
+                    emit_mov_addr_to_reg(arg_idx, XMM0);
+                    PUSHQ(XMM0);
+                } else {
+                    assert(false && "Not implemented");
                 }
+            }
 
-                if (stack_arg_space & 0xF) {
-                    PUSHQ("$0");
-                    stack_arg_space += 8;
-                }
+            for (long i = 0; i < num_params && i < NUM_REGISTER_PARAMS; ++i) {
+                POPQ(REGISTER_PARAMS[i]);
+            }
+            EMIT("call .%s", function_symbol->name);
 
-                for (long i = num_params - 1; i >= 0; --i) {
-                    size_t arg_idx = addr_arg_list.data.arg_addr_list[i];
-                    addr_t arg = addr_list[arg_idx];
-                    if (arg.type_info == TYPE_CHAR) {
-                        EMIT("leaq %s, %s", generate_addr_access(arg_idx), RAX);
-                        PUSHQ(RAX);
-                    } else if (arg.type_info == TYPE_INT || arg.type_info == TYPE_SIZE) {
-                        MOVQ(generate_addr_access(arg_idx), RAX);
-                        PUSHQ(RAX);
-                    } else if (arg.type_info == TYPE_REAL) {
-                        MOVSD(generate_addr_access(arg_idx), XMM0);
-                        PUSHQ(XMM0);
-                    } else {
-                        assert(false && "Not implemented");
-                    }
-                }
-
-                for (long i = 0; i < num_params && i < NUM_REGISTER_PARAMS; ++i) {
-                    POPQ(REGISTER_PARAMS[i]);
-                }
-                EMIT("call .%s", function_symbol->name);
-
-                // restore stack
-                if (num_params > NUM_REGISTER_PARAMS)
-                {
-                    EMIT("addq $%zu, %s", stack_arg_space, RSP);
-                }
+            // restore stack
+            if (num_params > NUM_REGISTER_PARAMS)
+            {
+                EMIT("addq $%zu, %s", stack_arg_space, RSP);
             }
         }
         break;
     case TAC_CALL:
         {
             //assert(false);
-            symbol_t* function_symbol = addr_list[tac.src1].data.symbol;
-            assert(!function_symbol->is_builtin && "No builtin function with return value");
+            symbol_t* called_func = addr_list[tac.src1].data.symbol;
+
+            if (called_func->is_builtin) {
+                if (strcmp(called_func->name, "readchar") == 0) {
+                    EMIT("call safe_getchar");
+                    emit_mov_reg_to_addr(REG_RAX, tac.dst);
+                    break;
+                } else {
+                    assert(false && "Unhandled builtin function");
+                }
+            }
 
             addr_t addr_arg_list = addr_list[tac.src2];
             long num_params = da_size(addr_arg_list.data.arg_addr_list);
@@ -540,10 +702,10 @@ static void generate_tac(tac_t tac) {
                     EMIT("leaq %s, %s", generate_addr_access(arg_idx), RAX);
                     PUSHQ(RAX);
                 } else if (arg.type_info == TYPE_INT) {
-                    MOVQ(generate_addr_access(arg_idx), RAX);
+                    emit_mov_addr_to_reg(arg_idx, RAX);
                     PUSHQ(RAX);
                 } else if (arg.type_info == TYPE_REAL) {
-                    MOVSD(generate_addr_access(arg_idx), XMM0);
+                    emit_mov_addr_to_reg(arg_idx, XMM0);
                     PUSHQ(XMM0);
                 } else {
                     assert(false && "Not implemented");
@@ -562,25 +724,25 @@ static void generate_tac(tac_t tac) {
                 EMIT("addq $%zu, %s", stack_arg_space, RSP);
             }
             // store result
-            MOVQ(RAX, generate_addr_access(tac.dst));
+            emit_mov_reg_to_addr(REG_RAX, tac.dst);
         }
         break;
     case TAC_ALLOC:
         {
-            MOVQ(generate_addr_access(tac.src1), RDI);
+            emit_mov_addr_to_reg(tac.src1, RDI);
             EMIT("call safe_malloc");
-            MOVQ(RAX, generate_addr_access(tac.dst));
+            emit_mov_reg_to_addr(REG_RAX, tac.dst);
         }
         break;
     case TAC_COPY:
         {
-            MOVQ(generate_addr_access(tac.src1), RAX);
-            MOVQ(RAX, generate_addr_access(tac.dst));
+            emit_mov_addr_to_reg(tac.src1, RAX);
+            emit_mov_reg_to_addr(REG_RAX, tac.dst);
         }
         break;
     case TAC_IF_FALSE:
         {
-            MOVQ(generate_addr_access(tac.src1), RAX);
+            emit_mov_addr_to_reg(tac.src1, RAX);
             CMPQ("$0", RAX);
             EMIT("je L%zu", addr_list[tac.dst].data.label);
         }
@@ -592,25 +754,26 @@ static void generate_tac(tac_t tac) {
         break;
     case TAC_CAST_REAL_INT:
         {
-            MOVQ(generate_addr_access(tac.src1), "%xmm0");
-            EMIT("cvttsd2si %s, %s", "%xmm0", RAX);
-            MOVQ(RAX, generate_addr_access(tac.dst));
+            emit_mov_addr_to_reg(tac.src1, XMM0);
+            MOVQ(generate_addr_access(tac.src1), XMM0);
+            EMIT("cvttsd2si %s, %s", XMM0, RAX);
+            emit_mov_reg_to_addr(REG_RAX, tac.dst);
         }
         break;
     case TAC_LOCOF:
         {
             EMIT("leaq %s, %s", generate_addr_access(tac.src1), RAX);
-            MOVQ(RAX, generate_addr_access(tac.dst));
+            emit_mov_reg_to_addr(REG_RAX, tac.dst);
         }
         break;
     case TAC_STORE:
         {
             // src1 -> src2[dst]
             // Load base of array
-            MOVQ(generate_addr_access(tac.src2), RAX);
+            emit_mov_addr_to_reg(tac.src2, RAX);
 
             // load index of array
-            MOVQ(generate_addr_access(tac.dst), RCX);
+            emit_mov_addr_to_reg(tac.dst, RCX);
 
             // store exact memory location in rax
             // TODO: preceding multiplication can be put in this
@@ -618,7 +781,7 @@ static void generate_tac(tac_t tac) {
             EMIT("leaq (%s, %s, 1), %s", RAX, RCX, RAX);
 
             // What we want to store
-            MOVQ(generate_addr_access(tac.src1), RCX);
+            emit_mov_addr_to_reg(tac.src1, RCX);
 
             MOVQ(RCX, MEM(RAX));
         }
@@ -627,12 +790,12 @@ static void generate_tac(tac_t tac) {
         {
             // src1[src2] -> dst
             // Load base
-            MOVQ(generate_addr_access(tac.src1), RAX);
+            emit_mov_addr_to_reg(tac.src1, RAX);
 
             // Load index
 
             if (tac.src2 > 0) {
-                MOVQ(generate_addr_access(tac.src2), RCX);
+                emit_mov_addr_to_reg(tac.src2, RCX);
             } else {
                 MOVQ("$0", RCX);
             }
@@ -642,16 +805,16 @@ static void generate_tac(tac_t tac) {
 
             MOVQ(MEM(RAX), RCX);
 
-            MOVQ(RCX, generate_addr_access(tac.dst));
+            emit_mov_reg_to_addr(REG_RCX, tac.dst);
         }
         break;
     case TAC_UNARY_NEG:
         {
-            MOVQ(generate_addr_access(tac.src1), RCX);
+            emit_mov_addr_to_reg(tac.src1, RCX);
             EMIT("xor %s, %s", RAX, RAX);
             EMIT("test %s, %s", RCX, RCX);
             SETE(AL);
-            MOVQ(RAX, generate_addr_access(tac.dst));
+            emit_mov_reg_to_addr(REG_RAX, tac.dst);
         }
         break;
     case TAC_UNARY_SUB:
@@ -659,9 +822,9 @@ static void generate_tac(tac_t tac) {
             if (addr_list[tac.src1].type_info == TYPE_REAL) {
                 assert(false && "Not implemented");
             }
-            MOVQ(generate_addr_access(tac.src1), RAX);
+            emit_mov_addr_to_reg(tac.src1, RAX);
             EMIT("neg %s", RAX);
-            MOVQ(RAX, generate_addr_access(tac.dst));
+            emit_mov_reg_to_addr(REG_RAX, tac.dst);
         }
         break;
     default:
@@ -769,6 +932,18 @@ static void generate_safe_free(void)
     RET;
 }
 
+static void generate_safe_getchar(void) {
+    LABEL("safe_getchar");
+
+    PUSHQ(RBP);
+    MOVQ(RSP, RBP);
+    ANDQ("$-16", RSP);
+    EMIT("call getchar");
+    MOVQ(RBP, RSP);
+    POPQ(RBP);
+    RET;
+}
+
 static void generate_main_function() {
     LABEL("main");
 
@@ -794,6 +969,7 @@ static void generate_main_function() {
     generate_safe_putchar();
     generate_safe_malloc();
     generate_safe_free();
+    generate_safe_getchar();
 
     DIRECTIVE("%s", ASM_DECLARE_MAIN);
 }

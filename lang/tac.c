@@ -778,6 +778,8 @@ void print_tac_addr(size_t addr_idx) {
             }
             break;
       }
+
+    printf(" t: %s", BASIC_TYPE_NAMES[addr.type_info]);
 }
 
 static void print_tac_impl(tac_t tac) {

@@ -12,6 +12,7 @@ extern FILE * gen_outfile;
 #define AL "%al"   // lowest byte of %rax
 #define RBX "%rbx" // callee saved
 #define RCX "%rcx"
+#define CL "%cl"   // lowest byte of %rcx
 #define RDX "%rdx"
 #define RSP "%rsp" // callee saved
 #define RBP "%rbp" // callee saved
@@ -83,6 +84,32 @@ extern FILE * gen_outfile;
 #define ASM_BSS_SECTION ".bss"
 #define ASM_STRING_SECTION ".rodata"
 #define ASM_DECLARE_MAIN ".global main"
+
+typedef enum {
+    REG_RAX,
+    REG_RBX,
+    REG_RCX,
+    REG_RDX,
+    REG_RSI,
+    REG_RDI,
+    REG_RSP,
+    REG_RBP,
+    REG_R8,
+    REG_R9,
+    REG_R10,
+    REG_R11,
+    REG_R12,
+    REG_R13,
+    REG_R14,
+    REG_R15,
+    REG_XMM0,
+    REG_XMM1
+} reg_t;
+
+extern char* REG64[18];
+extern char* REG32[18];
+extern char* REG16[18];
+extern char* REG8[18];
 
 void generate_program(void);
 

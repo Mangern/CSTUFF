@@ -519,23 +519,17 @@ static void register_type_node(node_t* node) {
 
 static void handle_builtin_function_type(node_t* node, symbol_t* function_symbol) {
     if (strcmp(function_symbol->name, "println") == 0) {
-        type_info_t* type_info = create_type_function();
-        type_info->info.info_function->return_type = type_create_basic(TYPE_VOID);
-        node->type_info = type_info;
+        node->type_info = type_create_basic(TYPE_VOID);
         return;
     }
 
     if (strcmp(function_symbol->name, "print") == 0) {
-        type_info_t* type_info = create_type_function();
-        type_info->info.info_function->return_type = type_create_basic(TYPE_VOID);
-        node->type_info = type_info;
+        node->type_info = type_create_basic(TYPE_VOID);
         return;
     } 
 
     if (strcmp(function_symbol->name, "delete") == 0) {
-        type_info_t* type_info = create_type_function();
-        type_info->info.info_function->return_type = type_create_basic(TYPE_VOID);
-        node->type_info = type_info;
+        node->type_info = type_create_basic(TYPE_VOID);
 
         node_t* args_list= node->children[1];
 
@@ -554,6 +548,20 @@ static void handle_builtin_function_type(node_t* node, symbol_t* function_symbol
         // to prevent some invalid deletes but yeah.
         // .. later
 
+        return;
+    }
+
+    if (strcmp(function_symbol->name, "readchar") == 0) {
+        node->type_info = type_create_basic(TYPE_CHAR);
+
+        node_t* args_list= node->children[1];
+
+        if (da_size(args_list->children) != 0) {
+            fprintf(stderr, "Function %s accepts no arguments, but was called with %zu\n",
+                function_symbol->name,
+                da_size(args_list->children));
+            fail_node(node, "");
+        }
         return;
     }
 
