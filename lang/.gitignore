@@ -4,3 +4,4 @@ langc
 lexer-test
 parser-test
 symbol-type-test
+example-files/aoc2024/**/*.txt
