@@ -213,6 +213,7 @@ static void register_type_node(node_t* node) {
                     fail("Return statement not allowed outside function");
                 }
                 type_info_t* required_return_type = current_function_type_node->type_info->info.info_function->return_type;
+                // TODO: is broken
                 if (!types_equivalent(node->type_info, required_return_type)) {
                     fprintf(stderr, "Function '%s', with return type '", current_function_type_node->children[0]->data.identifier_str);
                     type_print(stderr, required_return_type);

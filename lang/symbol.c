@@ -174,7 +174,6 @@ static void bind_references(symbol_table_t* local_symbols, node_t* node) {
         case PARENTHESIZED_EXPRESSION:
         case ASSIGNMENT_STATEMENT:
         case CAST_EXPRESSION:
-        case TYPE:
         case IF_STATEMENT:
         case WHILE_STATEMENT:
         case ARRAY_INDEXING:
@@ -210,6 +209,15 @@ static void bind_references(symbol_table_t* local_symbols, node_t* node) {
                 symbol->node->symbol = symbol;
                 if (symbol_table_insert(local_symbols, symbol) == INSERT_COLLISION) {
                     fail_node(identifier, "Error: Redefinition of variable '%s'", symbol->name);
+                }
+            }
+            break;
+        case TYPE:
+            {
+                if (node->data.type_class != TC_UNKNOWN) {
+                    for (size_t i = 0; i < da_size(node->children); ++i) {
+                        bind_references(local_symbols, node->children[i]);
+                    }
                 }
             }
             break;

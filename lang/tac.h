@@ -26,6 +26,8 @@ enum instruction_t {
     TAC_CALL, // same as above, but stores result in dst.
     TAC_COPY, // src1 -> dst
     TAC_CAST_REAL_INT,
+    TAC_CAST_INT_CHAR,
+    TAC_CAST_CHAR_INT,
     TAC_IF_FALSE, // ifFalse(src1) goto dst (label)
     TAC_GOTO, // unconditional jmp to dst
     TAC_LOCOF, // store location of src1 into dst

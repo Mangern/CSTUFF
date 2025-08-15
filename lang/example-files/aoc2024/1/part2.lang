@@ -1,0 +1,103 @@
+token_size: int;
+buf: char[100];
+EOF: char;
+
+// epic
+read_token_buf: () -> void = {
+    token_size = 0;
+    c: char;
+
+    while (true) {
+        c = readchar();
+
+        // rip || operator
+        flag: bool = false;
+        if (c == ' ') { flag = true; }
+        if (c == '\n') { flag = true; }
+        if (c == '\t') { flag = true; }
+
+        if (!flag) {
+            break;
+        }
+    }
+
+    if (c == EOF) {
+        return;
+    }
+
+    buf[token_size] = c;
+    token_size += 1;
+
+    while (true) {
+        c = readchar();
+
+        if (c == EOF) {
+            break;
+        }
+
+        // need some OR
+        if (c == ' ') { break; }
+        if (c == '\n') { break; }
+        if (c == '\t') { break; }
+
+        buf[token_size] = c;
+        token_size += 1;
+    }
+}
+
+tokentoll : () -> int = {
+    i := 0;
+    ret := 0;
+
+    while (i < token_size) {
+        ret *= 10;
+
+        dig := cast(int, buf[i] - '0');
+        ret += dig;
+        i += 1;
+    }
+
+    return ret;
+}
+
+main: () -> void =  {
+    // hehe
+    EOF = cast(char, 255);
+
+    arr1 := alloc(int, 1024);
+
+    freq : *int = alloc(int, 100000);
+
+    n := 0;
+    while (true) {
+        // read first token B-)
+        read_token_buf();
+
+        if (token_size == 0) {
+            break;
+        }
+
+        arr1[n] = tokentoll();
+
+        read_token_buf();
+
+        x := tokentoll();
+        old := freq[x];
+        freq[x] = old + 1;
+
+        n += 1;
+    }
+
+    ans := 0;
+
+    i := 0;
+    while (i < n) {
+        ans += arr1[i] * freq[arr1[i]];
+        i += 1;
+    }
+
+    println(ans);
+
+    delete(arr1);
+    delete(freq);
+}

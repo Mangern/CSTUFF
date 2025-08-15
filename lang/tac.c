@@ -34,6 +34,8 @@ static char* TAC_INSTRUCTION_NAMES[] = {
     "CALL", 
     "COPY",
     "CAST_REAL_TO_INT",
+    "CAST_INT_TO_CHAR",
+    "CAST_CHAR_TO_INT",
     "IF_FALSE",
     "GOTO",
     "LOCOF", 
@@ -195,7 +197,7 @@ static void generate_node_code(tac_t** list, node_t* node) {
                     }
                     assert(identifier->type_info->info.info_array->subtype->type_class == TC_BASIC);
                     basic_type_t array_type = identifier->type_info->info.info_array->subtype->info.info_basic;
-                    size_t loc_addr = new_temp(array_type);
+                    size_t loc_addr = new_temp(TYPE_SIZE);
                     size_t index_addr = generate_indexing(list, indexing_node);
                     tac_emit(list, TAC_LOCOF, arr_addr, 0, loc_addr);
                     tac_emit(list, TAC_STORE, src_addr, loc_addr, index_addr);
@@ -406,7 +408,7 @@ static size_t generate_valued_code(tac_t** list, node_t* node) {
                 assert(identifier->type_info->info.info_array->subtype->type_class == TC_BASIC);
                 basic_type_t array_type = identifier->type_info->info.info_array->subtype->info.info_basic;
 
-                size_t loc_addr = new_temp(array_type);
+                size_t loc_addr = new_temp(TYPE_SIZE);
                 size_t index_addr = generate_indexing(list, node);
 
                 tac_emit(list, TAC_LOCOF, arr_addr, 0, loc_addr);
@@ -661,6 +663,10 @@ static void generate_cast_expr(tac_t** list, type_info_t* info_src, size_t addr_
     if (info_src->type_class == TC_BASIC && info_dst->type_class == TC_BASIC) {
         if (info_src->info.info_basic == TYPE_REAL && info_dst->info.info_basic == TYPE_INT) {
             tac_emit(list, TAC_CAST_REAL_INT, addr_src, 0, addr_dst);
+        } else if (info_src->info.info_basic == TYPE_INT && info_dst->info.info_basic == TYPE_CHAR) {
+            tac_emit(list, TAC_CAST_INT_CHAR, addr_src, 0, addr_dst);
+        } else if (info_src->info.info_basic == TYPE_CHAR && info_dst->info.info_basic == TYPE_INT) {
+            tac_emit(list, TAC_CAST_CHAR_INT, addr_src, 0, addr_dst);
         } else {
             fprintf(stderr, "Unhandled basic type conversion: \n");
             type_print(stderr, info_src);

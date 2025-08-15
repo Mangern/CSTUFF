@@ -755,8 +755,14 @@ static void generate_tac(tac_t tac) {
     case TAC_CAST_REAL_INT:
         {
             emit_mov_addr_to_reg(tac.src1, XMM0);
-            MOVQ(generate_addr_access(tac.src1), XMM0);
             EMIT("cvttsd2si %s, %s", XMM0, RAX);
+            emit_mov_reg_to_addr(REG_RAX, tac.dst);
+        }
+        break;
+    case TAC_CAST_INT_CHAR:
+    case TAC_CAST_CHAR_INT:
+        { // kinda interesting that it becomes 'the same' (not really)
+            emit_mov_addr_to_reg(tac.src1, RAX);
             emit_mov_reg_to_addr(REG_RAX, tac.dst);
         }
         break;
