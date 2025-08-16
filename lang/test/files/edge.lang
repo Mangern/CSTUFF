@@ -1,0 +1,15 @@
+// Various 'edge cases'
+
+edge1: () -> void = {
+    freq := alloc(int, 1);
+    freq[0] = 0;
+    freq[0] += 1;
+
+    println(freq[0]);
+
+    delete(freq);
+}
+
+main: () -> void = {
+    edge1();
+}

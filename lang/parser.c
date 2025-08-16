@@ -800,7 +800,7 @@ static node_t* parse_block_operation(node_t* lhs_node) {
 
     node_t* operator_node = node_create(OPERATOR);
 
-    node_add_child(operator_node, lhs_node);
+    node_add_child(operator_node, node_deep_copy(lhs_node));
     node_add_child(operator_node, rhs_node);
 
     switch(op) {

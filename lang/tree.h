@@ -98,6 +98,8 @@ node_t* node_create(node_type_t type);
 node_t* node_create_leaf(node_type_t type, token_t token);
 void node_add_child(node_t*, node_t*);
 
+node_t* node_deep_copy(node_t* node);
+
 // Returns INCLUSIVE range (first and last character)
 void node_find_range(node_t* node, range_t* range);
 

@@ -23,6 +23,8 @@ def test_file(filename: str, expected_stdout: str, expected_stderr: str):
     )
 
     if result.returncode != 0:
+        if len(expected_stderr) == 0:
+            print("Compilation failed: " + result.stderr)
         return compare_output(result.stdout, result.stderr)
 
     result = subprocess.run(

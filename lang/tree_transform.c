@@ -66,6 +66,7 @@ static void transform_pointer_indexing(node_t* node) {
 
     long insert_idx = da_indexof(node->parent->children, &node);
     assert(insert_idx >= 0);
+    assert(node->parent->children[insert_idx] == node);
     node->parent->children[insert_idx] = deref_node;
 
     // node should actually now be totally done :O

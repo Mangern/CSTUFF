@@ -96,6 +96,10 @@
         "file": "charlit.lang",
         "expect-stdout": "Hello World!\n"
     },
+    {
+        "file": "edge.lang",
+        "expect-stdout": "1\n"
+    },
 
 
     {

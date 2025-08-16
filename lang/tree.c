@@ -4,6 +4,7 @@
 #include "tree.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 node_t* root;
 
@@ -102,6 +103,18 @@ node_t* node_create_leaf(node_type_t type, token_t token) {
     node->pos = token;
     node->leaf = true;
     return node;
+}
+
+node_t* node_deep_copy(node_t* node) {
+    node_t* new_node = node_create(node->type);
+    memcpy(new_node, node, sizeof(node_t));
+    new_node->children = 0;
+
+    for (size_t i = 0; i < da_size(node->children); ++i) {
+        node_t* child_cpy = node_deep_copy(node->children[i]);
+        da_append(new_node->children, child_cpy);
+    }
+    return new_node;
 }
 
 static void print_tree_impl(node_t* node, int indent) {

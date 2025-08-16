@@ -138,7 +138,9 @@ int main(int argc, char** argv) {
     gettimeofday(&t_types, NULL);
 
     if (opt_print_tree) {
+        printf("===== Syntax tree ===== \n");
         print_tree(root);
+        printf("\n\n");
     }
 
     tree_transform(root);
@@ -146,7 +148,9 @@ int main(int argc, char** argv) {
     gettimeofday(&t_transform, NULL);
 
     if (opt_print_transformed_tree) {
+        printf("===== Transformed syntax tree ===== \n");
         print_tree(root);
+        printf("\n\n");
     }
 
     generate_function_codes();
