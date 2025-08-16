@@ -100,6 +100,10 @@
         "file": "edge.lang",
         "expect-stdout": "1\n"
     },
+    {
+        "file": "continue.lang",
+        "expect-stdout": "1245\n81\n"
+    },
 
 
     {

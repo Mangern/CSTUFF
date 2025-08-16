@@ -30,6 +30,7 @@ typedef enum {
     LEX_TRUE,
     LEX_FALSE,
     LEX_BREAK,
+    LEX_CONTINUE,
     LEX_STRUCT,
     LEX_ALLOC,
     LEX_END

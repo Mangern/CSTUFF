@@ -506,6 +506,11 @@ static void register_type_node(node_t* node) {
                 node->type_info = type_create_basic(TYPE_VOID);
             }
             break;
+        case CONTINUE_STATEMENT:
+            {
+                node->type_info = type_create_basic(TYPE_VOID);
+            }
+            break;
         case DOT_ACCESS:
             {
                 register_type_node(node->children[0]);

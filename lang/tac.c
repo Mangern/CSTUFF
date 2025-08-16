@@ -132,6 +132,7 @@ static void generate_function_call_setup(tac_t** list, node_t* node, size_t* add
 }
 
 static size_t* break_statement_idxs = 0;
+static size_t* continue_statement_idxs = 0;
 
 static void generate_node_code(tac_t** list, node_t* node) {
     switch (node->type) {
@@ -178,7 +179,8 @@ static void generate_node_code(tac_t** list, node_t* node) {
         case ASSIGNMENT_STATEMENT:
             {
                 if (node->children[0]->type == IDENTIFIER) {
-                    if (node->children[0]->type_info->type_class == TC_BASIC) {
+                    if (node->children[0]->type_info->type_class == TC_BASIC
+                      || node->children[0]->type_info->type_class == TC_POINTER) {
                         size_t dst_addr = get_symbol_addr(node->children[0]->symbol);
                         size_t src_addr = generate_valued_code(list, node->children[1]);
                         tac_emit(list, TAC_COPY, src_addr, 0, dst_addr);
@@ -261,6 +263,7 @@ static void generate_node_code(tac_t** list, node_t* node) {
                 size_t if_jmp_idx = tac_emit(list, TAC_IF_FALSE, cond_addr, 0, new_label_ref(0));
 
                 size_t curr_break_statement_size = da_size(break_statement_idxs);
+                size_t curr_continue_statement_size = da_size(continue_statement_idxs);
 
                 // body
                 generate_node_code(list, node->children[1]);
@@ -277,12 +280,23 @@ static void generate_node_code(tac_t** list, node_t* node) {
                     size_t break_stmt = da_pop(break_statement_idxs);
                     addr_list[(*list)[break_stmt].dst].data.label = loop_end_label;
                 }
+
+                while (da_size(continue_statement_idxs) > curr_continue_statement_size) {
+                    size_t cont_stmt = da_pop(continue_statement_idxs);
+                    addr_list[(*list)[cont_stmt].dst].data.label = header_start_label;
+                }
             }
             break;
         case BREAK_STATEMENT:
             {
                 size_t idx = tac_emit(list, TAC_GOTO, 0, 0, new_label_ref(0));
                 da_append(break_statement_idxs, idx);
+            }
+            break;
+        case CONTINUE_STATEMENT:
+            {
+                size_t idx = tac_emit(list, TAC_GOTO, 0, 0, new_label_ref(0));
+                da_append(continue_statement_idxs, idx);
             }
             break;
         default:

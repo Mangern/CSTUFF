@@ -27,7 +27,8 @@ typedef enum {
     IF_STATEMENT,           // children: [expression, block] | [expression, block, block]
     WHILE_STATEMENT,
     ARRAY_INDEXING,         // children: [identifier, list[expression]]
-    BREAK_STATEMENT,
+    BREAK_STATEMENT,        // leaf
+    CONTINUE_STATEMENT,     // leaf
     SCOPE_RESOLUTION, // children: [scope resolution, identifier] | [identifier, identifier]
     DOT_ACCESS, // children: [dot_access, identifier] | [identifier, identifier]
     ALLOC_EXPRESSION, // children: [type] | [type, expression]

@@ -252,9 +252,17 @@ static node_t* parse_block() {
         } else if (token.type == LEX_BREAK) {
             lexer_advance();
 
-            node_t* break_node = node_create(BREAK_STATEMENT);
+            node_t* break_node = node_create_leaf(BREAK_STATEMENT, token);
 
             node_add_child(block_node, break_node);
+
+            peek_expect_advance(LEX_SEMICOLON);
+        } else if (token.type == LEX_CONTINUE) {
+            lexer_advance();
+
+            node_t* continue_node = node_create_leaf(CONTINUE_STATEMENT, token);
+
+            node_add_child(block_node, continue_node);
 
             peek_expect_advance(LEX_SEMICOLON);
         } else {
