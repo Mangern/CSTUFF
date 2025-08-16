@@ -79,7 +79,6 @@ struct node_t {
         bool bool_literal_value;
         char char_literal_value;
         char* identifier_str;
-        char* typename_str;
         operator_t operator;
         type_class_t type_class;
     } data;

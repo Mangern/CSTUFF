@@ -114,6 +114,15 @@ node_t* node_deep_copy(node_t* node) {
         node_t* child_cpy = node_deep_copy(node->children[i]);
         da_append(new_node->children, child_cpy);
     }
+
+    if (node->type == STRING_LITERAL && node->data.string_literal_value != NULL) {
+        node->data.string_literal_value = strdup(node->data.string_literal_value);
+    }
+
+    if (node->type == IDENTIFIER && node->data.identifier_str != NULL) {
+        node->data.identifier_str = strdup(node->data.identifier_str);
+    }
+
     return new_node;
 }
 
