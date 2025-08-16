@@ -649,6 +649,9 @@ static void generate_tac(tac_t tac) {
                 } else if (arg.type_info == TYPE_REAL) {
                     emit_mov_addr_to_reg(arg_idx, XMM0);
                     PUSHQ(XMM0);
+                } else if (arg.type_info == TYPE_SIZE) {
+                    emit_mov_addr_to_reg(arg_idx, RAX);
+                    PUSHQ(RAX);
                 } else {
                     assert(false && "Not implemented");
                 }
@@ -707,6 +710,9 @@ static void generate_tac(tac_t tac) {
                 } else if (arg.type_info == TYPE_REAL) {
                     emit_mov_addr_to_reg(arg_idx, XMM0);
                     PUSHQ(XMM0);
+                } else if (arg.type_info == TYPE_SIZE) {
+                    emit_mov_addr_to_reg(arg_idx, RAX);
+                    PUSHQ(RAX);
                 } else {
                     assert(false && "Not implemented");
                 }
