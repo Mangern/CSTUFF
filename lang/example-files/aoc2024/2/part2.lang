@@ -51,17 +51,16 @@ tokenize_buf: () -> void = {
     n = 0;
 
     while (i < line_size) {
-        if (buf[i] == EOF) { break; }
-        if (buf[i] == '\n') { break; }
+        if (buf[i] == EOF || buf[i] == '\n') { break; }
 
         j := i;
 
         while (true) {
             token[j-i] = buf[j];
 
-            if (buf[j] == ' ') { break; }
-            if (buf[j] == '\n') { break; }
-            if (buf[j] == EOF) { break; }
+            if ( buf[j] == ' '
+              || buf[j] == '\n'
+              || buf[j] == EOF) { break; }
 
             j += 1;
         }
@@ -146,12 +145,8 @@ main: () -> void = {
 
         tokenize_buf();
 
-        if (is_arr_good(arr, n)) {
+        if (is_arr_good(arr, n) || is_modifiably_good()) {
             ans += 1;
-        } else {
-            if (is_modifiably_good()) {
-                ans += 1;
-            }
         }
     }
     println(ans);
