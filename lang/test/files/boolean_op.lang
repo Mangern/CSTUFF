@@ -1,0 +1,38 @@
+ff: () -> bool = {
+    println("false");
+    return false;
+}
+
+tt: () -> bool = {
+    println("true");
+    return true;
+}
+
+main: () -> void = {
+    x := 1;
+    y := 2;
+    z := 3;
+    t := true;
+    f := false;
+
+    // basic
+    println(t || f); // t
+    println(t && f); // f
+    println(!t); // f
+    println(!f); // t
+
+    // precedence
+    println(x == y || t); // t
+    println(f || x == y); // f
+    println(x + y == z && t); // t
+    println(f && x + y == z); // f
+    println(f || f && t); // f
+    println(t && t || t && t); // t
+    println(t && x + y == z && t); // t
+
+    // short-circuit semantics
+    println(tt() && ff()); // true\nfalse\nf\n
+    println(ff() && tt()); // false\nf\n
+    println(tt() || ff()); // true\nt\n
+    println(ff() || tt()); // false\ntrue\nt\n
+}

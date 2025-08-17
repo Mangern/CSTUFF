@@ -53,6 +53,7 @@ static size_t generate_valued_code(tac_t** list, node_t* node);
 static void generate_function_call_setup(tac_t**, node_t*, size_t*, size_t*);
 static void generate_cast_expr(tac_t** list, type_info_t* info_src, size_t addr_src, type_info_t* info_dst, size_t addr_dst);
 static size_t generate_indexing(tac_t**, node_t*);
+static size_t generate_or_or_and(tac_t**, node_t*);
 static void get_struct_addr_offset(node_t*, size_t*, size_t*);
 
 static size_t TAC_NEXT_LABEL = 0;
@@ -397,6 +398,12 @@ static size_t generate_valued_code(tac_t** list, node_t* node) {
                     return dst_addr;
                 } else {
                     // Binary
+
+                    // short circuit operators
+                    if (node->data.operator == BINARY_OR || node->data.operator == BINARY_AND) {
+                        size_t dst_addr = generate_or_or_and(list, node);
+                        return dst_addr;
+                    }
                     size_t src1_addr = generate_valued_code(list, node->children[0]);
                     size_t src2_addr = generate_valued_code(list, node->children[1]);
                     size_t dst_addr = new_temp(node->type_info->info.info_basic);
@@ -732,6 +739,84 @@ static size_t generate_indexing(tac_t** list, node_t* array_indexing) {
     return res_idx;
 }
 
+/*
+ * The purpose is to be able to short circuit evaluation 
+ * if applicable.
+ */
+static size_t generate_or_or_and(tac_t** list, node_t* node) {
+    if (node->data.operator == BINARY_OR) {
+        // A || B
+        size_t res_addr = new_temp(TYPE_BOOL);
+        tac_emit(list, TAC_COPY, new_bool_const(false), 0, res_addr);
+
+        // A
+
+        size_t src1_addr = generate_valued_code(list, node->children[0]);
+
+        // if A is false, evaluate B
+        size_t if_a_false_idx = tac_emit(list, TAC_IF_FALSE, src1_addr, 0, new_label_ref(0));
+
+        // else, set result to true and skip evaluation of B
+        size_t goto_idx     = tac_emit(list, TAC_GOTO, 0, 0, new_label_ref(0));
+
+        // B evaluation path
+
+        // backpatch if_a_false_idx -> next instruction
+        addr_list[(*list)[if_a_false_idx].dst].data.label = TAC_NEXT_LABEL;
+
+        // evaluate B
+        size_t src2_addr = generate_valued_code(list, node->children[1]);
+
+        // if B is (also) false, skip setting result to true
+        size_t if_b_false_idx = tac_emit(list, TAC_IF_FALSE, src2_addr, 0, new_label_ref(0));
+
+        // END_IF_TRUE
+        // set result to true
+        size_t end_if_true_idx = tac_emit(list, TAC_COPY, new_bool_const(true), 0, res_addr);
+
+        // END
+        size_t end_idx = tac_emit(list, TAC_NOP, 0, 0, 0);
+
+        // backpatch goto_idx -> end_if_true (the skipping of B)
+        addr_list[(*list)[goto_idx].dst].data.label = (*list)[end_if_true_idx].label;
+
+        // backpatch if_b_false_idx -> end_idx (the skipping of setting to true)
+        addr_list[(*list)[if_b_false_idx].dst].data.label = (*list)[end_idx].label;
+
+        return res_addr;
+    } else if (node->data.operator == BINARY_AND) {
+        // A && B
+        size_t res_addr = new_temp(TYPE_BOOL);
+        tac_emit(list, TAC_COPY, new_bool_const(false), 0, res_addr);
+
+        // A
+        size_t src1_addr = generate_valued_code(list, node->children[0]);
+
+        // if A is false, skip evaluation of B
+        size_t if_a_false_idx = tac_emit(list, TAC_IF_FALSE, src1_addr, 0, new_label_ref(0));
+
+        // B
+        size_t src2_addr = generate_valued_code(list, node->children[1]);
+
+        // if B is false, skip setting to true
+        size_t if_b_false_idx = tac_emit(list, TAC_IF_FALSE, src2_addr, 0, new_label_ref(0));
+
+        // OK, set result to true
+        tac_emit(list, TAC_COPY, new_bool_const(true), 0, res_addr);
+
+        // END
+        size_t end_idx = tac_emit(list, TAC_NOP, 0, 0, 0);
+
+        // backpatch both jumps to go to end
+        addr_list[(*list)[if_a_false_idx].dst].data.label = (*list)[end_idx].label;
+        addr_list[(*list)[if_b_false_idx].dst].data.label = (*list)[end_idx].label;
+
+        return res_addr;
+    } else {
+        assert(false && "Not implemented");
+    }
+}
+
 void print_tac_addr(size_t addr_idx) {
     //if (addr_idx == 0) return;
     addr_t addr = addr_list[addr_idx];
@@ -799,7 +884,7 @@ void print_tac_addr(size_t addr_idx) {
             break;
       }
 
-    printf(" t: %s", BASIC_TYPE_NAMES[addr.type_info]);
+    //printf(" t: %s", BASIC_TYPE_NAMES[addr.type_info]);
 }
 
 static void print_tac_impl(tac_t tac) {

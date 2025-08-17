@@ -104,6 +104,10 @@
         "file": "continue.lang",
         "expect-stdout": "1245\n81\n"
     },
+    {
+        "file": "boolean_op.lang",
+        "expect-stdout": "1\n0\n0\n1\n1\n0\n1\n0\n0\n1\n1\ntrue\nfalse\n0\nfalse\n0\ntrue\n1\nfalse\ntrue\n1\n"
+    },
 
 
     {

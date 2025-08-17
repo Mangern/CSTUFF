@@ -506,6 +506,10 @@ static operator_t parse_operator_str(char* operator_str, bool binary) {
             return BINARY_SCOPE_RES;
         } else if (strcmp(operator_str, ".") == 0) {
             return BINARY_DOT;
+        } else if (strcmp(operator_str, "||") == 0) {
+            return BINARY_OR;
+        } else if (strcmp(operator_str, "&&") == 0) {
+            return BINARY_AND;
         } else if (strcmp(operator_str, ".*") == 0) { // eeeeh
             return UNARY_DEREF;
         }

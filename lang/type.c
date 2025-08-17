@@ -294,6 +294,28 @@ static void register_type_node(node_t* node) {
                             return;
                         }
                         break;
+                    case BINARY_OR:
+                    case BINARY_AND:
+                        {
+                            if (node->children[0]->type_info->type_class != TC_BASIC
+                              || node->children[0]->type_info->info.info_basic != TYPE_BOOL) {
+                                fprintf(stderr, "Expected bool, got '");
+                                type_print(stderr, node->children[0]->type_info);
+                                fprintf(stderr, "' as a logical operand.\n");
+                                fail_node(node->children[0], "");
+                            }
+                            if (node->children[1]->type_info->type_class != TC_BASIC
+                              || node->children[1]->type_info->info.info_basic != TYPE_BOOL) {
+                                fprintf(stderr, "Expected bool, got '");
+                                type_print(stderr, node->children[1]->type_info);
+                                fprintf(stderr, "' as a logical operand.\n");
+                                fail_node(node->children[1], "");
+                            }
+
+                            node->type_info = type_create_basic(TYPE_BOOL);
+                            return;
+                        }
+                        break;
                     case UNARY_SUB:
                     case UNARY_NEG:
                         {

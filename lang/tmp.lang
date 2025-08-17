@@ -1,14 +1,5 @@
-func: (ptr: * struct { x: int; }) -> void = {
-    //ptr.x = 123;
-}
 main: () -> void = {
-    p: struct {
-        x: int;
-    };
-
-    q := *p;
-
-    func(q);
-
-    println(p.x);
+    if (true && false) {
+        println("Hello");
+    }
 }

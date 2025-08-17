@@ -53,6 +53,8 @@ typedef enum operator_t {
     BINARY_NEQ,
     BINARY_SCOPE_RES,
     BINARY_DOT,
+    BINARY_OR,
+    BINARY_AND,
     UNARY_SUB, 
     UNARY_NEG, 
     UNARY_STAR,

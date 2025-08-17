@@ -9,30 +9,32 @@
 node_t* root;
 
 // This is the values from 
-// https://www.cppreference.com/w/c/language/operator_precedence.html
+// https://en.cppreference.com/w/cpp/language/operator_precedence.html
 const int OPERATOR_PRECEDENCE[] = {
-    4,  // BINARY_ADD
-    4,  // BINARY_SUB,
-    3,  // BINARY_MUL,
-    3,  // BINARY_DIV,
-    3,  // BINARY_MOD,
-    14, // BINARY_ASS_ADD,
-    14, // BINARY_ASS_SUB,
-    14, // BINARY_ASS_MUL,
-    14, // BINARY_ASS_DIV,
-    14, // BINARY_ASS_MOD,
-    6,  // BINARY_GT, 
-    6,  // BINARY_LT, 
-    6,  // BINARY_GEQ,
-    6,  // BINARY_LEQ,
-    7,  // BINARY_EQ,
-    7,  // BINARY_NEQ,
+    6,  // BINARY_ADD
+    6,  // BINARY_SUB,
+    5,  // BINARY_MUL,
+    5,  // BINARY_DIV,
+    5,  // BINARY_MOD,
+    16, // BINARY_ASS_ADD,
+    16, // BINARY_ASS_SUB,
+    16, // BINARY_ASS_MUL,
+    16, // BINARY_ASS_DIV,
+    16, // BINARY_ASS_MOD,
+    9,  // BINARY_GT, 
+    9,  // BINARY_LT, 
+    9,  // BINARY_GEQ,
+    9,  // BINARY_LEQ,
+    10,  // BINARY_EQ,
+    10,  // BINARY_NEQ,
     1,  // BINARY_SCOPE_RES
-    1,  // BINARY_DOT
-    2,  // UNARY_SUB,
-    2,  // UNARY_NEG
+    2,  // BINARY_DOT
+    15, // BINARY_OR
+    14, // BINARY_AND
+    3,  // UNARY_SUB,
+    3,  // UNARY_NEG
     3,  // UNARY_STAR,
-    1,  // UNARY_DEREF TODO: don't know precedence
+    3,  // UNARY_DEREF TODO: don't know precedence..
 };
 
 char* NODE_TYPE_NAMES[] = {
@@ -82,6 +84,8 @@ char* OPERATOR_TYPE_NAMES[] = {
     "binary_neq",
     "binary_scope_res",
     "binary_dot",
+    "binary_or",
+    "binary_and",
     "unary_sub",
     "unary_neg",
     "unary_star",
