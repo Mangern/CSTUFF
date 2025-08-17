@@ -23,6 +23,7 @@ typedef enum {
     TC_STRUCT_FIELD,
     TC_TUPLE,
     TC_FUNCTION,
+    TC_TAGGED,
     TC_UNKNOWN
 } type_class_t;
 
@@ -36,6 +37,7 @@ struct type_info_t {
         struct type_tuple_t* info_tuple;
         struct type_function_t* info_function;
         struct type_pointer_t* info_pointer;
+        struct type_tagged_t* info_tagged;
     } info;
 };
 
@@ -67,11 +69,19 @@ struct type_function_t {
     type_info_t* return_type;
 };
 
+typedef struct type_tagged_t {
+    size_t type_id;
+    type_info_t* type;
+} type_tagged_t;
+
 extern char* BASIC_TYPE_NAMES[];
+extern symbol_table_t* global_type_table;
 
 void register_types();
 
 type_info_t* type_create_basic(basic_type_t basic_type);
+
+type_info_t* type_penetrate_tagged(type_info_t *type_info);
 
 size_t type_sizeof(type_info_t*);
 

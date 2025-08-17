@@ -15,6 +15,7 @@ static node_t* parse_global_statement();
 static node_t* parse_declaration_list();
 static node_t* parse_type();
 static node_t* parse_declaration(node_t*);
+static node_t* parse_type_declaration();
 static node_t* parse_block();
 static node_t* parse_struct_body();
 static node_t* parse_function_type();
@@ -58,6 +59,8 @@ static node_t* parse_global_statement() {
 
     if (token.type == LEX_IDENTIFIER) {
         return parse_declaration(NULL);
+    } else if (token.type == LEX_TYPE) {
+        return parse_type_declaration();
     }
 
     fail_token(token);
@@ -137,6 +140,24 @@ static node_t* parse_declaration(node_t* identifier) {
     node_add_child(declaration, rhs);
 
     return declaration;
+}
+
+static node_t* parse_type_declaration() {
+    peek_expect_advance(LEX_TYPE);
+
+    token_t token = peek_expect_advance(LEX_IDENTIFIER);
+    node_t* identifier_node = node_create_leaf(IDENTIFIER, token);
+    identifier_node->data.identifier_str = lexer_substring(token.begin_offset, token.end_offset);
+    peek_expect_advance(LEX_COLON);
+    node_t* type_node = parse_type();
+
+    peek_expect_advance(LEX_SEMICOLON);
+    node_t* type_decl_node = node_create(TYPE_DECLARATION);
+
+    node_add_child(type_decl_node, identifier_node);
+    node_add_child(type_decl_node, type_node);
+
+    return type_decl_node;
 }
 
 static node_t* parse_block() {

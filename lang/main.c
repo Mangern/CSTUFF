@@ -133,15 +133,16 @@ int main(int argc, char** argv) {
 
     gettimeofday(&t_create_symbols, NULL);
 
-    register_types();
-
-    gettimeofday(&t_types, NULL);
-
     if (opt_print_tree) {
         printf("===== Syntax tree ===== \n");
         print_tree(root);
         printf("\n\n");
     }
+
+    register_types();
+
+    gettimeofday(&t_types, NULL);
+
 
     tree_transform(root);
 

@@ -496,10 +496,10 @@ symbol_t* foo(node_t* node, size_t* struct_addr, size_t* offset) {
     assert(access_node->symbol != NULL);
 
     node_t* definition = access_node->symbol->node;
-    assert(prev->node->type_info->type_class == TC_STRUCT);
+    assert(type_penetrate_tagged(prev->node->type_info)->type_class == TC_STRUCT);
     node_t* field_decl = definition->parent;
-    assert(field_decl->type_info->type_class == TC_STRUCT_FIELD);
-    *offset += field_decl->type_info->info.info_struct_field->offset;
+    assert(type_penetrate_tagged(field_decl->type_info)->type_class == TC_STRUCT_FIELD);
+    *offset += type_penetrate_tagged(field_decl->type_info)->info.info_struct_field->offset;
     return definition->symbol;
 }
 
@@ -645,6 +645,22 @@ static instruction_t instr_from_node_operator(operator_t op) {
     }
 }
 
+static basic_type_t type_info_to_addr_type(type_info_t *type_info) {
+    if (type_info->type_class == TC_ARRAY) {
+        assert(type_info->info.info_array->subtype->type_class == TC_BASIC);
+        return type_info->info.info_array->subtype->info.info_basic;
+    } else if (type_info->type_class == TC_POINTER) {
+        return TYPE_SIZE;
+    } else if (type_info->type_class == TC_STRUCT) {
+        return TYPE_SIZE; // TODO: wtf?
+    } else if (type_info->type_class == TC_TAGGED) {
+        return type_info_to_addr_type(type_info->info.info_tagged->type);
+    } else {
+        assert((type_info->type_class == TC_BASIC) && "Unhandled type class in get_symbol_addr");
+        return type_info->info.info_basic;
+    }
+}
+
 static size_t get_symbol_addr(symbol_t* symbol) {
     assert(symbol != NULL);
     // TODO: its quadratic...
@@ -662,18 +678,7 @@ static size_t get_symbol_addr(symbol_t* symbol) {
 
     if (symbol->type != SYMBOL_FUNCTION) {
         assert(symbol->node != NULL);
-
-        if (symbol->node->type_info->type_class == TC_ARRAY) {
-            assert(symbol->node->type_info->info.info_array->subtype->type_class == TC_BASIC);
-            addr.type_info = symbol->node->type_info->info.info_array->subtype->info.info_basic;
-        } else if (symbol->node->type_info->type_class == TC_POINTER) {
-            addr.type_info = TYPE_SIZE;
-        } else if (symbol->node->type_info->type_class == TC_STRUCT) {
-            addr.type_info = TYPE_SIZE; // TODO: wtf?
-        } else {
-            assert((symbol->node->type_info->type_class == TC_BASIC) && "Unhandled type class in get_symbol_addr");
-            addr.type_info = symbol->node->type_info->info.info_basic;
-        }
+        addr.type_info = type_info_to_addr_type(symbol->node->type_info);
     }
 
     da_append(addr_list, addr);

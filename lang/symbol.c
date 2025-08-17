@@ -17,8 +17,9 @@ static void insert_builtin_functions();
 static void create_function_tables(node_t*);
 static void create_insert_variable_declaration(symbol_table_t*, symbol_type_t, node_t*);
 static void bind_references(symbol_table_t*, node_t*);
+static node_t* resolve_type_node(node_t*);
 static symbol_t* symbol_resolve_scope(symbol_table_t*, node_t*);
-static void create_struct_symbol(symbol_table_t*, node_t*);
+static void create_struct_symbol(symbol_table_t* local_symbols, node_t* identifier_node, node_t* type_node);
 static symbol_t* resolve_struct_access(symbol_table_t*, node_t*);
 
 typedef struct struct_info_t struct_info_t;
@@ -30,6 +31,7 @@ char* SYMBOL_TYPE_NAMES[] = {
     "LOCAL_VAR",
     "GLOBAL_STRUCT",
     "LOCAL_STRUCT",
+    "TYPE",
     "NAMESPACE",
 };
 
@@ -39,6 +41,7 @@ char** global_string_list = 0;
 void create_symbol_tables() {
 
     global_symbol_table = symbol_table_init();
+    global_type_table = symbol_table_init();
 
     insert_builtin_functions();
 
@@ -58,6 +61,26 @@ void create_symbol_tables() {
                 // expression
                 create_insert_variable_declaration(global_symbol_table, SYMBOL_GLOBAL_VAR, node);
             }
+        } else if (node->type == TYPE_DECLARATION) {
+            assert(da_size(node->children) == 2);
+
+            node_t* identifier_node = node->children[0];
+            node_t* type_node = node->children[1];
+
+            symbol_t* type_symbol = malloc(sizeof(symbol_t));
+            type_symbol->name = identifier_node->data.identifier_str;
+            type_symbol->node = node;
+            node->symbol = type_symbol;
+            type_symbol->type = SYMBOL_TYPE;
+            type_symbol->function_symtable = global_type_table; // idk
+            type_symbol->is_builtin = false;
+            type_symbol->data.type_node = type_node;
+
+            if (symbol_table_insert(global_type_table, type_symbol) == INSERT_COLLISION) {
+                fail_node(identifier_node, "Redefinition of type '%s'", type_symbol->name);
+            }
+
+            bind_references(global_symbol_table, type_node);
         } else {
             assert(false && "Unexpected node type in global statement list");
         }
@@ -178,6 +201,7 @@ static void bind_references(symbol_table_t* local_symbols, node_t* node) {
         case WHILE_STATEMENT:
         case ARRAY_INDEXING:
         case LIST:
+        case DECLARATION_LIST:
         case BREAK_STATEMENT:
         case CONTINUE_STATEMENT:
             {
@@ -195,11 +219,15 @@ static void bind_references(symbol_table_t* local_symbols, node_t* node) {
                     bind_references(local_symbols, node->children[1]);
                 }
 
-                if (node->children[1]->type == TYPE && node->children[1]->data.type_class == TC_STRUCT) {
-                    create_struct_symbol(local_symbols, node);
-
-                    return;
+                if (node->children[1]->type == TYPE) {
+                    node_t* type_node = resolve_type_node(node->children[1]);
+                    if (type_node->data.type_class == TC_STRUCT) {
+                        create_struct_symbol(local_symbols, node->children[0], type_node);
+                        return;
+                    }
                 }
+
+
                 symbol_t* symbol = malloc(sizeof(symbol_t));
                 node_t* identifier = node->children[0];
                 assert((identifier->type == IDENTIFIER) && "Expected identifier_node");
@@ -288,6 +316,20 @@ static void bind_references(symbol_table_t* local_symbols, node_t* node) {
     }
 }
 
+static node_t* resolve_type_node(node_t* node) {
+    if (node->data.type_class != TC_UNKNOWN) {
+        return node;
+    }
+
+    node_t* identifier_node = node->children[0];
+    assert(identifier_node->type == IDENTIFIER);
+    symbol_t* symbol = symbol_hashmap_lookup(global_type_table->hashmap, identifier_node->data.identifier_str);
+    if (symbol != NULL) {
+        return symbol->data.type_node;
+    }
+    return node;
+}
+
 // resolve scope resolution
 static symbol_t* symbol_resolve_scope(symbol_table_t* local_symbols, node_t* scope_resolution_node) {
 
@@ -301,21 +343,19 @@ static symbol_t* symbol_resolve_scope(symbol_table_t* local_symbols, node_t* sco
     assert(false && "Not done");
 }
 
-static void create_struct_symbol(symbol_table_t* local_symbols, node_t* declaration_node) {
+static void create_struct_symbol(symbol_table_t* local_symbols, node_t* identifier_node, node_t* type_node) {
     symbol_t* symbol = malloc(sizeof(symbol_t));
-    node_t* identifier = declaration_node->children[0];
-    assert((identifier->type == IDENTIFIER) && "Expected identifier_node");
-    symbol->name = identifier->data.identifier_str;
+    symbol->name = identifier_node->data.identifier_str;
     symbol->type = SYMBOL_LOCAL_STRUCT; // TODO: global struct
-    symbol->node = identifier;
+    symbol->node = identifier_node;
     symbol->function_symtable = local_symbols;
     symbol->node->symbol = symbol;
 
     if (symbol_table_insert(local_symbols, symbol) == INSERT_COLLISION) {
-        fail_node(identifier, "Error: Redefinition of variable '%s'", symbol->name);
+        fail_node(identifier_node, "Error: Redefinition of variable '%s'", symbol->name);
     }
 
-    node_t* declaration_list = declaration_node->children[1]->children[0];
+    node_t* declaration_list = type_node->children[0];
     symbol->data.struct_info = malloc(sizeof(struct_info_t));
     symbol->data.struct_info->fields = symbol_table_init();
 
@@ -328,8 +368,9 @@ static void create_struct_symbol(symbol_table_t* local_symbols, node_t* declarat
             fail_node(decl->children[2], "Default values are not supported yet:(");
         }
 
-        if (decl->children[1]->data.type_class == TC_STRUCT) {
-            create_struct_symbol(symbol->data.struct_info->fields, decl);
+        node_t* decl_type_node = resolve_type_node(decl->children[1]);
+        if (decl_type_node->data.type_class == TC_STRUCT) {
+            create_struct_symbol(symbol->data.struct_info->fields, decl->children[0], decl_type_node);
         } else {
             symbol_t* field_symbol = malloc(sizeof(symbol_t));
             node_t* identifier = decl->children[0];

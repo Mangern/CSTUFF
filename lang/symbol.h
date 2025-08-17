@@ -13,6 +13,7 @@ enum symbol_type_t {
     SYMBOL_LOCAL_VAR,
     SYMBOL_GLOBAL_STRUCT,
     SYMBOL_LOCAL_STRUCT,
+    SYMBOL_TYPE,
     SYMBOL_NAMESPACE
 };
 
@@ -31,6 +32,7 @@ struct symbol_t {
         double real_value;
         char* string_value;
         struct struct_info_t* struct_info;
+        node_t* type_node;
     } data;
 
     // Only if local, param or function

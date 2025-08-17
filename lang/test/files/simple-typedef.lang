@@ -1,9 +1,4 @@
-type Point = struct {
-    x: int;
-    y: int;
-}
-
-anon_pt: struct {
+type Point: struct {
     x: int;
     y: int;
 };
@@ -14,8 +9,6 @@ main: () -> void = {
 
     p.x = 123;
     p.y = 456;
-
-    q = p;
 
     println(p.x, p.y);
 }

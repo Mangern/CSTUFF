@@ -9,6 +9,7 @@
 #include "fail.h"
 #include "langc.h"
 #include "lex.h"
+#include "symbol_table.h"
 #include "tree.h"
 
 #define fail(s, ...) do {\
@@ -26,6 +27,8 @@ char* BASIC_TYPE_NAMES[] = {
     "size"
 };
 
+symbol_table_t *global_type_table = 0;
+
 static void register_type_node(node_t*);
 static void handle_builtin_function_type(node_t*, symbol_t*);
 static bool types_equivalent(type_info_t* type_a, type_info_t* type_b);
@@ -35,6 +38,7 @@ static type_info_t* create_type_function();
 static type_info_t* create_type_array(type_info_t*, node_t*);
 static type_info_t* create_type_pointer(type_info_t*);
 static type_info_t* create_type_struct(node_t*);
+static type_info_t* create_type_tagged(size_t, type_info_t* type);
 static type_tuple_t* create_tuple();
 static basic_type_t is_basic_type(const char* identifier_str);
 
@@ -131,9 +135,20 @@ static void register_type_node(node_t* node) {
                     basic_type_t basic_type = is_basic_type(identifier->data.identifier_str);
                     if (((int)(basic_type) >= 0)) {
                         node->type_info = type_create_basic(basic_type);
-                    } else {
-                        fail_node(identifier, "Unknown type %s", identifier->data.identifier_str);
+                        break;
                     }
+
+                    symbol_t* type_symbol = symbol_hashmap_lookup(global_type_table->hashmap, identifier->data.identifier_str);
+
+                    if (type_symbol != NULL) {
+                        node_t* decl_node = type_symbol->node;
+                        assert(decl_node->type_info != NULL);
+                        assert(decl_node->type_info->type_class == TC_TAGGED);
+                        node->type_info = decl_node->type_info;
+                        break;
+                    }
+
+                    fail_node(identifier, "Unknown type %s", identifier->data.identifier_str);
                 } else if (node->data.type_class == TC_ARRAY) {
                     // first child: (sybtype, second: list)
                     register_type_node(node->children[0]);
@@ -150,6 +165,15 @@ static void register_type_node(node_t* node) {
                 }
 
                 return;
+            }
+            break;
+        case TYPE_DECLARATION:
+            {
+                register_type_node(node->children[1]);
+                node->type_info = create_type_tagged(
+                    node->symbol->sequence_number, 
+                    node->children[1]->type_info
+                );
             }
             break;
         case INTEGER_LITERAL:
@@ -638,6 +662,15 @@ static bool types_equivalent(type_info_t* type_a, type_info_t* type_b) {
         }
 
         return true;
+    } else if (type_class == TC_TAGGED) {
+        size_t id_a = type_a->info.info_tagged->type_id;
+        size_t id_b = type_b->info.info_tagged->type_id;
+
+        if (id_a != id_b) {
+            return false;
+        }
+
+        return true;
     } else {
         fprintf(stderr, "Not implemented type class equivalency:\n");
         type_print(stderr, type_a);
@@ -737,6 +770,15 @@ static type_info_t* create_type_struct(node_t* type_node) {
     return type_info;
 }
 
+static type_info_t* create_type_tagged(size_t sequence_number, type_info_t* type) {
+    type_info_t *type_info = malloc(sizeof(type_info_t));
+    type_info->type_class = TC_TAGGED;
+    type_info->info.info_tagged = malloc(sizeof(type_tagged_t));
+    type_info->info.info_tagged->type_id = sequence_number;
+    type_info->info.info_tagged->type = type;
+    return type_info;
+}
+
 void type_print(FILE* stream, type_info_t* type) {
     switch (type->type_class) {
         case TC_BASIC:
@@ -806,6 +848,11 @@ void type_print(FILE* stream, type_info_t* type) {
                 fprintf(stream, "unknown");
                 break;
             }
+        case TC_TAGGED:
+            {
+                fprintf(stream, "%s", global_type_table->symbols[type->info.info_tagged->type_id]->name);
+            }
+            break;
     }
 }
 
@@ -824,6 +871,13 @@ static basic_type_t is_basic_type(const char* identifier_str) {
         return TYPE_STRING;
     }
     return -1;
+}
+
+type_info_t* type_penetrate_tagged(type_info_t *type_info) {
+    if (type_info->type_class != TC_TAGGED) {
+        return type_info;
+    }
+    return type_penetrate_tagged(type_info->info.info_tagged->type);
 }
 
 size_t type_sizeof(type_info_t* type) {
@@ -850,6 +904,8 @@ size_t type_sizeof(type_info_t* type) {
             total_size += type_sizeof(type->info.info_struct->fields[i]->type);
         }
         return total_size;
+    } else if (type->type_class == TC_TAGGED) {
+        return type_sizeof(type->info.info_tagged->type);
     } else {
         assert(false && "Not implemented");
     }

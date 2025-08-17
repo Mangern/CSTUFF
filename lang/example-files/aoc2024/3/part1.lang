@@ -1,0 +1,82 @@
+buf: char[100];
+
+parse_mul: (len: int) -> int = {
+    i := 0;
+    a := 0;
+    b := 0;
+    while (buf[i] != ',') {
+        a *= 10;
+        a += cast(int, buf[i] - '0');
+        i += 1;
+    }
+    i += 1;
+    while (i < len) {
+        b *= 10;
+        b += cast(int, buf[i] - '0');
+        i += 1;
+    }
+    return a * b;
+}
+
+main: () -> void = {
+    EOF := cast(char, 255);
+    ans := 0;
+
+    state := 0;
+    ptr := 0;
+
+    while (true) {
+        c := readchar();
+
+        if (c == EOF) {
+            break;
+        }
+
+        if (c == ')' && state == 7) {
+            ans += parse_mul(ptr);
+            ptr = 0;
+            state = 0;
+        }
+
+        if (c != ',' && (c < '0' || c > '9') && state >= 4 && state <= 7) {
+            state = 0;
+            ptr = 0;
+        }
+
+
+        if (c == 'm' && state == 0) {
+            state = 1;
+        }
+
+        if (c == 'u' && state == 1) {
+            state = 2;
+        }
+
+        if (c == 'l' && state == 2) {
+            state = 3;
+        }
+
+        if (c == '(' && state == 3) {
+            state = 4;
+        }
+
+        if ('0' <= c && c <= '9' && state == 4) {
+            state = 5;
+        }
+
+        if (c == ',' && state == 5) {
+            state = 6;
+        }
+
+        if ('0' <= c && c <= '9' && state == 6) {
+            state = 7;
+        }
+
+        if (state >= 4 && state <= 7 && c != '(') {
+            buf[ptr] = c;
+            ptr += 1;
+        }
+
+    }
+    println(ans);
+}

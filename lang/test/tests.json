@@ -108,6 +108,10 @@
         "file": "boolean_op.lang",
         "expect-stdout": "1\n0\n0\n1\n1\n0\n1\n0\n0\n1\n1\ntrue\nfalse\n0\nfalse\n0\ntrue\n1\nfalse\ntrue\n1\n"
     },
+    {
+        "file": "simple-typedef.lang",
+        "expect-stdout": "123 456\n"
+    },
 
 
     {

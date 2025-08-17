@@ -41,6 +41,7 @@ char* NODE_TYPE_NAMES[] = {
     "LIST",
     "DECLARATION",
     "TYPE",
+    "TYPE_DECLARATION",
     "IDENTIFIER",
     "DECLARATION_LIST",
     "BLOCK",

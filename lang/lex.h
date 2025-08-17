@@ -33,6 +33,7 @@ typedef enum {
     LEX_CONTINUE,
     LEX_STRUCT,
     LEX_ALLOC,
+    LEX_TYPE,
     LEX_END
 } token_type_t;
 
