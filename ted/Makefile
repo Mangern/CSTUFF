@@ -2,7 +2,7 @@ CFLAGS := -g -O2 -Wall -Wextra -I../da/
 OBJS   := gap_buffer.o
 
 ted: $(OBJS) main.o
-	gcc $(CFLAGS) -o ted $(OBJS) test.o
+	gcc $(CFLAGS) -o ted $(OBJS) main.o
 
 %.o: %.c
 	gcc $(CFLAGS) -c $? -o $@
