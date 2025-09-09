@@ -20,9 +20,9 @@ size_t num_ok;
 
 #define TEST_START(s) { curr_test = s; curr_test_fail = false; curr_test_err = 0; ++num_attempted; printf("\x1b[0m"); } do {
 #define TEST_END } while (0); if (!curr_test_fail) { printf("%-23s\x1b[1;32mPASS\n", curr_test); ++num_ok; } else if (curr_test_err != 0) { printf("\x1b[1;31m%s:%d: %s\n", curr_test, curr_test_fail_line, curr_test_err); } else { printf("\x1b[1;31m%s:%d: Assertion failed.\n", curr_test, curr_test_fail_line); }
-#define TEST_ASSERT(expr) if (!(expr)) { curr_test_fail = 1; curr_test_fail_line = __LINE__; }
+#define TEST_ASSERT(expr) if (!(expr)) { curr_test_fail = 1; curr_test_fail_line = __LINE__; break; }
 // TODO: Format str?
-#define TEST_ASSERT_MSG(expr, msg) if (!(expr)) { curr_test_fail = 1; curr_test_fail_line = __LINE__; curr_test_err = (msg); }
+#define TEST_ASSERT_MSG(expr, msg) if (!(expr)) { curr_test_fail = 1; curr_test_fail_line = __LINE__; curr_test_err = (msg); break; }
 
 TEST_GROUP(gap_buffer_test)
 
@@ -97,34 +97,34 @@ TEST_GROUP(gap_buffer_test)
 
     TEST_START("misc");
 
-    gap_buffer_gap_at(&gap_buffer, 7);
+        gap_buffer_gap_at(&gap_buffer, 7);
 
-    gap_buffer_gap_insert(&gap_buffer, ' ');
-    gap_buffer_gap_insert(&gap_buffer, 's');
-    gap_buffer_gap_insert(&gap_buffer, 'o');
-    gap_buffer_gap_insert(&gap_buffer, 'm');
-    gap_buffer_gap_insert(&gap_buffer, 'e');
+        gap_buffer_gap_insert(&gap_buffer, ' ');
+        gap_buffer_gap_insert(&gap_buffer, 's');
+        gap_buffer_gap_insert(&gap_buffer, 'o');
+        gap_buffer_gap_insert(&gap_buffer, 'm');
+        gap_buffer_gap_insert(&gap_buffer, 'e');
 
-    char *result = malloc(100);
-    gap_buffer_str(&gap_buffer, result);
+        char *result = malloc(100);
+        gap_buffer_str(&gap_buffer, result);
 
-    TEST_ASSERT(memcmp(result, "foo bar some baz", 16) == 0);
+        TEST_ASSERT(memcmp(result, "foo bar some baz", 16) == 0);
 
-    gap_buffer_gap_at(&gap_buffer, 0);
-    gap_buffer_gap_insert(&gap_buffer, 't');
-    gap_buffer_gap_insert(&gap_buffer, 'e');
-    gap_buffer_gap_insert(&gap_buffer, 's');
-    gap_buffer_gap_insert(&gap_buffer, 't');
-    gap_buffer_gap_insert(&gap_buffer, ':');
-    gap_buffer_gap_insert(&gap_buffer, ' ');
+        gap_buffer_gap_at(&gap_buffer, 0);
+        gap_buffer_gap_insert(&gap_buffer, 't');
+        gap_buffer_gap_insert(&gap_buffer, 'e');
+        gap_buffer_gap_insert(&gap_buffer, 's');
+        gap_buffer_gap_insert(&gap_buffer, 't');
+        gap_buffer_gap_insert(&gap_buffer, ':');
+        gap_buffer_gap_insert(&gap_buffer, ' ');
 
-    gap_buffer_gap_at(&gap_buffer, 10);
+        gap_buffer_gap_at(&gap_buffer, 10);
 
-    gap_buffer_str(&gap_buffer, result);
+        gap_buffer_str(&gap_buffer, result);
 
-    TEST_ASSERT(memcmp(result, "test: foo bar some baz", 22) == 0);
+        TEST_ASSERT(memcmp(result, "test: foo bar some baz", 22) == 0);
 
-    free(result);
+        free(result);
 
     TEST_END;
 

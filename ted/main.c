@@ -79,7 +79,7 @@ void options(int argc, char **argv) {
 }
 
 bool buffer_char(int c) {
-    return isprint(c) || (c == '\n');
+    return (isascii(c) && isprint(c)) || (c == '\n');
 }
 
 #define BUF_SIZE (1024*1024)
