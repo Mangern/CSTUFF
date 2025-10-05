@@ -7,6 +7,7 @@
 #include <stdlib.h>
 
 static void transform_pointer_indexing(node_t*);
+static void transform_pointer_arithmetic(node_t*);
 
 // Hmm not sure how I want to do this
 void tree_transform(node_t* node) {
@@ -25,6 +26,15 @@ void tree_transform(node_t* node) {
     if ( node->type == ARRAY_INDEXING
       && node->children[0]->type_info->type_class == TC_POINTER) {
         transform_pointer_indexing(node);
+    }
+
+    if (
+        node->type == OPERATOR 
+     && node->data.operator == BINARY_ADD
+     && node->children[0]->type_info->type_class == TC_POINTER
+     && node->children[1]->type_info->type_class == TC_BASIC
+     && node->children[1]->type_info->info.info_basic == TYPE_INT) {
+        transform_pointer_arithmetic(node);
     }
 }
 
@@ -71,4 +81,26 @@ static void transform_pointer_indexing(node_t* node) {
 
     // node should actually now be totally done :O
     // free(node); but fuck free'ing
+}
+
+static void transform_pointer_arithmetic(node_t* op_node) {
+    type_info_t *lhs_type = op_node->children[0]->type_info;
+    assert(lhs_type->type_class == TC_POINTER);
+
+    node_t *expression_node = op_node->children[1];
+
+    size_t subtype_sz = type_sizeof(lhs_type->info.info_pointer->inner);
+
+    node_t *mul_node = node_create(OPERATOR);
+    mul_node->data.operator = BINARY_MUL;
+    mul_node->type_info = expression_node->type_info;
+
+    node_t *literal_node = node_create(INTEGER_LITERAL);
+    literal_node->data.int_literal_value = subtype_sz;
+    literal_node->type_info = expression_node->type_info;
+    node_add_child(mul_node, literal_node);
+    node_add_child(mul_node, expression_node);
+
+    op_node->children[1] = mul_node;
+    mul_node->parent = op_node;
 }

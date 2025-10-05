@@ -802,6 +802,7 @@ static void generate_tac(tac_t tac) {
         {
             // src1[src2] -> dst
             // Load base
+
             emit_mov_addr_to_reg(tac.src1, RAX);
 
             // Load index

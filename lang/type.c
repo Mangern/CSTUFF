@@ -285,7 +285,13 @@ static void register_type_node(node_t* node) {
                                     assert(false);
                             }
 
-                            if (!types_equivalent(node->children[0]->type_info, node->children[1]->type_info)) {
+                            bool is_ptr_int = 
+                                node->data.operator == BINARY_ADD 
+                                && node->children[0]->type_info->type_class == TC_POINTER
+                                && node->children[1]->type_info->type_class == TC_BASIC
+                                && node->children[1]->type_info->info.info_basic == TYPE_INT;
+
+                            if (!is_ptr_int && !types_equivalent(node->children[0]->type_info, node->children[1]->type_info)) {
                                 fprintf(stderr, "Cannot %s ", opstr);
                                 type_print(stderr, node->children[0]->type_info);
                                 fprintf(stderr, " and ");

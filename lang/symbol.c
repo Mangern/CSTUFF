@@ -85,6 +85,20 @@ void create_symbol_tables() {
             assert(false && "Unexpected node type in global statement list");
         }
     }
+
+    // Ugly but quick extra pass so we can refer to functions defined later
+    // TODO: not finished, should do the same for type nodes
+    for (size_t i = 0; i < da_size(root->children); ++i) {
+        node_t* node = root->children[i];
+        if (node->type == DECLARATION) {
+            node_t* typenode = node->children[1];
+            if (typenode->type == TYPE) {
+                if (typenode->data.type_class == TC_FUNCTION) {
+                    bind_references(node->symbol->function_symtable, node->children[2]);
+                }
+            }
+        }
+    }
 }
 
 static void insert_builtin_functions() {
@@ -141,12 +155,12 @@ static void create_function_tables(node_t* function_declaration_node) {
     function_symbol->node = function_declaration_node;
     function_symbol->function_symtable = function_symtable;
     function_symbol->is_builtin = false;
+    function_declaration_node->symbol = function_symbol;
     if (symbol_table_insert(global_symbol_table, function_symbol) == INSERT_COLLISION) {
         // TODO: Note:
         fail_node(identifier_node, "Error: Redefinition of function '%s'", function_symbol->name);
     }
 
-    bind_references(function_symtable, function_declaration_node->children[2]);
 }
 
 static void create_insert_variable_declaration(symbol_table_t* symtable, symbol_type_t symbol_type, node_t* declaration_node) {

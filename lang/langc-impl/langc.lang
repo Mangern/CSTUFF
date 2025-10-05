@@ -1,0 +1,913 @@
+EOF: int;
+buf: *int;
+nbuf: int;
+
+// ==================== STD ====================
+isspace: (c: int) -> bool = {
+    return c == 10 || c == 32;
+}
+
+isascii: (c: int) -> bool = {
+    return c <= 127;
+}
+
+isalpha: (c: int) -> bool = {
+    if (!isascii(c)) {
+        return false;
+    }
+    if (cast(int, 'A') <= c && c <= cast(int, 'Z')) {
+        return true;
+    }
+    if (cast(int, 'a') <= c && c <= cast(int, 'z')) {
+        return true;
+    }
+    return false;
+}
+
+streq: (str_a: *int, str_b: *int, len: int) -> bool = {
+    i := 0;
+    while (i < len) {
+        if (str_a[i] != str_b[i]) {
+            return false;
+        }
+        if (str_a[i] == 0 && str_b[i] == 0) {
+            return true;
+        }
+        i += 1;
+    }
+    return true;
+}
+
+// ==================== UTILITY ====================
+read_content: () -> void = {
+    buf = alloc(int, 16777216);
+    nbuf = 0;
+    while (true) {
+        c := cast(int, readchar());
+        if (c == EOF) {
+            break;
+        }
+        buf[nbuf] = c;
+        nbuf += 1;
+    }
+};
+
+STRING_PRINTLN: *int;
+
+ST_ID: int;
+ST_LIT: int;
+
+string_table: **int;
+string_table_len: *int;
+string_table_type: *int;
+string_table_sz: int;
+string_table_cap: int;
+
+string_table_init: () -> void = {
+    ST_ID = 0;
+    ST_LIT = 1;
+
+    // bruhest moment
+    {
+        STRING_PRINTLN = alloc(int, 8);
+        STRING_PRINTLN[0] = cast(int, 'p');
+        STRING_PRINTLN[1] = cast(int, 'r');
+        STRING_PRINTLN[2] = cast(int, 'i');
+        STRING_PRINTLN[3] = cast(int, 'n');
+        STRING_PRINTLN[4] = cast(int, 't');
+        STRING_PRINTLN[5] = cast(int, 'l');
+        STRING_PRINTLN[6] = cast(int, 'n');
+        STRING_PRINTLN[7] = 0;
+    }
+}
+
+string_table_add: (str_buf: *int, len: int) -> int = {
+    if (string_table_sz == string_table_cap) {
+        new_cap := string_table_cap * 2;
+        if (new_cap == 0) {
+            new_cap = 1;
+        }
+
+        new_table := alloc(*int, new_cap);
+        new_table_len := alloc(int, new_cap);
+        new_table_type := alloc(int, new_cap);
+        i := 0;
+        while (i < string_table_cap) {
+            new_table[i] = string_table[i];
+            new_table_len[i] = string_table_len[i];
+            new_table_type[i] = string_table_type[i];
+            i += 1;
+        }
+
+        if (string_table_cap > 0) {
+            delete(string_table);
+            delete(string_table_len);
+            delete(string_table_type);
+        }
+
+        string_table = new_table;
+        string_table_len = new_table_len;
+        string_table_type = new_table_type;
+        string_table_cap = new_cap;
+    }
+    stridx := string_table_sz;
+    string_table_sz += 1;
+
+    string_table[stridx]     = alloc(int, len);
+    string_table_len[stridx] = len;
+
+    dst := string_table[stridx];
+
+    i := 0;
+    while (i < len) {
+        dst[i] = str_buf[i];
+        i += 1;
+    }
+
+    return stridx;
+}
+
+string_table_print: (stridx: int) -> void = {
+    len := string_table_len[stridx];
+    str := string_table[stridx];
+    i := 0;
+    while (i < len) {
+        print(cast(char, str[i]));
+        i += 1;
+    }
+}
+
+// ==================== LEX ====================
+lex_ptr: int;
+cur_tok: int;
+cur_tok_beg: int;
+cur_tok_end: int;
+
+TOK_EOF  : int;
+TOK_ID   : int;
+TOK_STR  : int;
+TOK_ARROW: int;
+
+lex_init: () -> void = {
+    lex_ptr = 0;
+    cur_tok_beg = -1;
+
+    TOK_EOF   = 255;
+    TOK_ID    = 256;
+    TOK_STR   = 257;
+    TOK_ARROW = 258;
+}
+
+
+lex_skip_ws: () -> void = {
+    while (lex_ptr < nbuf && isspace(buf[lex_ptr])) {
+        lex_ptr += 1;
+    }
+}
+
+lex_skip_comments: () -> void = {
+    if (buf[lex_ptr] != cast(int, '/')) {
+        return;
+    }
+    if (lex_ptr + 1 < nbuf && buf[lex_ptr+1] == cast(int, '/')) {
+        while (lex_ptr < nbuf && buf[lex_ptr] != 10) {
+            lex_ptr += 1;
+        }
+    }
+    // TODO: multiline comments
+    lex_skip_ws();
+    lex_skip_comments();
+}
+
+lex_matches_arrow: () -> bool = {
+    if (lex_ptr + 1 >= nbuf) {
+        return false;
+    }
+
+    return cast(char, buf[lex_ptr]) == '-' && cast(char, buf[lex_ptr + 1]) == '>';
+}
+
+lex_isidchar: (c: int) -> bool = {
+    // [_0-9A-Za-z]
+    return isalpha(c) || (cast(int, '0') <= c && c <= cast(int, '9')) || (c == cast(int, '_'));
+}
+
+lex_matches_id: () -> int = {
+    if (!isalpha(buf[lex_ptr])) {
+        return 0;
+    }
+    ptr := lex_ptr;
+
+    while (ptr < nbuf && lex_isidchar(buf[ptr])) {
+        ptr += 1;
+    }
+
+    return ptr - lex_ptr;
+}
+
+lex_matches_str: () -> int = {
+    if (cast(char, buf[lex_ptr]) != '"') {
+        return 0;
+    }
+    ptr := lex_ptr + 1;
+    while (ptr < nbuf && cast(char, buf[ptr]) != '"') {
+        // 92: '\'  Char literals not stable.
+        if (buf[ptr] == 92) {
+            ptr += 2;
+        } else {
+            ptr += 1;
+        }
+    }
+    if (ptr >= nbuf) {
+        println("Unexpected EOF when parsing string literal!");
+        // TODO: exit
+        x := 1 / 0;
+        return 0;
+    }
+    ptr += 1;
+    return ptr - lex_ptr;
+}
+
+lex_peek: () -> int = {
+    match: int;
+    if (cur_tok_beg == lex_ptr) {
+        return cur_tok;
+    }
+
+    lex_skip_ws();
+    lex_skip_comments();
+
+    cur_tok_beg = lex_ptr;
+
+    if (lex_ptr >= nbuf) {
+        cur_tok = TOK_EOF;
+        cur_tok_end = nbuf;
+        return cur_tok;
+    }
+
+    if (lex_matches_arrow()) {
+        cur_tok = TOK_ARROW;
+        cur_tok_end = cur_tok_beg + 2;
+        return cur_tok;
+    }
+
+    match = lex_matches_id();
+    if (match > 0) {
+        cur_tok = TOK_ID;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_str();
+    if (match > 0) {
+        cur_tok = TOK_STR;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    cur_tok = buf[lex_ptr];
+    cur_tok_end = cur_tok_beg + 1;
+    return cur_tok;
+}
+
+lex_advance: () -> void = {
+    lex_peek();
+    lex_ptr = cur_tok_end;
+}
+
+tok_print: (t: int) -> void = {
+    if (isascii(t)) {
+        println(cast(char, t));
+        return;
+    }
+    if (t == TOK_EOF) {
+        println("<EOF>");
+        return;
+    }
+    if (t == TOK_ID) {
+        println("<identifier>");
+        return;
+    }
+    if (t == TOK_STR) {
+        println("<string>");
+        return;
+    }
+    if (t == TOK_ARROW) {
+        println("->");
+        return;
+    }
+
+    println("???");
+}
+
+peek_expect_advance: (expected: int) -> int = {
+    token := lex_peek();
+    if (token != expected) {
+        print("Unexpected token: ");
+        tok_print(token);
+        print("Expected: ");
+        tok_print(expected);
+        //exit := 1 / 0;
+    }
+    lex_advance();
+    return token;
+}
+
+// ==================== PARSE ====================
+
+// Node types
+NODE_LIST   : int; // [any, ...]
+NODE_ID     : int; // leaf
+NODE_DECL   : int; // [identifier, type] | [identifier, type?, block] | [identifier, type?, expr]
+NODE_TYPE   : int; // [identifier] | [list[declaration], type] (func)
+NODE_BLOCK  : int; // list
+NODE_CALL   : int; // [identifier, list[expression]]
+NODE_LIT_STR: int; // leaf
+
+// expression: list_str | TODO
+
+node_da_cap: int;
+node_da_sz: int;
+node_type: *int;
+// array of children lists
+node_children: **int;
+// array of children list capacities
+node_children_cap: *int;
+// array of children list sizes
+node_children_sz : *int;
+// optional string data: index in string table
+node_data_str : *int;
+
+node_create: (ntype: int) -> int = {
+    if (node_da_sz == node_da_cap) {
+        new_cap := node_da_cap * 2;
+        if (new_cap == 0) {
+            new_cap = 1;
+        }
+        new_type := alloc(int, new_cap);
+        new_children := alloc(*int, new_cap);
+        new_children_cap := alloc(int, new_cap);
+        new_children_sz := alloc(int, new_cap);
+        new_data_str := alloc(int, new_cap);
+
+        // copy data to new buffers
+        i := 0;
+        while (i < node_da_cap) {
+            new_type[i] = node_type[i];
+            new_children[i] = node_children[i];
+            new_children_cap[i] = node_children_cap[i];
+            new_children_sz[i] = node_children_sz[i];
+            new_data_str[i] = node_data_str[i];
+            i += 1;
+        }
+
+        // free old
+        if (node_da_cap != 0) {
+            delete(node_type);
+            delete(node_children);
+            delete(node_children_cap);
+            delete(node_children_sz);
+            delete(node_data_str);
+        }
+
+        // update
+        node_type = new_type;
+        node_children = new_children;
+        node_children_cap = new_children_cap;
+        node_children_sz = new_children_sz;
+        node_data_str = new_data_str;
+
+        node_da_cap = new_cap;
+    }
+
+
+    // assert node_da_sz < node_da_cap
+    ret := node_da_sz;
+
+    node_type[ret] = ntype;
+    node_children_cap[ret] = 0;
+    node_children_sz[ret] = 0;
+
+    node_da_sz += 1;
+    return ret;
+}
+
+node_add_child: (parent: int, child: int) -> void = {
+    cap := node_children_cap[parent];
+    sz  := node_children_sz[parent];
+
+    if (sz == cap) {
+        new_cap := cap * 2;
+
+        if (new_cap == 0) {
+            new_cap = 1;
+        }
+
+        new_children := alloc(int, new_cap);
+        old_children := node_children[parent];
+
+        i := 0;
+        while (i < cap) {
+            new_children[i] = old_children[i];
+            i += 1;
+        }
+
+        if (cap != 0) {
+            delete(old_children);
+        }
+
+        node_children[parent] = new_children;
+        node_children_cap[parent] = new_cap;
+    }
+
+    dst := node_children[parent];
+    dst[sz] = child;
+
+    node_children_sz[parent] += 1;
+}
+
+node_set_idstr: (node: int) -> void = {
+    strlen := cur_tok_end - cur_tok_beg;
+    ptr := buf + cur_tok_beg;
+    stridx := string_table_add(ptr, strlen);
+    node_data_str[node] = stridx;
+    string_table_type[stridx] = ST_ID;
+}
+
+node_set_strdata: (node: int) -> void = {
+    strlen := cur_tok_end - cur_tok_beg - 2;
+    ptr := buf + (cur_tok_beg + 1);
+    stridx := string_table_add(ptr, strlen);
+    node_data_str[node] = stridx;
+    string_table_type[stridx] = ST_LIT;
+}
+
+parser_init: () -> void = {
+    NODE_LIST   = 0;
+    NODE_ID     = 1;
+    NODE_DECL   = 2;
+    NODE_TYPE   = 3;
+    NODE_BLOCK  = 4;
+    NODE_CALL   = 5;
+    NODE_LIT_STR= 6;
+}
+
+parse_type: () -> int = {
+    type_node := node_create(NODE_TYPE);
+
+    token := lex_peek();
+    if (token == cast(int, '(')) {
+        // function type
+        lex_advance();
+
+        // TODO: argument list
+        decl_list_node := node_create(NODE_LIST);
+        node_add_child(type_node, decl_list_node);
+
+        peek_expect_advance(cast(int, ')'));
+        peek_expect_advance(TOK_ARROW);
+
+        return_type_node := parse_type();
+
+        node_add_child(type_node, return_type_node);
+
+        return type_node;
+    }
+
+    if (token != TOK_ID) {
+        print("Unexpected token: ");
+        tok_print(token);
+        exit := 1 / 0;
+    }
+
+    {
+        id_node := node_create(NODE_ID);
+        node_set_idstr(id_node);
+        node_add_child(type_node, id_node);
+    }
+    lex_advance();
+
+    return type_node;
+}
+
+parse_declaration: () -> int = {
+    decl_node := node_create(NODE_DECL);
+
+    // eat identifier
+    {
+        id_node := node_create(NODE_ID);
+
+        // collect str
+        node_set_idstr(id_node);
+
+        node_add_child(decl_node, id_node);
+    }
+    lex_advance();
+
+    peek_expect_advance(cast(int, ':'));
+
+    token := lex_peek();
+
+    if (token == cast(int, '=')) {
+        println("Not implemented :=");
+        exit := 1 / 0;
+    }
+
+    // type
+    {
+        type_node := parse_type();
+        node_add_child(decl_node, type_node);
+    }
+
+    token = lex_peek();
+
+    // these are in our FOLLOW set
+    if (token == cast(int, ';') || token == cast(int, ')') || token == cast(int, ',')) {
+        return decl_node;
+    }
+
+    peek_expect_advance(cast(int, '='));
+
+    token = lex_peek();
+
+    if (token == cast(int, '{')) {
+        lex_advance();
+
+        // block
+        rhs := parse_block();
+
+        peek_expect_advance(cast(int, '}'));
+
+        node_add_child(decl_node, rhs);
+    } else {
+        // expression
+        println("Not implemented: expression rhs of decl");
+        exit := 1 / 0;
+    }
+
+    return decl_node;
+}
+
+parse_block: () -> int = {
+    block_node := node_create(NODE_BLOCK);
+
+    while (true) {
+        token := lex_peek();
+        if (token == cast(int, '}')) {
+            break;
+        }
+
+        if (token == cast(int, '{')) {
+            // new scope
+            node_add_child(block_node, parse_block());
+            peek_expect_advance(cast(int, '}'));
+            continue;
+        }
+
+        if (token == TOK_ID) {
+            id_node := node_create(NODE_ID);
+            node_set_idstr(id_node);
+
+            lex_advance();
+
+            token = lex_peek();
+
+            if (token == cast(int, '(')) {
+                node_add_child(block_node, parse_function_call(id_node));
+                peek_expect_advance(cast(int, ';'));
+            } else {
+                // temporarily: fail
+                peek_expect_advance(cast(int, '(')); // )
+            }
+            continue;
+        }
+
+        print("Unexpected token: ");
+        tok_print(token);
+        exit := 1 / 0;
+    }
+
+    return block_node;
+}
+
+parse_function_call: (id_node: int) -> int = {
+    call_node := node_create(NODE_CALL);
+    node_add_child(call_node, id_node);
+
+    list_node := node_create(NODE_LIST);
+    peek_expect_advance(cast(int, '('));
+
+    token := lex_peek();
+    while (token != cast(int, ')')) {
+        node_add_child(list_node, parse_expression());
+
+        token = lex_peek();
+        if (token == cast(int, ')')) {
+            break;
+        }
+        token = peek_expect_advance(cast(int, ','));
+    }
+    lex_advance();
+
+    node_add_child(call_node, list_node);
+
+    return call_node;
+}
+
+parse_expression: () -> int = {
+    token := lex_peek();
+
+    if (token == TOK_STR) {
+        str_node := node_create(NODE_LIT_STR);
+        node_set_strdata(str_node);
+        lex_advance();
+
+        return str_node;
+    }
+    print("parse_expression unhandled token: ");
+    tok_print(token);
+    return 0;
+}
+
+parse: () -> int = {
+    root := node_create(NODE_LIST);
+
+    while (true) {
+        tok := lex_peek();
+
+        if (tok == TOK_EOF) {
+            break;
+        }
+        if (tok == cast(int, ';')) {
+            lex_advance();
+            continue;
+        }
+        if (tok == TOK_ID) {
+            node := parse_declaration();
+
+            node_add_child(root, node);
+            continue;
+        }
+
+        print("Unexpected token: ");
+        tok_print(tok);
+        //exit := 1 / 0;
+        lex_advance();
+    }
+
+    return root;
+}
+
+// ==================== SYMBOL ====================
+
+// ==================== GEN ====================
+generate_code: (root: int) -> void = {
+
+    { // string data. Consts?
+        println(".section .rodata");
+        println("strout: .asciz \"%s\"");
+
+        i := 0;
+        while (i < string_table_sz) {
+            if (string_table_type[i] != ST_LIT) {
+                i += 1;
+                continue;
+            }
+            print("string");
+            print(i);
+            print(":  .asciz \"");
+
+            j := 0;
+
+            str := string_table[i];
+            while (j < string_table_len[i]) {
+                print(cast(char, str[j]));
+                j += 1;
+            }
+            println("\"");
+
+            i += 1;
+        }
+    }
+
+    { // global vars
+        println(".section .bss");
+        println(".align 8");
+    }
+
+    println(".text");
+
+    i := 0;
+
+    root_children := node_children[root];
+    while (i < node_children_sz[root]) {
+        child := root_children[root];
+        child_children := node_children[child];
+
+        if (node_type[child] == NODE_DECL) {
+            if (node_children_sz[child] == 3) {
+                if (node_type[child_children[2]] == NODE_BLOCK) {
+                    // function
+                    generate_function_code(
+                        child_children[0],
+                        child_children[1],
+                        child_children[2]
+                    );
+                } else {
+                    println("Not implemented: root decl node variant");
+                    exit := 1 / 0;
+                }
+            } else {
+                println("Not implemented: root decl node variant");
+                exit := 1 / 0;
+            }
+        } else {
+            println("Not implemented: root decl node type");
+            exit := 1 / 0;
+        }
+
+        i += 1;
+    }
+
+    // entrypoint
+    println("main:");
+    println("    pushq %rbp");
+    println("    movq %rsp, %rbp");
+    println("    andq $-16, %rsp");
+    println("    call .main");
+	println("    movq %rbp, %rsp");
+	println("    popq %rbp");
+	println("    movq $0, %rdi");
+	println("    pushq %rbp");
+	println("    movq %rsp, %rbp");
+	println("    andq $-16, %rsp");
+	println("    call exit");
+    println(".global main");
+}
+
+generate_function_code: (id_node: int, arg_node: int, body_node: int) -> void = {
+    print(".");
+    string_table_print(node_data_str[id_node]);
+    println(":");
+
+    println("    pushq %rbp");
+    println("    movq %rsp, %rbp");
+
+    body_children := node_children[body_node];
+
+    i := 0;
+    while (i < node_children_sz[body_node]) {
+        child := body_children[i];
+
+        if (node_type[child] == NODE_CALL) {
+            generate_function_call(child);
+        }
+
+        i += 1;
+    }
+
+    string_table_print(node_data_str[id_node]);
+    println(".epilogue:");
+    println("    movq %rbp, %rsp");
+    println("    popq %rbp");
+    println("    ret");
+}
+
+generate_function_call: (node: int) -> void = {
+    children := node_children[node];
+    id_node := children[0];
+
+    id_stridx := node_data_str[id_node];
+
+    if (streq(
+        string_table[id_stridx], 
+        STRING_PRINTLN, 
+        string_table_len[id_stridx])
+    ) {
+        generate_call_println(children[1]);
+        return;
+    }
+
+    print("FUNCTION CALL TO: ");
+    string_table_print(id_stridx);
+    println();
+}
+
+generate_call_println: (args_node: int) -> void = {
+    args := node_children[args_node];
+
+    i := 0;
+    while (i < node_children_sz[args_node]) {
+        if (i > 0) {
+            println("    movq $' ', %rdi");
+            println("    call putchar");
+        }
+
+        arg := args[i];
+
+        generate_expression(arg);
+        println("    movq %rax, %rsi");
+
+        if (node_type[arg] == NODE_LIT_STR) {
+            println("    leaq strout(%rip), %rdi");
+        } else {
+            println("Unhandled node type println");
+            exit := 1 / 0;
+        }
+        println("    movq $1, %rax");
+        println("    call printf");
+        i += 1;
+    }
+
+    println("    movq $'\\n', %rdi");
+    println("    call putchar");
+}
+
+// Place result of computation in rax
+generate_expression: (node: int) -> void = {
+    if (node_type[node] == NODE_LIT_STR) {
+        print("    leaq string");
+        print(node_data_str[node]);
+        print("(%rip)");
+        println(", %rax");
+        return;
+    } else {
+        println("generate_expression unhandled node type");
+        exit := 1 / 0;
+    }
+}
+
+// ==================== DEBUG ====================
+node_print: (node: int) -> void = {
+    typ := node_type[node];
+    if (typ == NODE_LIST) {
+        print("LIST");
+        return;
+    }
+    if (typ == NODE_ID) {
+        print("ID (");
+        string_table_print(node_data_str[node]);
+        print(")");
+        return;
+    }
+    if (typ == NODE_DECL) {
+        print("DECL");
+        return;
+    }
+    if (typ == NODE_TYPE) {
+        print("TYPE");
+        return;
+    }
+    if (typ == NODE_BLOCK) {
+        print("BLOCK");
+        return;
+    }
+    if (typ == NODE_CALL) {
+        print("CALL");
+        return;
+    }
+    if (typ == NODE_LIT_STR) {
+        print("LIT_STR \"");
+        string_table_print(node_data_str[node]);
+        print("\"");
+        return;
+    }
+    print("????");
+}
+
+print_tree: (node: int, indent: int) -> void = {
+    {
+        i := 0;
+        while (i < indent) {
+            print(" ");
+            i += 1;
+        }
+    }
+    node_print(node);
+    println();
+
+    i := 0;
+    children := node_children[node];
+    while (i < node_children_sz[node]) {
+        print_tree(children[i], indent + 2);
+        i += 1;
+    }
+}
+
+main: () -> void = {
+    EOF = 255;
+
+    read_content();
+
+    lex_init();
+    parser_init();
+    string_table_init();
+
+    root := parse();
+
+    //print_tree(root, 0);
+
+    generate_code(root);
+
+    delete(buf);
+}
