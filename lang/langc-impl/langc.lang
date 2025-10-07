@@ -193,6 +193,8 @@ lex_skip_comments: () -> void = {
         while (lex_ptr < nbuf && buf[lex_ptr] != 10) {
             lex_ptr += 1;
         }
+    } else {
+        return;
     }
     // TODO: multiline comments
     lex_skip_ws();
@@ -526,6 +528,7 @@ parser_init: () -> void = {
     operator_prec[cast(int, '-')] = 110;
     operator_prec[cast(int, '*')] = 120;
     operator_prec[cast(int, '/')] = 120;
+    operator_prec[cast(int, '%')] = 120;
 }
 
 parse_type: () -> int = {
@@ -759,7 +762,6 @@ parse_primary_expr: () -> int = {
 parse_expr_rhs: (expr_prec: int, lhs: int) -> int = {
     while (true) {
         token := lex_peek();
-        println(token);
         prec := get_tok_precedence(token);
         if (prec < expr_prec) {
             return lhs;
@@ -972,12 +974,15 @@ generate_call_println: (args_node: int) -> void = {
         println("    movq %rax, %rsi");
 
         while (true) {
+            // TODO: type checking and not this mess
+
             if (node_type[arg] == NODE_LIT_STR) {
                 println("    leaq strout(%rip), %rdi");
                 break;
             }
 
-            if (node_type[arg] == NODE_LIT_INT) {
+            if (node_type[arg] == NODE_LIT_INT 
+             || node_type[arg] == NODE_BINOP) {
                 println("    leaq intout(%rip), %rdi");
                 break;
             }
@@ -994,6 +999,47 @@ generate_call_println: (args_node: int) -> void = {
     println("    call putchar");
 }
 
+// expects: lhs in %rcx, rhs in %rax
+// result in %rax
+generate_binop: (op: int) -> void = {
+    if (op == cast(int, '+')) {
+        println("    addq %rcx, %rax");
+        return;
+    }
+    if (op == cast(int, '-')) {
+        println("    subq %rax, %rcx");
+        println("    movq %rcx, %rax");
+        return;
+    }
+    if (op == cast(int, '*')) {
+        println("    imulq %rcx, %rax");
+        return;
+    }
+    if (op == cast(int, '/')) {
+        // swap
+        println("    xchg %rax, %rcx");
+        // sign extend rax
+        println("    cqo");
+        // div by rcx
+        println("    idivq %rcx");
+        return;
+    }
+    if (op == cast(int, '%')) {
+        // swap
+        println("    xchg %rax, %rcx");
+        // sign extend rax
+        println("    cqo");
+        // div by rcx
+        println("    idivq %rcx");
+        // get remainder
+        println("    movq %rdx, %rax");
+        return;
+    }
+
+    println("Unhandled binop gen");
+    exit := 1 / 0;
+}
+
 // Place result of computation in rax
 generate_expression: (node: int) -> void = {
     if (node_type[node] == NODE_LIT_STR) {
@@ -1008,6 +1054,15 @@ generate_expression: (node: int) -> void = {
         print("    movq $");
         print(node_data_int[node]);
         println(", %rax");
+        return;
+    }
+
+    if (node_type[node] == NODE_BINOP) {
+        children := node_children[node];
+        generate_expression(children[0]);
+        println("    movq %rax, %rcx");
+        generate_expression(children[1]);
+        generate_binop(node_data_op[node]);
         return;
     }
 
@@ -1094,9 +1149,9 @@ main: () -> void = {
 
     root := parse();
 
-    print_tree(root, 0);
+    //print_tree(root, 0);
 
-    //generate_code(root);
+    generate_code(root);
 
     delete(buf);
 }
