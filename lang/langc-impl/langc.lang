@@ -1339,7 +1339,14 @@ generate_expression: (node: int) -> void = {
         return;
     }
 
-    println("generate_expression unhandled node type");
+    if (node_type[node] == NODE_IF) {
+        generate_if(node);
+        return;
+    }
+
+    print("generate_expression unhandled node type: ");
+    node_print(node);
+    println();
     exit := 1 / 0;
 }
 
