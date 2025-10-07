@@ -24,6 +24,13 @@ isalpha: (c: int) -> bool = {
     return false;
 }
 
+isdigit: (c: int) -> bool = {
+    if (!isascii(c)) {
+        return false;
+    }
+    return cast(int, '0') <= c && c <= cast(int, '9');
+}
+
 streq: (str_a: *int, str_b: *int, len: int) -> bool = {
     i := 0;
     while (i < len) {
@@ -36,6 +43,17 @@ streq: (str_a: *int, str_b: *int, len: int) -> bool = {
         i += 1;
     }
     return true;
+}
+
+stoi: (str: *int, len: int) -> int = {
+    res := 0;
+    i := 0;
+    while (i < len) {
+        res *= 10;
+        res += str[i] - cast(int, '0');
+        i += 1;
+    }
+    return res;
 }
 
 // ==================== UTILITY ====================
@@ -147,6 +165,7 @@ TOK_EOF  : int;
 TOK_ID   : int;
 TOK_STR  : int;
 TOK_ARROW: int;
+TOK_INT  : int;
 
 lex_init: () -> void = {
     lex_ptr = 0;
@@ -156,6 +175,7 @@ lex_init: () -> void = {
     TOK_ID    = 256;
     TOK_STR   = 257;
     TOK_ARROW = 258;
+    TOK_INT   = 259;
 }
 
 
@@ -189,7 +209,7 @@ lex_matches_arrow: () -> bool = {
 
 lex_isidchar: (c: int) -> bool = {
     // [_0-9A-Za-z]
-    return isalpha(c) || (cast(int, '0') <= c && c <= cast(int, '9')) || (c == cast(int, '_'));
+    return isalpha(c) || isdigit(c) || (c == cast(int, '_'));
 }
 
 lex_matches_id: () -> int = {
@@ -225,6 +245,22 @@ lex_matches_str: () -> int = {
         return 0;
     }
     ptr += 1;
+    return ptr - lex_ptr;
+}
+
+lex_matches_int: () -> int = {
+    if (!isdigit(buf[lex_ptr])) {
+        return 0;
+    }
+    ptr := lex_ptr;
+    while (ptr < nbuf && isdigit(buf[ptr])) {
+        ptr += 1;
+    }
+
+    if (ptr < nbuf && buf[ptr] == cast(int, '.')) {
+        return 0;
+    }
+
     return ptr - lex_ptr;
 }
 
@@ -265,6 +301,13 @@ lex_peek: () -> int = {
         return cur_tok;
     }
 
+    match = lex_matches_int();
+    if (match > 0) {
+        cur_tok = TOK_INT;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
     cur_tok = buf[lex_ptr];
     cur_tok_end = cur_tok_beg + 1;
     return cur_tok;
@@ -296,6 +339,10 @@ tok_print: (t: int) -> void = {
         println("->");
         return;
     }
+    if (t == TOK_INT) {
+        println("<integer>");
+        return;
+    }
 
     println("???");
 }
@@ -307,7 +354,7 @@ peek_expect_advance: (expected: int) -> int = {
         tok_print(token);
         print("Expected: ");
         tok_print(expected);
-        //exit := 1 / 0;
+        exit := 1 / 0;
     }
     lex_advance();
     return token;
@@ -323,8 +370,10 @@ NODE_TYPE   : int; // [identifier] | [list[declaration], type] (func)
 NODE_BLOCK  : int; // list
 NODE_CALL   : int; // [identifier, list[expression]]
 NODE_LIT_STR: int; // leaf
+NODE_LIT_INT: int; // leaf
+NODE_BINOP  : int; // [expression, expression]
 
-// expression: list_str | TODO
+operator_prec: *int;
 
 node_da_cap: int;
 node_da_sz: int;
@@ -337,6 +386,10 @@ node_children_cap: *int;
 node_children_sz : *int;
 // optional string data: index in string table
 node_data_str : *int;
+// optional integer literal
+node_data_int : *int;
+// optional operator
+node_data_op  : *int;
 
 node_create: (ntype: int) -> int = {
     if (node_da_sz == node_da_cap) {
@@ -349,6 +402,8 @@ node_create: (ntype: int) -> int = {
         new_children_cap := alloc(int, new_cap);
         new_children_sz := alloc(int, new_cap);
         new_data_str := alloc(int, new_cap);
+        new_data_int := alloc(int, new_cap);
+        new_data_op := alloc(int, new_cap);
 
         // copy data to new buffers
         i := 0;
@@ -358,6 +413,8 @@ node_create: (ntype: int) -> int = {
             new_children_cap[i] = node_children_cap[i];
             new_children_sz[i] = node_children_sz[i];
             new_data_str[i] = node_data_str[i];
+            new_data_int[i] = node_data_int[i];
+            new_data_op[i] = node_data_op[i];
             i += 1;
         }
 
@@ -368,6 +425,8 @@ node_create: (ntype: int) -> int = {
             delete(node_children_cap);
             delete(node_children_sz);
             delete(node_data_str);
+            delete(node_data_int);
+            delete(node_data_op);
         }
 
         // update
@@ -376,6 +435,8 @@ node_create: (ntype: int) -> int = {
         node_children_cap = new_children_cap;
         node_children_sz = new_children_sz;
         node_data_str = new_data_str;
+        node_data_int = new_data_int;
+        node_data_op = new_data_op;
 
         node_da_cap = new_cap;
     }
@@ -442,14 +503,29 @@ node_set_strdata: (node: int) -> void = {
     string_table_type[stridx] = ST_LIT;
 }
 
+node_set_intdata: (node: int) -> void = {
+    strlen := cur_tok_end - cur_tok_beg;
+    ptr := buf + cur_tok_beg;
+    node_data_int[node] = stoi(ptr, strlen);
+}
+
 parser_init: () -> void = {
-    NODE_LIST   = 0;
-    NODE_ID     = 1;
-    NODE_DECL   = 2;
-    NODE_TYPE   = 3;
-    NODE_BLOCK  = 4;
-    NODE_CALL   = 5;
-    NODE_LIT_STR= 6;
+    NODE_LIST    = 0;
+    NODE_ID      = 1;
+    NODE_DECL    = 2;
+    NODE_TYPE    = 3;
+    NODE_BLOCK   = 4;
+    NODE_CALL    = 5;
+    NODE_LIT_STR = 6;
+    NODE_LIT_INT = 7;
+    NODE_BINOP   = 8;
+
+    operator_prec = alloc(int, 256);
+    // 10 * (17 - original C precedence)
+    operator_prec[cast(int, '+')] = 110;
+    operator_prec[cast(int, '-')] = 110;
+    operator_prec[cast(int, '*')] = 120;
+    operator_prec[cast(int, '/')] = 120;
 }
 
 parse_type: () -> int = {
@@ -564,30 +640,52 @@ parse_block: () -> int = {
             continue;
         }
 
-        if (token == TOK_ID) {
-            id_node := node_create(NODE_ID);
-            node_set_idstr(id_node);
-
+        if (token == cast(int, ';')) {
             lex_advance();
-
-            token = lex_peek();
-
-            if (token == cast(int, '(')) {
-                node_add_child(block_node, parse_function_call(id_node));
-                peek_expect_advance(cast(int, ';'));
-            } else {
-                // temporarily: fail
-                peek_expect_advance(cast(int, '(')); // )
-            }
             continue;
         }
 
-        print("Unexpected token: ");
-        tok_print(token);
-        exit := 1 / 0;
+        // TODO: FIRST set of expression
+        node_add_child(block_node, parse_expression());
+
+        //print("Unexpected token: ");
+        //tok_print(token);
+        //exit := 1 / 0;
     }
 
     return block_node;
+}
+
+get_tok_precedence: (tok: int) -> int = {
+    if (!isascii(tok)) {
+        return -1;
+    }
+
+    prec := operator_prec[tok];
+    if (prec == 0) {
+        // not registered
+        return -1;
+    }
+    return prec;
+}
+
+// identifierexpr
+//     ::= identifier (TODO)
+//     ::= identifier ([ expression [ , expression ]*  ])
+parse_identifier_expr: () -> int = {
+    token := lex_peek();
+
+    id_node := node_create(NODE_ID);
+    node_set_idstr(id_node);
+
+    lex_advance();
+
+    token = lex_peek();
+
+    if (token == cast(int, '(')) {
+        return parse_function_call(id_node);
+    }
+    return id_node;
 }
 
 parse_function_call: (id_node: int) -> int = {
@@ -614,19 +712,83 @@ parse_function_call: (id_node: int) -> int = {
     return call_node;
 }
 
-parse_expression: () -> int = {
+// parenexpr
+//     ::= ( expr )
+parse_paren_expr: () -> int = {
+    peek_expect_advance(cast(int, '('));
+    expr := parse_expression();
+    peek_expect_advance(cast(int, ')'));
+    return expr;
+}
+
+// primaryexpr
+//     ::= identifierexpr
+//     ::= lit_int
+//     ::= lit_str
+//     ::= parenexpr
+parse_primary_expr: () -> int = {
     token := lex_peek();
 
     if (token == TOK_STR) {
         str_node := node_create(NODE_LIT_STR);
         node_set_strdata(str_node);
         lex_advance();
-
         return str_node;
     }
-    print("parse_expression unhandled token: ");
+
+    if (token == TOK_INT) {
+        int_node := node_create(NODE_LIT_INT);
+        node_set_intdata(int_node);
+        lex_advance();
+        return int_node;
+    }
+
+    if (token == cast(int, '(')) {
+        return parse_paren_expr();
+    }
+
+    if (token == TOK_ID) {
+        return parse_identifier_expr();
+    }
+
+    print("parse_primary_expr unhandled token: ");
     tok_print(token);
     return 0;
+}
+
+parse_expr_rhs: (expr_prec: int, lhs: int) -> int = {
+    while (true) {
+        token := lex_peek();
+        println(token);
+        prec := get_tok_precedence(token);
+        if (prec < expr_prec) {
+            return lhs;
+        }
+        // token is guaranteed to be an operator
+        lex_advance();
+        rhs := parse_primary_expr();
+
+        next_prec := get_tok_precedence(lex_peek());
+        if (prec < next_prec) {
+            rhs = parse_expr_rhs(prec + 1, rhs);
+        }
+
+        // merge
+        op_node := node_create(NODE_BINOP);
+        node_data_op[op_node] = token;
+        node_add_child(op_node, lhs);
+        node_add_child(op_node, rhs);
+
+        lhs = op_node;
+    }
+    return lhs;
+}
+
+// expression
+//     ::= primary [binop, primary]*
+parse_expression: () -> int = {
+    lhs := parse_primary_expr();
+    return parse_expr_rhs(0, lhs);
 }
 
 parse: () -> int = {
@@ -666,6 +828,7 @@ generate_code: (root: int) -> void = {
     { // string data. Consts?
         println(".section .rodata");
         println("strout: .asciz \"%s\"");
+        println("intout: .asciz \"%ld\"");
 
         i := 0;
         while (i < string_table_sz) {
@@ -808,9 +971,17 @@ generate_call_println: (args_node: int) -> void = {
         generate_expression(arg);
         println("    movq %rax, %rsi");
 
-        if (node_type[arg] == NODE_LIT_STR) {
-            println("    leaq strout(%rip), %rdi");
-        } else {
+        while (true) {
+            if (node_type[arg] == NODE_LIT_STR) {
+                println("    leaq strout(%rip), %rdi");
+                break;
+            }
+
+            if (node_type[arg] == NODE_LIT_INT) {
+                println("    leaq intout(%rip), %rdi");
+                break;
+            }
+
             println("Unhandled node type println");
             exit := 1 / 0;
         }
@@ -831,10 +1002,17 @@ generate_expression: (node: int) -> void = {
         print("(%rip)");
         println(", %rax");
         return;
-    } else {
-        println("generate_expression unhandled node type");
-        exit := 1 / 0;
     }
+
+    if (node_type[node] == NODE_LIT_INT) {
+        print("    movq $");
+        print(node_data_int[node]);
+        println(", %rax");
+        return;
+    }
+
+    println("generate_expression unhandled node type");
+    exit := 1 / 0;
 }
 
 // ==================== DEBUG ====================
@@ -872,6 +1050,17 @@ node_print: (node: int) -> void = {
         print("\"");
         return;
     }
+    if (typ == NODE_LIT_INT) {
+        print("LIT_INT (");
+        print(node_data_int[node]);
+        print(")");
+        return;
+    }
+    if (typ == NODE_BINOP) {
+        print("BINOP ");
+        print(cast(char, node_data_op[node]));
+        return;
+    }
     print("????");
 }
 
@@ -905,9 +1094,9 @@ main: () -> void = {
 
     root := parse();
 
-    //print_tree(root, 0);
+    print_tree(root, 0);
 
-    generate_code(root);
+    //generate_code(root);
 
     delete(buf);
 }
