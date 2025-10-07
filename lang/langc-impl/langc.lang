@@ -166,6 +166,15 @@ TOK_ID   : int;
 TOK_STR  : int;
 TOK_ARROW: int;
 TOK_INT  : int;
+TOK_IF   : int;
+TOK_ELSE : int;
+
+operator_prec: *int;
+TOK_LEQ: int;
+TOK_GEQ: int;
+TOK_EQ : int;
+TOK_NEQ: int;
+
 
 lex_init: () -> void = {
     lex_ptr = 0;
@@ -176,6 +185,26 @@ lex_init: () -> void = {
     TOK_STR   = 257;
     TOK_ARROW = 258;
     TOK_INT   = 259;
+    TOK_IF    = 260;
+    TOK_ELSE  = 261;
+    TOK_LEQ   = 262;
+    TOK_GEQ   = 263;
+    TOK_EQ    = 264;
+    TOK_NEQ   = 265;
+
+    operator_prec = alloc(int, 512);
+    // 10 * (17 - original C implementation precedence)
+    operator_prec[cast(int, '+')] = 110;
+    operator_prec[cast(int, '-')] = 110;
+    operator_prec[cast(int, '*')] = 120;
+    operator_prec[cast(int, '/')] = 120;
+    operator_prec[cast(int, '%')] = 120;
+    operator_prec[cast(int, '<')] = 80;
+    operator_prec[cast(int, '>')] = 80;
+    operator_prec[TOK_LEQ]        = 80;
+    operator_prec[TOK_GEQ]        = 80;
+    operator_prec[TOK_EQ]         = 70;
+    operator_prec[TOK_NEQ]        = 70;
 }
 
 
@@ -266,6 +295,94 @@ lex_matches_int: () -> int = {
     return ptr - lex_ptr;
 }
 
+lex_matches_if: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'i')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'f')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr < nbuf && lex_isidchar(buf[ptr])) {
+        return 0;
+    }
+    return 2;
+}
+
+lex_matches_else: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'e')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'l')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 's')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'e')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr < nbuf && lex_isidchar(buf[ptr])) {
+        return 0;
+    }
+    return 4;
+}
+
+lex_matches_leq: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '<')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '=')) {
+        return 0;
+    }
+    return 2;
+}
+
+lex_matches_geq: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '>')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '=')) {
+        return 0;
+    }
+    return 2;
+}
+
+lex_matches_eq: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '=')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '=')) {
+        return 0;
+    }
+    return 2;
+}
+
+lex_matches_neq: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '!')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '=')) {
+        return 0;
+    }
+    return 2;
+}
+
 lex_peek: () -> int = {
     match: int;
     if (cur_tok_beg == lex_ptr) {
@@ -289,6 +406,20 @@ lex_peek: () -> int = {
         return cur_tok;
     }
 
+    match = lex_matches_if();
+    if (match > 0) {
+        cur_tok = TOK_IF;
+        cur_tok_end = cur_tok_beg + 2;
+        return cur_tok;
+    }
+
+    match = lex_matches_else();
+    if (match > 0) {
+        cur_tok = TOK_ELSE;
+        cur_tok_end = cur_tok_beg + 4;
+        return cur_tok;
+    }
+
     match = lex_matches_id();
     if (match > 0) {
         cur_tok = TOK_ID;
@@ -307,6 +438,34 @@ lex_peek: () -> int = {
     if (match > 0) {
         cur_tok = TOK_INT;
         cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_leq();
+    if (match > 0) {
+        cur_tok = TOK_LEQ;
+        cur_tok_end = cur_tok_beg + 2;
+        return cur_tok;
+    }
+
+    match = lex_matches_geq();
+    if (match > 0) {
+        cur_tok = TOK_GEQ;
+        cur_tok_end = cur_tok_beg + 2;
+        return cur_tok;
+    }
+
+    match = lex_matches_eq();
+    if (match > 0) {
+        cur_tok = TOK_EQ;
+        cur_tok_end = cur_tok_beg + 2;
+        return cur_tok;
+    }
+
+    match = lex_matches_neq();
+    if (match > 0) {
+        cur_tok = TOK_NEQ;
+        cur_tok_end = cur_tok_beg + 2;
         return cur_tok;
     }
 
@@ -345,6 +504,31 @@ tok_print: (t: int) -> void = {
         println("<integer>");
         return;
     }
+    if (t == TOK_IF) {
+        println("if");
+        return;
+    }
+    if (t == TOK_ELSE) {
+        println("else");
+        return;
+    }
+
+    if (t == TOK_LEQ) {
+        println("<=");
+        return;
+    }
+    if (t == TOK_GEQ) {
+        println(">=");
+        return;
+    }
+    if (t == TOK_EQ) {
+        println("==");
+        return;
+    }
+    if (t == TOK_NEQ) {
+        println("!=");
+        return;
+    }
 
     println("???");
 }
@@ -374,8 +558,7 @@ NODE_CALL   : int; // [identifier, list[expression]]
 NODE_LIT_STR: int; // leaf
 NODE_LIT_INT: int; // leaf
 NODE_BINOP  : int; // [expression, expression]
-
-operator_prec: *int;
+NODE_IF     : int; // [expr, expr] | [expr, expr, expr]
 
 node_da_cap: int;
 node_da_sz: int;
@@ -521,14 +704,8 @@ parser_init: () -> void = {
     NODE_LIT_STR = 6;
     NODE_LIT_INT = 7;
     NODE_BINOP   = 8;
+    NODE_IF      = 9;
 
-    operator_prec = alloc(int, 256);
-    // 10 * (17 - original C precedence)
-    operator_prec[cast(int, '+')] = 110;
-    operator_prec[cast(int, '-')] = 110;
-    operator_prec[cast(int, '*')] = 120;
-    operator_prec[cast(int, '/')] = 120;
-    operator_prec[cast(int, '%')] = 120;
 }
 
 parse_type: () -> int = {
@@ -636,20 +813,20 @@ parse_block: () -> int = {
             break;
         }
 
-        if (token == cast(int, '{')) {
-            // new scope
-            node_add_child(block_node, parse_block());
-            peek_expect_advance(cast(int, '}'));
-            continue;
-        }
-
         if (token == cast(int, ';')) {
             lex_advance();
             continue;
         }
 
-        // TODO: FIRST set of expression
+        expect_semicolon := !(
+            (token == TOK_IF)
+        );
+    
         node_add_child(block_node, parse_expression());
+
+        if (expect_semicolon) {
+            peek_expect_advance(cast(int, ';'));
+        }
 
         //print("Unexpected token: ");
         //tok_print(token);
@@ -660,10 +837,6 @@ parse_block: () -> int = {
 }
 
 get_tok_precedence: (tok: int) -> int = {
-    if (!isascii(tok)) {
-        return -1;
-    }
-
     prec := operator_prec[tok];
     if (prec == 0) {
         // not registered
@@ -724,11 +897,31 @@ parse_paren_expr: () -> int = {
     return expr;
 }
 
+parse_if_expr: () -> int = {
+    peek_expect_advance(TOK_IF);
+    cond := parse_paren_expr();
+    body := parse_expression();
+    token := lex_peek();
+
+    if_node := node_create(NODE_IF);
+    node_add_child(if_node, cond);
+    node_add_child(if_node, body);
+
+    if (token == TOK_ELSE) {
+        lex_advance();
+        else_body := parse_expression();
+        node_add_child(if_node, else_body);
+    }
+    return if_node;
+}
+
 // primaryexpr
 //     ::= identifierexpr
 //     ::= lit_int
 //     ::= lit_str
 //     ::= parenexpr
+//     ::= block
+//     ::= ifexpr
 parse_primary_expr: () -> int = {
     token := lex_peek();
 
@@ -753,6 +946,17 @@ parse_primary_expr: () -> int = {
     if (token == TOK_ID) {
         return parse_identifier_expr();
     }
+    if (token == cast(int, '{')) {
+        lex_advance();
+        block_node := parse_block();
+        peek_expect_advance(cast(int, '}'));
+        return block_node;
+    }
+
+    if (token == TOK_IF) {
+        return parse_if_expr();
+    }
+
 
     print("parse_primary_expr unhandled token: ");
     tok_print(token);
@@ -825,6 +1029,8 @@ parse: () -> int = {
 // ==================== SYMBOL ====================
 
 // ==================== GEN ====================
+LABEL_COUNTER: int;
+
 generate_code: (root: int) -> void = {
 
     { // string data. Consts?
@@ -926,9 +1132,20 @@ generate_function_code: (id_node: int, arg_node: int, body_node: int) -> void = 
 
         if (node_type[child] == NODE_CALL) {
             generate_function_call(child);
+            i += 1;
+            continue;
         }
 
-        i += 1;
+        if (node_type[child] == NODE_IF) {
+            generate_if(child);
+            i += 1;
+            continue;
+        }
+
+        print("Unhandled node type in function body: ");
+        node_print(child);
+        println();
+        exit := 1/  0;
     }
 
     string_table_print(node_data_str[id_node]);
@@ -1036,6 +1253,46 @@ generate_binop: (op: int) -> void = {
         return;
     }
 
+    if (op == cast(int, '<')) {
+        println("    cmpq %rax, %rcx");
+        println("    setl %al");
+        println("    movzbq %al, %rax");
+        return;
+    }
+
+    if (op == cast(int, '>')) {
+        println("    cmpq %rax, %rcx");
+        println("    setg %al");
+        println("    movzbq %al, %rax");
+        return;
+    }
+
+    if (op == TOK_LEQ) {
+        println("    cmpq %rax, %rcx");
+        println("    setle %al");
+        println("    movzbq %al, %rax");
+        return;
+    }
+
+    if (op == TOK_GEQ) {
+        println("    cmpq %rax, %rcx");
+        println("    setge %al");
+        println("    movzbq %al, %rax");
+        return;
+    }
+    if (op == TOK_EQ) {
+        println("    cmpq %rax, %rcx");
+        println("    sete %al");
+        println("    movzbq %al, %rax");
+        return;
+    }
+    if (op == TOK_NEQ) {
+        println("    cmpq %rax, %rcx");
+        println("    setne %al");
+        println("    movzbq %al, %rax");
+        return;
+    }
+
     println("Unhandled binop gen");
     exit := 1 / 0;
 }
@@ -1066,8 +1323,70 @@ generate_expression: (node: int) -> void = {
         return;
     }
 
+    if (node_type[node] == NODE_CALL) {
+        generate_function_call(node);
+        return;
+    }
+
+    if (node_type[node] == NODE_BLOCK) {
+        children := node_children[node];
+
+        i := 0;
+        while (i < node_children_sz[node]) {
+            generate_expression(children[i]);
+            i += 1;
+        }
+        return;
+    }
+
     println("generate_expression unhandled node type");
     exit := 1 / 0;
+}
+
+generate_if: (node: int) -> void = {
+    children := node_children[node];
+
+    cur_if := gen_next_label();
+    has_else := (node_children_sz[node] > 2);
+
+    generate_expression(children[0]);
+
+    println("    cmpq $0, %rax");
+
+    if (has_else) {
+        print("    je ELSE");
+        println(cur_if);
+    } else {
+        print("    je ENDIF");
+        println(cur_if);
+    }
+
+    generate_expression(children[1]);
+
+    if (has_else) {
+        print("    jmp ENDIF");
+        println(cur_if);
+
+        print("ELSE");
+        print(cur_if);
+        println(":");
+
+        generate_expression(children[2]);
+    }
+
+    // generate condition
+    // generate body
+    // generate else body
+    // generate endif
+    print("ENDIF");
+    print(cur_if);
+    println(":");
+}
+
+gen_next_label: () -> int = {
+    lab := LABEL_COUNTER;
+    LABEL_COUNTER += 1;
+    return lab;
 }
 
 // ==================== DEBUG ====================
@@ -1114,6 +1433,10 @@ node_print: (node: int) -> void = {
     if (typ == NODE_BINOP) {
         print("BINOP ");
         print(cast(char, node_data_op[node]));
+        return;
+    }
+    if (typ == NODE_IF) {
+        print("IF ");
         return;
     }
     print("????");

@@ -1,3 +1,13 @@
 main: () -> void = {
-    println((28980+69) % 420);
+    if (10 >= 10) {
+        println("A");
+    } else {
+        println("B");
+    }
+
+    if (5 > 10) {
+        println("C");
+    } else {
+        println("D");
+    }
 }
