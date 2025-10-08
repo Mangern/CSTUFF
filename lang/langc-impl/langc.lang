@@ -551,7 +551,7 @@ peek_expect_advance: (expected: int) -> int = {
 // Node types
 NODE_LIST   : int; // [any, ...]
 NODE_ID     : int; // leaf
-NODE_DECL   : int; // [identifier, type] | [identifier, type?, block] | [identifier, type?, expr]
+NODE_DECL   : int; // [identifier, type] | [identifier, type?, expr]
 NODE_TYPE   : int; // [identifier] | [list[declaration], type] (func)
 NODE_BLOCK  : int; // list
 NODE_CALL   : int; // [identifier, list[expression]]
@@ -575,6 +575,8 @@ node_data_str : *int;
 node_data_int : *int;
 // optional operator
 node_data_op  : *int;
+// optional symbol id
+node_data_sym : *int;
 
 node_create: (ntype: int) -> int = {
     if (node_da_sz == node_da_cap) {
@@ -589,6 +591,7 @@ node_create: (ntype: int) -> int = {
         new_data_str := alloc(int, new_cap);
         new_data_int := alloc(int, new_cap);
         new_data_op := alloc(int, new_cap);
+        new_data_sym := alloc(int, new_cap);
 
         // copy data to new buffers
         i := 0;
@@ -600,6 +603,7 @@ node_create: (ntype: int) -> int = {
             new_data_str[i] = node_data_str[i];
             new_data_int[i] = node_data_int[i];
             new_data_op[i] = node_data_op[i];
+            new_data_sym[i] = node_data_sym[i];
             i += 1;
         }
 
@@ -612,6 +616,7 @@ node_create: (ntype: int) -> int = {
             delete(node_data_str);
             delete(node_data_int);
             delete(node_data_op);
+            delete(node_data_sym);
         }
 
         // update
@@ -622,6 +627,7 @@ node_create: (ntype: int) -> int = {
         node_data_str = new_data_str;
         node_data_int = new_data_int;
         node_data_op = new_data_op;
+        node_data_sym = new_data_sym;
 
         node_da_cap = new_cap;
     }
@@ -633,6 +639,7 @@ node_create: (ntype: int) -> int = {
     node_type[ret] = ntype;
     node_children_cap[ret] = 0;
     node_children_sz[ret] = 0;
+    node_data_sym[ret] = 0;
 
     node_da_sz += 1;
     return ret;
@@ -694,6 +701,17 @@ node_set_intdata: (node: int) -> void = {
     node_data_int[node] = stoi(ptr, strlen);
 }
 
+decl_get_body: (decl_node: int) -> int = {
+    children := node_children[decl_node];
+    if (node_children_sz[decl_node] == 3) {
+        return children[2];
+    }
+    if (node_type[children[1]] != NODE_TYPE) {
+        return children[1];
+    }
+    return -1;
+}
+
 parser_init: () -> void = {
     NODE_LIST    = 0;
     NODE_ID      = 1;
@@ -746,19 +764,10 @@ parse_type: () -> int = {
     return type_node;
 }
 
-parse_declaration: () -> int = {
+parse_declaration: (id_node: int) -> int = {
     decl_node := node_create(NODE_DECL);
 
-    // eat identifier
-    {
-        id_node := node_create(NODE_ID);
-
-        // collect str
-        node_set_idstr(id_node);
-
-        node_add_child(decl_node, id_node);
-    }
-    lex_advance();
+    node_add_child(decl_node, id_node);
 
     peek_expect_advance(cast(int, ':'));
 
@@ -786,20 +795,7 @@ parse_declaration: () -> int = {
 
     token = lex_peek();
 
-    if (token == cast(int, '{')) {
-        lex_advance();
-
-        // block
-        rhs := parse_block();
-
-        peek_expect_advance(cast(int, '}'));
-
-        node_add_child(decl_node, rhs);
-    } else {
-        // expression
-        println("Not implemented: expression rhs of decl");
-        exit := 1 / 0;
-    }
+    node_add_child(decl_node, parse_expression());
 
     return decl_node;
 }
@@ -819,9 +815,10 @@ parse_block: () -> int = {
         }
 
         expect_semicolon := !(
-            (token == TOK_IF)
+             (token == TOK_IF)
+          || (token == cast(int, '{'))
         );
-    
+
         node_add_child(block_node, parse_expression());
 
         if (expect_semicolon) {
@@ -848,6 +845,7 @@ get_tok_precedence: (tok: int) -> int = {
 // identifierexpr
 //     ::= identifier (TODO)
 //     ::= identifier ([ expression [ , expression ]*  ])
+//     ::= identifier : [type] [= expression]
 parse_identifier_expr: () -> int = {
     token := lex_peek();
 
@@ -860,6 +858,9 @@ parse_identifier_expr: () -> int = {
 
     if (token == cast(int, '(')) {
         return parse_function_call(id_node);
+    }
+    if (token == cast(int, ':')) {
+        return parse_declaration(id_node);
     }
     return id_node;
 }
@@ -1011,7 +1012,15 @@ parse: () -> int = {
             continue;
         }
         if (tok == TOK_ID) {
-            node := parse_declaration();
+            // eat identifier
+            id_node := node_create(NODE_ID);
+
+            // collect str
+            node_set_idstr(id_node);
+
+            lex_advance();
+
+            node := parse_declaration(id_node);
 
             node_add_child(root, node);
             continue;
@@ -1027,6 +1036,311 @@ parse: () -> int = {
 }
 
 // ==================== SYMBOL ====================
+SYMBOL_INT: int;
+SYMBOL_FUNC: int;
+
+
+// first index: by scope. 
+// array at location: list of indices in string table
+scope_parent: *int; // scope_parent[s] = parent scope of s
+
+scope_syms: **int;
+scope_szs: *int;
+scope_caps: *int;
+
+scope_sz: int;
+scope_cap: int;
+
+// given the symbol, get its name (index in string table)
+symbol_table_str: *int;
+symbol_table_type: *int;
+symbol_table_sz: int;
+symbol_table_cap: int;
+
+symbol_table_init: () -> void = {
+    SYMBOL_INT = 0;
+    SYMBOL_FUNC = 1;
+
+    scope_parent = alloc(int, 1);
+    scope_syms = alloc(*int, 1);
+    scope_szs = alloc(int, 1);
+    scope_caps = alloc(int, 1);
+    scope_sz = 1;
+    scope_cap = 1;
+
+    scope_szs[0] = 0;
+    scope_caps[0] = 0;
+}
+
+decl_get_symbol_type: (node: int) -> int = {
+    // TODO: use type info
+    if (node_children_sz[node] <= 2) {
+        return SYMBOL_INT;
+    }
+    children := node_children[node];
+    if (node_type[children[2]] == NODE_BLOCK) {
+        return SYMBOL_FUNC;
+    }
+    return SYMBOL_INT;
+}
+
+// lookup a name from a scope
+// return symbol id or -1 if not found
+symbol_table_lookup: (stridx: int, scope: int) -> int = {
+    len := string_table_len[stridx];
+    while (true) {
+        syms := scope_syms[scope];
+
+        i := 0;
+
+        while (i < scope_szs[scope]) {
+            sym := syms[i];
+
+            intable_stridx := symbol_table_str[sym];
+            intable_len := string_table_len[intable_stridx];
+            if (len == intable_len) {
+                if (streq(string_table[stridx], string_table[intable_stridx], len)) {
+                    return sym;
+                }
+            }
+
+            i += 1;
+        }
+
+        if (scope == 0) {
+            break;
+        }
+        scope = scope_parent[scope];
+    }
+
+    return -1;
+}
+
+// append a symbol to the symbol list of a scope
+symbol_table_scope_append: (scope: int, symidx: int) -> void = {
+    sz := scope_szs[scope];
+    cap := scope_caps[scope];
+
+    if (sz == cap) {
+        new_cap := cap * 2;
+        if (new_cap == 0) {
+            new_cap = 1;
+        }
+
+        new_data_syms := alloc(int, new_cap);
+        old_data_syms := scope_syms[scope];
+
+        i := 0;
+
+        while (i < cap) {
+            new_data_syms[i] = old_data_syms[i];
+            i += 1;
+        }
+
+        if (cap > 0) {
+            delete(old_data_syms);
+        }
+
+        scope_syms[scope] = new_data_syms;
+        scope_caps[scope] = new_cap;
+    }
+    arr := scope_syms[scope];
+    arr[sz] = symidx;
+    scope_szs[scope] = sz + 1;
+}
+
+// assumes the scope exists
+symbol_table_insert: (stridx: int, scope: int, symtype: int) -> int = {
+    if (symbol_table_sz == symbol_table_cap) {
+        new_cap := symbol_table_cap * 2;
+        if (new_cap == 0) {
+            new_cap = 1;
+        }
+
+        new_table_str := alloc(int, new_cap);
+        new_table_type := alloc(int, new_cap);
+
+        i := 0;
+        while (i < symbol_table_cap) {
+            new_table_str[i] = symbol_table_str[i];
+            new_table_type[i] = symbol_table_type[i];
+            i += 1;
+        }
+
+        if (symbol_table_cap > 0) {
+            delete(symbol_table_str);
+            delete(symbol_table_type);
+        }
+
+        symbol_table_str = new_table_str;
+        symbol_table_type = new_table_type;
+        symbol_table_cap = new_cap;
+    }
+
+    symidx := symbol_table_sz;
+    symbol_table_sz += 1;
+
+    symbol_table_str[symidx] = stridx;
+    symbol_table_type[symidx] = symtype;
+
+    symbol_table_scope_append(scope, symidx);
+
+    return symidx;
+}
+
+symbol_table_scope_add: (par: int) -> int = {
+    if (scope_sz == scope_cap) {
+        new_cap := scope_cap * 2;
+        if (new_cap == 0) {
+            new_cap = 1;
+        }
+
+        new_data_parent := alloc(int, new_cap);
+        new_data_syms := alloc(*int, new_cap);
+        new_data_szs := alloc(int, new_cap);
+        new_data_caps := alloc(int, new_cap);
+
+        i := 0;
+
+        while (i < scope_cap) {
+            new_data_parent[i] = scope_parent[i];
+            new_data_syms[i] = scope_syms[i];
+            new_data_szs[i] = scope_szs[i];
+            new_data_caps[i] = scope_caps[i];
+            i += 1;
+        }
+
+        if (scope_cap > 0) {
+            delete(scope_parent);
+            delete(scope_syms);
+            delete(scope_szs);
+            delete(scope_caps);
+        }
+
+        scope_parent = new_data_parent;
+        scope_syms = new_data_syms;
+        scope_szs = new_data_szs;
+        scope_caps = new_data_caps;
+        scope_cap = new_cap;
+    }
+
+    scope := scope_sz;
+    scope_sz += 1;
+
+    scope_parent[scope] = par;
+    scope_szs[scope] = 0;
+    scope_caps[scope] = 0;
+    return scope;
+}
+
+resolve_symbols: (root: int) -> void = {
+    // builtin functions
+    {
+        println_idx := string_table_add(STRING_PRINTLN, 7);
+        symbol_table_insert(println_idx, 0, SYMBOL_FUNC);
+    }
+
+
+    // register top level
+
+    i := 0;
+    children := node_children[root];
+
+    while (i < node_children_sz[root]) {
+        child := children[i];
+        if (node_type[child] != NODE_DECL) {
+            print("Unhandled root node type in resolve_symbols: ");
+            node_print(child);
+            println();
+            exit := 1 / 0;
+        }
+
+        subchildren := node_children[child];
+
+        id_node := subchildren[0];
+
+        id_str := node_data_str[id_node];
+        
+        idx := symbol_table_insert(id_str, 0, decl_get_symbol_type(child));
+        node_data_sym[id_node] = idx;
+
+        i += 1;
+    }
+
+    // register all blocks
+    i = 0;
+
+    while (i < node_children_sz[root]) {
+        child := children[i];
+        body := decl_get_body(child);
+        if (body >= 0) {
+            resolve_node(body, 0);
+        }
+        i += 1;
+    }
+}
+
+resolve_node: (node: int, scope: int) -> void = {
+    children := node_children[node];
+    if (node_type[node] == NODE_DECL) {
+        // references in body first
+        body := decl_get_body(node);
+        if (body >= 0) {
+            resolve_node(body, scope);
+        }
+        // register new symbol
+        id_node := children[0];
+        id_str := node_data_str[id_node];
+
+        // TODO: check if exists
+        idx := symbol_table_insert(id_str, scope, decl_get_symbol_type(node));
+        // TODO: set on id or decl?
+        node_data_sym[id_node] = idx;
+        return;
+    }
+
+    new_scope := scope;
+    if (node_type[node] == NODE_BLOCK) {
+        new_scope = symbol_table_scope_add(scope);
+    }
+
+    if ( (node_type[node] == NODE_IF)
+      || (node_type[node] == NODE_BLOCK)
+      || (node_type[node] == NODE_CALL)
+      || (node_type[node] == NODE_LIT_INT)
+      || (node_type[node] == NODE_LIT_STR)
+      || (node_type[node] == NODE_LIST)
+      || (node_type[node] == NODE_BINOP)
+    ) {
+
+        i := 0;
+        while (i < node_children_sz[node]) {
+            resolve_node(children[i], new_scope);
+            i += 1;
+        }
+        return;
+    }
+    if (node_type[node] == NODE_ID) {
+        id_str := node_data_str[node];
+        idx := symbol_table_lookup(
+            id_str,
+            scope
+        );
+
+        if (idx < 0) {
+            print("Unresolved reference: ");
+            string_table_print(id_str);
+            println();
+            exit := 1 / 0;
+        }
+        node_data_sym[node] = idx;
+        return;
+    }
+
+    print("resolve_node unhandled: ");
+    node_print(node);
+    println();
+}
 
 // ==================== GEN ====================
 LABEL_COUNTER: int;
@@ -1407,6 +1721,11 @@ node_print: (node: int) -> void = {
         print("ID (");
         string_table_print(node_data_str[node]);
         print(")");
+
+        if (node_data_sym[node] > 0) {
+            print(" -> ");
+            print(node_data_sym[node]);
+        }
         return;
     }
     if (typ == NODE_DECL) {
@@ -1468,6 +1787,44 @@ print_tree: (node: int, indent: int) -> void = {
     }
 }
 
+print_symbol: (sym: int) -> void = {
+    print(sym);
+    print(" ");
+    string_table_print(symbol_table_str[sym]);
+    print(" ");
+
+    if (symbol_table_type[sym] == SYMBOL_INT) {
+        print("(int)");
+        return;
+    }
+    if (symbol_table_type[sym] == SYMBOL_FUNC) {
+        print("(function)");
+        return;
+    }
+    print("???");
+}
+
+print_symbols: () -> void = {
+    scope := 0;
+
+    while (scope < scope_sz) {
+        syms := scope_syms[scope];
+        println("Scope", scope, ":");
+
+        i := 0;
+        while (i < scope_szs[scope]) {
+            sym := syms[i];
+            print("  ");
+            print_symbol(sym);
+            println();
+
+            i += 1;
+        }
+
+        scope += 1;
+    }
+}
+
 main: () -> void = {
     EOF = 255;
 
@@ -1479,9 +1836,15 @@ main: () -> void = {
 
     root := parse();
 
-    //print_tree(root, 0);
+    symbol_table_init();
 
-    generate_code(root);
+    resolve_symbols(root);
+
+    print_symbols();
+
+    print_tree(root, 0);
+
+    //generate_code(root);
 
     delete(buf);
 }

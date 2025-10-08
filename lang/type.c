@@ -688,6 +688,16 @@ static bool types_equivalent(type_info_t* type_a, type_info_t* type_b) {
 static bool can_cast(type_info_t* type_dst, type_info_t* type_src) {
     if (types_equivalent(type_dst, type_src))
         return true;
+    if ( type_dst->type_class == TC_POINTER 
+      && type_src->type_class == TC_BASIC
+      && type_src->info.info_basic == TYPE_INT) {
+        return true;
+    }
+    if ( type_src->type_class == TC_POINTER 
+      && type_dst->type_class == TC_BASIC
+      && type_dst->info.info_basic == TYPE_INT) {
+        return true;
+    }
     if (type_dst->type_class != TC_BASIC)
         return false;
     if (type_src->type_class != TC_BASIC)

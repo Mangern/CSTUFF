@@ -1,15 +1,16 @@
+global: int;
 main: () -> void = {
-    if (10 >= 10) {
-        println("A");
-    } else {
-        println("B");
+    x: int = 6;
+    y: int = 9;
+    z: int = x + y;
+
+    {
+        x: int = 123;
+
+        w: int = x + z;
     }
 
-    if (5 > 10) {
-        println("C");
-    } else if (5 != 5) {
-        println("D");
-    } else {
-        println("E");
-    }
+    println(x);
+    println(y);
+    println(global);
 }

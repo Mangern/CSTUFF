@@ -341,7 +341,8 @@ static size_t generate_valued_code(tac_t** list, node_t* node) {
         case CAST_EXPRESSION:
             {
                 size_t to_cast_addr = generate_valued_code(list, node->children[1]);
-                assert(node->children[0]->type_info->type_class == TC_BASIC);
+                assert(node->children[0]->type_info->type_class == TC_BASIC 
+                    || node->children[0]->type_info->type_class == TC_POINTER);
                 size_t result_addr = new_temp(node->children[0]->type_info->info.info_basic);
                 generate_cast_expr(
                     list, 
@@ -702,7 +703,13 @@ static void generate_cast_expr(tac_t** list, type_info_t* info_src, size_t addr_
             assert(false && "Unhandled basic type combo");
         }
         return;
-    } 
+    } else if (info_src->type_class  == TC_BASIC 
+            && info_src->info.info_basic == TYPE_INT 
+            && info_dst->type_class == TC_POINTER
+    ) {
+        tac_emit(list, TAC_COPY, addr_src, 0, addr_dst);
+        return;
+    }
     assert(false && "Unhandled cast expr gen");
 }
 
