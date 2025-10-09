@@ -87,7 +87,7 @@ string_table_init: () -> void = {
 
     // bruhest moment
     {
-        STRING_PRINTLN = alloc(int, 8);
+        STRING_PRINTLN    = alloc(int, 8);
         STRING_PRINTLN[0] = cast(int, 'p');
         STRING_PRINTLN[1] = cast(int, 'r');
         STRING_PRINTLN[2] = cast(int, 'i');
@@ -577,6 +577,8 @@ node_data_int : *int;
 node_data_op  : *int;
 // optional symbol id
 node_data_sym : *int;
+// optional scope id for blocks
+node_data_block_scope: *int;
 
 node_create: (ntype: int) -> int = {
     if (node_da_sz == node_da_cap) {
@@ -592,6 +594,7 @@ node_create: (ntype: int) -> int = {
         new_data_int := alloc(int, new_cap);
         new_data_op := alloc(int, new_cap);
         new_data_sym := alloc(int, new_cap);
+        new_data_block_scope := alloc(int, new_cap);
 
         // copy data to new buffers
         i := 0;
@@ -604,6 +607,7 @@ node_create: (ntype: int) -> int = {
             new_data_int[i] = node_data_int[i];
             new_data_op[i] = node_data_op[i];
             new_data_sym[i] = node_data_sym[i];
+            new_data_block_scope[i] = node_data_block_scope[i];
             i += 1;
         }
 
@@ -617,6 +621,7 @@ node_create: (ntype: int) -> int = {
             delete(node_data_int);
             delete(node_data_op);
             delete(node_data_sym);
+            delete(node_data_block_scope);
         }
 
         // update
@@ -628,6 +633,7 @@ node_create: (ntype: int) -> int = {
         node_data_int = new_data_int;
         node_data_op = new_data_op;
         node_data_sym = new_data_sym;
+        node_data_block_scope = new_data_block_scope;
 
         node_da_cap = new_cap;
     }
@@ -1054,8 +1060,13 @@ scope_cap: int;
 // given the symbol, get its name (index in string table)
 symbol_table_str: *int;
 symbol_table_type: *int;
+symbol_table_scope: *int;
+// sequence number in function
+symbol_table_seq: *int;
 symbol_table_sz: int;
 symbol_table_cap: int;
+
+symbol_table_seq_counter: int;
 
 symbol_table_init: () -> void = {
     SYMBOL_INT = 0;
@@ -1082,6 +1093,17 @@ decl_get_symbol_type: (node: int) -> int = {
         return SYMBOL_FUNC;
     }
     return SYMBOL_INT;
+}
+
+scope_is_parent: (par: int, scope: int) -> bool = {
+    while (scope >= par && scope > 0) {
+        if (scope == par) {
+            return true;
+        }
+
+        scope = scope_parent[scope];
+    }
+    return false;
 }
 
 // lookup a name from a scope
@@ -1157,31 +1179,40 @@ symbol_table_insert: (stridx: int, scope: int, symtype: int) -> int = {
             new_cap = 1;
         }
 
-        new_table_str := alloc(int, new_cap);
-        new_table_type := alloc(int, new_cap);
+        new_table_str   := alloc(int, new_cap);
+        new_table_type  := alloc(int, new_cap);
+        new_table_scope := alloc(int, new_cap);
+        new_table_seq   := alloc(int, new_cap);
 
         i := 0;
         while (i < symbol_table_cap) {
-            new_table_str[i] = symbol_table_str[i];
-            new_table_type[i] = symbol_table_type[i];
+            new_table_str[i]   = symbol_table_str[i];
+            new_table_type[i]  = symbol_table_type[i];
+            new_table_scope[i] = symbol_table_scope[i];
+            new_table_seq[i]   = symbol_table_seq[i];
             i += 1;
         }
 
         if (symbol_table_cap > 0) {
             delete(symbol_table_str);
             delete(symbol_table_type);
+            delete(symbol_table_scope);
+            delete(symbol_table_seq);
         }
 
-        symbol_table_str = new_table_str;
-        symbol_table_type = new_table_type;
-        symbol_table_cap = new_cap;
+        symbol_table_str   = new_table_str;
+        symbol_table_type  = new_table_type;
+        symbol_table_scope = new_table_scope;
+        symbol_table_seq   = new_table_seq;
+        symbol_table_cap   = new_cap;
     }
 
     symidx := symbol_table_sz;
     symbol_table_sz += 1;
 
-    symbol_table_str[symidx] = stridx;
-    symbol_table_type[symidx] = symtype;
+    symbol_table_str[symidx]   = stridx;
+    symbol_table_type[symidx]  = symtype;
+    symbol_table_scope[symidx] = scope;
 
     symbol_table_scope_append(scope, symidx);
 
@@ -1274,6 +1305,7 @@ resolve_symbols: (root: int) -> void = {
         child := children[i];
         body := decl_get_body(child);
         if (body >= 0) {
+            symbol_table_seq_counter = 0;
             resolve_node(body, 0);
         }
         i += 1;
@@ -1292,9 +1324,19 @@ resolve_node: (node: int, scope: int) -> void = {
         id_node := children[0];
         id_str := node_data_str[id_node];
 
-        // TODO: check if exists
+        exists := symbol_table_lookup(id_str, scope);
+        if (exists >= 0 && symbol_table_scope[exists] == scope) {
+            print("Error: redeclaration of ");
+            string_table_print(id_str);
+            println();
+            exit := 1 / 0;
+        }
+
         idx := symbol_table_insert(id_str, scope, decl_get_symbol_type(node));
-        // TODO: set on id or decl?
+
+        symbol_table_seq[idx] = symbol_table_seq_counter;
+        symbol_table_seq_counter += 1;
+
         node_data_sym[id_node] = idx;
         return;
     }
@@ -1302,6 +1344,7 @@ resolve_node: (node: int, scope: int) -> void = {
     new_scope := scope;
     if (node_type[node] == NODE_BLOCK) {
         new_scope = symbol_table_scope_add(scope);
+        node_data_block_scope[node] = new_scope;
     }
 
     if ( (node_type[node] == NODE_IF)
@@ -1378,6 +1421,29 @@ generate_code: (root: int) -> void = {
     { // global vars
         println(".section .bss");
         println(".align 8");
+
+        i := 0;
+
+        global_syms := scope_syms[0];
+        while (i < scope_szs[0]) {
+            sym := global_syms[i];
+
+            if (symbol_table_type[sym] == SYMBOL_FUNC) {
+                i += 1;
+                continue;
+            }
+
+            if (symbol_table_type[sym] == SYMBOL_INT) {
+                print(".");
+                string_table_print(symbol_table_str[sym]);
+                println(": .zero 8");
+                i += 1;
+                continue;
+            }
+
+            println("Unhandled global symbol type:", symbol_table_type[sym]);
+            exit := 1 / 0;
+        }
     }
 
     println(".text");
@@ -1386,25 +1452,19 @@ generate_code: (root: int) -> void = {
 
     root_children := node_children[root];
     while (i < node_children_sz[root]) {
-        child := root_children[root];
+        child := root_children[i];
         child_children := node_children[child];
 
         if (node_type[child] == NODE_DECL) {
-            if (node_children_sz[child] == 3) {
-                if (node_type[child_children[2]] == NODE_BLOCK) {
-                    // function
-                    generate_function_code(
-                        child_children[0],
-                        child_children[1],
-                        child_children[2]
-                    );
-                } else {
-                    println("Not implemented: root decl node variant");
-                    exit := 1 / 0;
-                }
-            } else {
-                println("Not implemented: root decl node variant");
-                exit := 1 / 0;
+            id_node := child_children[0];
+            sym := node_data_sym[id_node];
+
+            if (symbol_table_type[sym] == SYMBOL_FUNC) {
+                generate_function_code(
+                    child_children[0],
+                    child_children[1],
+                    child_children[2]
+                );
             }
         } else {
             println("Not implemented: root decl node type");
@@ -1438,28 +1498,40 @@ generate_function_code: (id_node: int, arg_node: int, body_node: int) -> void = 
     println("    pushq %rbp");
     println("    movq %rsp, %rbp");
 
+    local_space := 0;
+    {
+        // TODO: args
+        // make some stack space
+        sym := 0;
+        curr_func_scope := node_data_block_scope[body_node];
+        if (curr_func_scope == 0) {
+            println("Something went wrong");
+            exit := 1 / 0;
+        }
+
+
+        while (sym < symbol_table_sz) {
+            sc := symbol_table_scope[sym];
+            if (scope_is_parent(curr_func_scope, sc)) {
+                local_space += 8; // TODO: type sizeof
+            }
+            sym += 1;
+        }
+
+        // align
+        local_space = ((local_space + 15) / 16) *16;
+
+        print("    subq $");
+        print(local_space);
+        println(", %rsp");
+    }
+
     body_children := node_children[body_node];
 
     i := 0;
     while (i < node_children_sz[body_node]) {
-        child := body_children[i];
-
-        if (node_type[child] == NODE_CALL) {
-            generate_function_call(child);
-            i += 1;
-            continue;
-        }
-
-        if (node_type[child] == NODE_IF) {
-            generate_if(child);
-            i += 1;
-            continue;
-        }
-
-        print("Unhandled node type in function body: ");
-        node_print(child);
-        println();
-        exit := 1/  0;
+        generate_node(body_children[i]);
+        i += 1;
     }
 
     string_table_print(node_data_str[id_node]);
@@ -1467,6 +1539,38 @@ generate_function_code: (id_node: int, arg_node: int, body_node: int) -> void = 
     println("    movq %rbp, %rsp");
     println("    popq %rbp");
     println("    ret");
+}
+
+generate_node: (node: int) -> void = {
+    if (node_type[node] == NODE_CALL) {
+        generate_function_call(node);
+        return;
+    }
+
+    if (node_type[node] == NODE_IF) {
+        generate_if(node);
+        return;
+    }
+
+    if (node_type[node] == NODE_DECL) {
+        generate_decl(node);
+        return;
+    }
+
+    if (node_type[node] == NODE_BLOCK) {
+        children := node_children[node];
+        i := 0;
+        while (i < node_children_sz[node]) {
+            generate_node(children[i]);
+            i += 1;
+        }
+        return;
+    }
+
+    print("Unhandled node type in generate_node: ");
+    node_print(node);
+    println();
+    exit := 1 / 0;
 }
 
 generate_function_call: (node: int) -> void = {
@@ -1513,12 +1617,16 @@ generate_call_println: (args_node: int) -> void = {
             }
 
             if (node_type[arg] == NODE_LIT_INT 
-             || node_type[arg] == NODE_BINOP) {
+             || node_type[arg] == NODE_BINOP
+             || (node_type[arg] == NODE_ID && symbol_table_type[node_data_sym[arg]] == SYMBOL_INT)) {
                 println("    leaq intout(%rip), %rdi");
                 break;
             }
 
             println("Unhandled node type println");
+            print("Violating: ");
+            node_print(arg);
+            println();
             exit := 1 / 0;
         }
         println("    movq $1, %rax");
@@ -1658,6 +1766,13 @@ generate_expression: (node: int) -> void = {
         return;
     }
 
+    if (node_type[node] == NODE_ID) {
+        print("    movq ");
+        emit_sym_access(node_data_sym[node]);
+        println(", %rax");
+        return;
+    }
+
     print("generate_expression unhandled node type: ");
     node_print(node);
     println();
@@ -1702,6 +1817,42 @@ generate_if: (node: int) -> void = {
     print("ENDIF");
     print(cur_if);
     println(":");
+}
+
+emit_sym_access: (sym: int) -> void = {
+    if (symbol_table_scope[sym] == 0) {
+        // global
+        print(".");
+        string_table_print(symbol_table_str[sym]);
+        print("(%rip)");
+        return;
+    }
+
+    seq := symbol_table_seq[sym];
+
+    offs := - (seq + 1) * 8;
+
+    print(offs);
+    print("(%rbp)");
+}
+
+generate_decl: (node: int) -> void = {
+    children := node_children[node];
+    rhs: int;
+    if (node_type[children[1]] == NODE_TYPE) {
+        if (node_children_sz[node] == 2) {
+            return;
+        }
+        rhs = children[2];
+    } else {
+        rhs = children[1];
+    }
+
+    generate_expression(rhs);
+
+    print("    movq %rax, ");
+    emit_sym_access(node_data_sym[children[0]]);
+    println();
 }
 
 gen_next_label: () -> int = {
@@ -1840,11 +1991,11 @@ main: () -> void = {
 
     resolve_symbols(root);
 
-    print_symbols();
+    //print_symbols();
 
-    print_tree(root, 0);
+    //print_tree(root, 0);
 
-    //generate_code(root);
+    generate_code(root);
 
     delete(buf);
 }

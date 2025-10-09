@@ -8,6 +8,8 @@ main: () -> void = {
         x: int = 123;
 
         w: int = x + z;
+
+        println(w);
     }
 
     println(x);
