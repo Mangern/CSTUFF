@@ -20,6 +20,7 @@
 static bool opt_print_tree = false;
 static bool opt_print_tac  = false;
 static bool opt_print_transformed_tree = false;
+static char* outfile_name = "a.out";
 
 void read_file(const char* file_path, char** content) {
     FILE* file = fopen(file_path, "r");
@@ -46,7 +47,7 @@ void read_file(const char* file_path, char** content) {
 
 static void options(int argc, char **argv) {
     for (;;) {
-        switch (getopt(argc, argv, "tpT")) {
+        switch (getopt(argc, argv, "tpTo:")) {
             case 't':
                 opt_print_tree = true;
                 break;
@@ -55,6 +56,9 @@ static void options(int argc, char **argv) {
                 break;
             case 'p':
                 opt_print_tac = true;
+                break;
+            case 'o':
+                outfile_name = optarg;
                 break;
             default:
                 return;
@@ -74,7 +78,7 @@ int assemble_and_link() {
 
     if (pid == 0) {
         // i am a child
-        char * args[] = {"gcc", "-g", "tmp.S", NULL};
+        char * args[] = {"gcc", "-o", outfile_name, "-g", "tmp.S", NULL};
         execvp("gcc", args);
 
         fprintf(stderr, "execv failed\n");
@@ -167,6 +171,7 @@ int main(int argc, char** argv) {
     gettimeofday(&t_gen, NULL);
     fclose(gen_outfile);
 
+
     if (assemble_and_link()) {
         fprintf(stderr, "Assembler failed\n");
         return EXIT_FAILURE;
@@ -188,6 +193,7 @@ int main(int argc, char** argv) {
     printf("Total time    : %7.3f ms\n", WALLTIME(t_end) - WALLTIME(t_start));
 
     printf("\nDone compiling %s (%zu bytes)\n", CURRENT_FILE_NAME, da_size(file_content));
+    printf("\nOutput written to %s\n", outfile_name);
 
     return 0;
 }
