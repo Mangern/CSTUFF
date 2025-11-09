@@ -132,40 +132,40 @@ node_t* node_deep_copy(node_t* node) {
     return new_node;
 }
 
-static void print_tree_impl(node_t* node, int indent) {
+static void print_tree_impl(FILE *stream, node_t* node, int indent) {
     for (int i = 0; i < indent; ++i)
-        printf(" ");
-    printf("%s", NODE_TYPE_NAMES[node->type]);
+        fprintf(stream, " ");
+    fprintf(stream, "%s", NODE_TYPE_NAMES[node->type]);
 
     if (node->type == IDENTIFIER) {
-        printf(" (%s)", node->data.identifier_str);
+        fprintf(stream, " (%s)", node->data.identifier_str);
     } else if (node->type == OPERATOR) {
-        printf(" (%s)", OPERATOR_TYPE_NAMES[node->data.operator]);
+        fprintf(stream, " (%s)", OPERATOR_TYPE_NAMES[node->data.operator]);
     } else if (node->type == INTEGER_LITERAL) {
-        printf(" (%ld)", node->data.int_literal_value);
+        fprintf(stream, " (%ld)", node->data.int_literal_value);
     } else if (node->type == STRING_LITERAL) {
         if (global_string_list == NULL) {
-            printf(" (%s)", node->data.string_literal_value);
+            fprintf(stream, " (%s)", node->data.string_literal_value);
         } else {
-            printf(" (%s)", global_string_list[node->data.string_literal_idx]);
+            fprintf(stream, " (%s)", global_string_list[node->data.string_literal_idx]);
         }
     } else if (node->type == BOOL_LITERAL) {
-        printf(" (%s)", node->data.bool_literal_value ? "true" : "false");
+        fprintf(stream, " (%s)", node->data.bool_literal_value ? "true" : "false");
     }
 
     if (node->symbol != NULL) {
-        printf(" -> [%s] %s", SYMBOL_TYPE_NAMES[node->symbol->type], node->symbol->name);
+        fprintf(stream, " -> [%s] %s", SYMBOL_TYPE_NAMES[node->symbol->type], node->symbol->name);
     }
 
-    puts("");
+    fprintf(stream, "\n");
 
     for (size_t i = 0; i < da_size(node->children); ++i) {
-        print_tree_impl(node->children[i], indent + 2);
+        print_tree_impl(stream, node->children[i], indent + 2);
     }
 }
 
-void print_tree(node_t* node) {
-    print_tree_impl(node, 0);
+void print_tree(FILE* stream, node_t* node) {
+    print_tree_impl(stream, node, 0);
 }
 
 void node_find_range(node_t* node, range_t* range) {

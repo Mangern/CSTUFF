@@ -106,6 +106,6 @@ node_t* node_deep_copy(node_t* node);
 // Returns INCLUSIVE range (first and last character)
 void node_find_range(node_t* node, range_t* range);
 
-void print_tree(node_t* node);
+void print_tree(FILE* stream, node_t* node);
 
 #endif // TREE_H

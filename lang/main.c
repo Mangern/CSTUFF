@@ -14,6 +14,7 @@
 #include "symbol.h"
 #include "tree_transform.h"
 #include "type.h"
+#include "fail.h"
 
 #define BUFSIZE 1024
 
@@ -124,6 +125,8 @@ int main(int argc, char** argv) {
     }
     options(argc, argv);
 
+    fail_init_exit(stderr);
+
     char* file_content;
     read_file(argv[optind], &file_content);
 
@@ -139,7 +142,7 @@ int main(int argc, char** argv) {
 
     if (opt_print_tree) {
         printf("===== Syntax tree ===== \n");
-        print_tree(root);
+        print_tree(stdout, root);
         printf("\n\n");
     }
 
@@ -154,7 +157,7 @@ int main(int argc, char** argv) {
 
     if (opt_print_transformed_tree) {
         printf("===== Transformed syntax tree ===== \n");
-        print_tree(root);
+        print_tree(stdout, root);
         printf("\n\n");
     }
 

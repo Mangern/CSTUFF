@@ -545,9 +545,11 @@ static operator_t parse_operator_str(char* operator_str, bool binary) {
             return UNARY_DEREF;
         }
     }
-    fprintf(stderr, "Parse operator str unhandled: %s, %d\n", operator_str, binary);
-    exit(1);
+    // TODO: proper
+    fail_token(lexer_peek());
     assert(false);
+    // fprintf(stderr, "Parse operator str unhandled: %s, %d\n", operator_str, binary);
+    // exit(1);
 }
 
 static node_t* merge_unary_op(token_t operator_token, node_t* rhs) {

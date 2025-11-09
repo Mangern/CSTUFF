@@ -6,7 +6,19 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <assert.h>
+#include <stdarg.h>
+
+#define FAIL_BUF_SZ 1024
+typedef struct diagnostic_t diagnostic_t;
+
+FILE *out_stream;
+enum FAIL_MODE fail_mode;
+
+char fail_buf[FAIL_BUF_SZ];
+jmp_buf FAIL_JMP_ENV;
+diagnostic_t *diagnostics;
 
 // fprintf(stream, "file:line:col: ")
 void print_node_location(FILE* stream, node_t* node) {
@@ -54,16 +66,79 @@ char* location_str(location_t loc) {
 }
 
 void fail_token(token_t token) {
-    location_t loc;
-    loc = lexer_offset_location(token.begin_offset);
-    fprintf(stderr, "%s: Unexpected token '%s'\n", location_str(loc), TOKEN_TYPE_NAMES[token.type]);
-    exit(1);
+    if (fail_mode == FAIL_EXIT) {
+        location_t loc;
+        loc = lexer_offset_location(token.begin_offset);
+        fprintf(stderr, "%s: Unexpected token '%s'\n", location_str(loc), TOKEN_TYPE_NAMES[token.type]);
+        exit(1);
+    } else {
+        snprintf(fail_buf, FAIL_BUF_SZ, "Unexpected token '%s'", TOKEN_TYPE_NAMES[token.type]);
+        range_t range;
+        range.start = lexer_offset_location(token.begin_offset);
+        range.end = lexer_offset_location(token.end_offset);
+        diagnostic_t diag = {
+            .message = strdup(fail_buf),
+            .range = range
+        };
+        da_append(diagnostics, diag);
+        longjmp(FAIL_JMP_ENV, 1);
+    }
 }
 
 void fail_token_expected(token_t token, token_type_t expected) {
-    location_t loc;
-    loc = lexer_offset_location(token.begin_offset);
-    fprintf(stderr, "%s: Expected '%s', got '%s'\n",location_str(loc),  TOKEN_TYPE_NAMES[expected], TOKEN_TYPE_NAMES[token.type]);
-    exit(1);
+    if (fail_mode == FAIL_EXIT) {
+        location_t loc;
+        loc = lexer_offset_location(token.begin_offset);
+        fprintf(stderr, "%s: Expected '%s', got '%s'\n",location_str(loc),  TOKEN_TYPE_NAMES[expected], TOKEN_TYPE_NAMES[token.type]);
+        exit(1);
+    } else {
+        snprintf(fail_buf, FAIL_BUF_SZ, "Expected '%s', got '%s'", TOKEN_TYPE_NAMES[expected], TOKEN_TYPE_NAMES[token.type]);
+        range_t range;
+        range.start = lexer_offset_location(token.begin_offset);
+        range.end = lexer_offset_location(token.end_offset);
+        diagnostic_t diag = {
+            .message = strdup(fail_buf),
+            .range = range
+        };
+        da_append(diagnostics, diag);
+        longjmp(FAIL_JMP_ENV, 1);
+    }
 }
 
+void fail_node(node_t *node, const char *fmt, ...) {
+    va_list args;
+    if (fail_mode == FAIL_EXIT) {
+        print_node_location(out_stream, node);
+        va_start(args, fmt);
+        vfprintf(out_stream, fmt, args);
+        va_end(args);
+        fprintf(out_stream, "\n");
+        print_visual_node_error(out_stream, node);
+
+        exit(EXIT_FAILURE);
+    } else {
+        va_start(args, fmt);
+        vsnprintf(fail_buf, FAIL_BUF_SZ, fmt, args);
+        va_end(args);
+
+        range_t range;
+        node_find_range(node, &range);
+        // exclusive
+        range.end.character++;
+        diagnostic_t diag = {
+            .message = strdup(fail_buf),
+            .range = range
+        };
+        da_append(diagnostics, diag);
+        longjmp(FAIL_JMP_ENV, 1);
+    }
+}
+
+void fail_init_exit(FILE *stream) {
+    fail_mode = FAIL_EXIT;
+    out_stream = stream;
+}
+
+void fail_init_diagnostic() {
+    fail_mode = FAIL_DIAGNOSTIC;
+}
