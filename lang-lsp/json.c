@@ -3,12 +3,9 @@
 #include <string.h>
 
 #include "json.h"
+#include "json_types.h"
 #include "da.h"
 #include "log.h"
-
-typedef struct json_obj_t json_obj_t;
-typedef struct json_arr_t json_arr_t;
-typedef struct json_any_t json_any_t;
 
 
 /* ------------------------------ Parsing ------------------------------ */
@@ -35,8 +32,6 @@ void json_init(char *json_content) {
     content_len = da_size(json_content);
     content_ptr = 0;
     cur_idx = -1;
-
-    LOG("Initialized parsing of %zu chars", content_len);
 }
 
 json_obj_t* json_parse() {
@@ -54,29 +49,22 @@ json_obj_t* parse_object() {
         advance();
         return obj;
     }
-    int i = 0;
     for (;;) {
         tok = peek();
 
         if (tok == '"') {
             char *key = parse_string();
-            LOG("Entry number %d: %s", i++, key);
             peek_expect_advance(':');
 
             json_any_t value = parse_any();
 
-            struct kv_pair_t kv;
-            kv.key = key;
-            kv.val = value;
-
-            da_append(obj->entries, kv);
+            json_obj_put(obj, key, value);
 
             tok = peek();
             if (tok == ',') {
                 advance();
                 continue;
             } else {
-                LOG("Break from token %c", tok);
                 break;
             }
         } else {
@@ -159,7 +147,6 @@ char* parse_string() {
     peek_expect_advance('"');
     char tok;
 
-    size_t n = 0;
     size_t start = content_ptr;
 
     for (;;) {
@@ -167,13 +154,17 @@ char* parse_string() {
         tok = peek();
         advance();
 
+        if (tok == '\\') {
+            advance();
+            continue;
+        }
+
         if (tok == '"') {
             break;
         }
-        ++n;
     }
 
-    return strndup(&content[start], n);
+    return strndup(&content[start], content_ptr - start - 1);
 }
 
 int64_t parse_number() {
@@ -249,6 +240,7 @@ char peek_expect_advance(char tok) {
 
 /* ------------------------------ JSON interface ------------------------------ */
 
+// TODO: trie or hashmap if necessary
 json_any_t json_obj_get(struct json_obj_t *obj, char *key) {
     for (size_t i = 0; i < da_size(obj->entries); ++i) {
         if (strcmp(key, obj->entries[i].key) == 0) {
@@ -257,4 +249,87 @@ json_any_t json_obj_get(struct json_obj_t *obj, char *key) {
     }
 
     return (json_any_t){.kind = JSON_NONE };
+}
+
+void json_obj_put(struct json_obj_t *obj, char *key, struct json_any_t val) {
+    struct kv_pair_t kv = {
+        .key = key,
+        .val = val
+    };
+    da_append(obj->entries, kv);
+}
+
+void da_strncat(char **da, char *str, size_t n) {
+    for (size_t i = 0; i < n; ++i) {
+        da_append(*da, str[i]);
+    }
+}
+
+void json_dumps(char **str, struct json_any_t *json) {
+    switch(json->kind) {
+    case JSON_NONE:
+        {
+            da_strncat(str, "null", 4);
+        }
+        break;
+    case JSON_OBJ:
+        {
+            json_obj_t *obj = json->obj;
+            da_append(*str, '{');
+
+            for (size_t i = 0; i < da_size(obj->entries); ++i) {
+                if (i > 0) {
+                    da_append(*str, ',');
+                }
+                char *key = obj->entries[i].key;
+                da_append(*str, '"');
+                da_strncat(str, key, strlen(key));
+                da_append(*str, '"');
+                da_append(*str, ':');
+                json_dumps(str, &obj->entries[i].val);
+            }
+            da_append(*str, '}');
+        }
+        break;
+    case JSON_ARR:
+        {
+            json_arr_t *arr = json->arr;
+            da_append(*str, '[');
+
+            for (size_t i = 0; i < da_size(arr->elements); ++i) {
+                if (i > 0) {
+                    da_append(*str, ',');
+                }
+
+                json_dumps(str, &arr->elements[i]);
+            }
+            da_append(*str, ']');
+        }
+        break;
+    case JSON_NUM:
+        {
+            // uuh
+            char buf[16];
+            memset(buf, 0, sizeof buf);
+            sprintf(buf, "%ld", json->num);
+            da_strncat(str, buf, strlen(buf));
+        }
+        break;
+    case JSON_STR:
+        {
+            da_append(*str, '"');
+            da_strncat(str, json->str, strlen(json->str));
+            da_append(*str, '"');
+        }
+        break;
+    case JSON_BOL:
+        {
+            if (json->bol == true) {
+                da_strncat(str, "true", 4);
+            } else {
+                da_strncat(str, "false", 5);
+            }
+        }
+        break;
+    }
 }

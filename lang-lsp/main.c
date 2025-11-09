@@ -6,110 +6,91 @@
 
 #include "log.h"
 #include "json.h"
+#include "json_types.h"
+#include "json_rpc.h"
 #include "da.h"
 
-#define LINEBUF_SIZE 1024
+void handle_notification(char *method, json_any_t params) {
+    LOG("Received notification: %s", method);
 
-size_t line_len;
-char linebuf[LINEBUF_SIZE];
-
-void next_line() {
-    for (line_len = 0; line_len < LINEBUF_SIZE; ++line_len) {
-        char c = getchar();
-
-        if (c == '\n') {
-            linebuf[line_len++] = c;
-            linebuf[line_len] = 0;
-            break;
+    if (strcmp(method, "textDocument/didOpen") == 0) {
+        if (params.kind != JSON_OBJ) {
+            LOG("Error: missing params");
+            return;
         }
 
-        linebuf[line_len] = c;
-    }
+        json_obj_t *text_document = json_obj_get(params.obj, "textDocument").obj;
 
-}
+        // parse that shit
 
-void linecheck() {
-    if (line_len >= LINEBUF_SIZE) {
-        log_writes("Unexpectedly long line!\n");
-        linebuf[LINEBUF_SIZE - 1] = 0;
-        log_writes(linebuf);
-        exit(1);
+        LOG("\"%s\"", json_obj_get(text_document, "text").str);
     }
 }
 
-size_t content_length;
-char *content_type;
+void handle_request(int64_t id, char *method, json_any_t params) {
+    LOG("Received request: %s", method);
 
-bool header_parse() {
-    char *ptr = strtok(linebuf, ":\r\n");
-
-    if (ptr == NULL) {
-        return true;
+    if (strcmp(method, "initialize") == 0) {
+        if (params.kind != JSON_OBJ) {
+            LOG("Error: missing params");
+            return;
+        }
+        json_obj_t capabilities = {0};
+        // textDocumentSync == 1 == TextDocumentSyncKind.Full
+        json_obj_put(&capabilities, "textDocumentSync", JSON_ANY_NUM(1));
+        json_obj_t result = {0};
+        json_obj_put(&result, "capabilities", JSON_ANY_OBJ(&capabilities));
+        write_response(id, JSON_ANY_OBJ(&result));
+        return;
     }
-
-    if (strcmp(ptr, "Content-Length") == 0) {
-        ptr = strtok(NULL, ":\r\n");
-        while (*ptr == ' ')++ptr;
-        content_length = atol(ptr);
-        return false;
-    }
-    if (strcmp(ptr, "Content-Type") == 0) {
-        ptr = strtok(NULL, ":\r\n");
-        while (*ptr == ' ')++ptr;
-        content_type = strdup(ptr);
-        return false;
-    }
-
-    log_writes("Unknown header!!\n");
-    log_writes(ptr);
-    return false;
 }
-
 
 int main() {
     setvbuf(stdin, NULL, _IONBF, 0);
     log_init();
-    char *msg_content = 0;
 
     for (;;) {
-        // parse header
-        content_length = 0;
-        for (;;) {
-            next_line();
+        json_obj_t *obj = next_request();
 
-            if (header_parse()) break;
+        char *method;
+        int64_t id;
+        json_any_t params;
+
+        {
+            json_any_t method_val = json_obj_get(obj, "method");
+            if (method_val.kind != JSON_STR) {
+                LOG("Expected method to be str, but was %d", method_val.kind);
+                exit(1);
+            }
+            method = method_val.str;
+        }
+        {
+            json_any_t id_val = json_obj_get(obj, "id");
+            if (id_val.kind != JSON_NUM && id_val.kind != JSON_NONE) {
+                LOG("Expected id to be int, but was %d", id_val.kind);
+                LOG("%s", method);
+                exit(1);
+            }
+            id = id_val.kind == JSON_NUM ? id_val.num : 0;
         }
 
-        LOG("Content length: %zu", content_length);
+        {
+            params = json_obj_get(obj, "params");
 
-        da_resize(msg_content, content_length);
-
-        char *ptr = msg_content;
-        size_t sum = 0;
-        for (; sum < content_length; ) {
-            ssize_t n = read(STDIN_FILENO, ptr, LINEBUF_SIZE - 1);
-            sum += n;
-            ptr += n;
+            // Three valid types
+            if (params.kind != JSON_NONE && params.kind != JSON_OBJ && params.kind != JSON_ARR) {
+                LOG("Invalid params type %d", params.kind);
+                exit(1);
+            }
         }
-        LOG("Successfully read %zu bytes of message", content_length);
-        fwrite(msg_content, 1, content_length, LOG_FILE);
-        LOG("\n\n");
 
-
-        json_init(msg_content);
-
-        struct json_obj_t *obj = json_parse();
-
-        // parse the json
-
-        struct json_any_t method_val = json_obj_get(obj, "method");
-
-        if (method_val.kind == JSON_STR) {
-            LOG("I demonstrate my ability to parse json by showing that 'method' = %s", method_val.str);
-        } else {
-            LOG("Expected method to be str, but was %d", method_val.kind);
-            exit(1);
+        if (id == 0) {
+            // TODO: process?
+            handle_notification(method, params);
+            continue;
         }
+        handle_request(id, method, params);
+
     }
 
     fclose(LOG_FILE);

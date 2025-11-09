@@ -1,5 +1,5 @@
 CFLAGS := -g -O2 -Wall -Wextra -I../da/
-OBJS   := main.o json.o da.o log.o
+OBJS   := main.o json.o json_rpc.o da.o log.o
 
 langls: $(OBJS)
 	gcc $(CFLAGS) -o $@ $(OBJS)
