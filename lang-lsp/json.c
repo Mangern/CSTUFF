@@ -42,7 +42,7 @@ json_obj_t* json_parse() {
 
 json_obj_t* parse_object() {
     peek_expect_advance('{');
-    json_obj_t *obj = malloc(sizeof(json_obj_t));
+    json_obj_t *obj = calloc(1, sizeof(json_obj_t));
 
     char tok = peek();
     if (tok == '}') {
@@ -78,7 +78,7 @@ json_obj_t* parse_object() {
 
 json_arr_t* parse_array() {
     peek_expect_advance('[');
-    json_arr_t *arr = malloc(sizeof(json_arr_t));
+    json_arr_t *arr = calloc(1, sizeof(json_arr_t));
 
     char tok = peek();
 

@@ -1,2 +1,2 @@
 CompileFlags:
-  Add: [-I../da/, -xc]
+  Add: [-I../da/, -I../lang/, -xc]

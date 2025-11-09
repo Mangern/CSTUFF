@@ -27,6 +27,8 @@ struct json_any_t {
 #define JSON_ANY_NUM(x) ((struct json_any_t){.kind = JSON_NUM, .num = (x)})
 #define JSON_ANY_OBJ(x) ((struct json_any_t){.kind = JSON_OBJ, .obj = (x)})
 #define JSON_ANY_BOOL(x) ((struct json_any_t){.kind = JSON_BOL, .bol = (x)})
+#define JSON_ANY_STR(x) ((struct json_any_t){.kind = JSON_STR, .str = (x)})
+#define JSON_ANY_ARR(x) ((struct json_any_t){.kind = JSON_ARR, .arr = (x)})
 
 struct kv_pair_t {
     char* key;

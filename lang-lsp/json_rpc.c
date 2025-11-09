@@ -64,9 +64,24 @@ void write_response(int64_t id, json_any_t result) {
 
     fprintf(stdout, "Content-Length: %zu\r\n\r\n", da_size(out));
     fprintf(stdout, "%s", out);
-    fprintf(stderr, "%s", out);
     fflush(stdout);
-    fflush(stderr);
+}
+
+void write_notification(char *method, json_any_t params) {
+    json_any_t msg = {0};
+    json_obj_t msg_obj = {0};
+    msg.kind = JSON_OBJ;
+    msg.obj = &msg_obj;
+
+    json_obj_put(&msg_obj, "method", JSON_ANY_STR(method));
+    json_obj_put(&msg_obj, "params", params);
+
+    char *out = 0;
+    json_dumps(&out, &msg);
+
+    fprintf(stdout, "Content-Length: %zu\r\n\r\n", da_size(out));
+    fprintf(stdout, "%s", out);
+    fflush(stdout);
 }
 
 void next_line() {
