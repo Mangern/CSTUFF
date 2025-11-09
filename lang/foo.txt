@@ -1,0 +1,4 @@
+./test/files/call-type.lang:6:10: Argument 1 of function func has the wrong type. Required: 'int', Got: 'real'
+
+    6 |     func(69.0);
+      |          ^~~~

@@ -10,7 +10,7 @@
 #include <assert.h>
 #include <stdarg.h>
 
-#define FAIL_BUF_SZ 1024
+#define FAIL_BUF_SZ 4096
 typedef struct diagnostic_t diagnostic_t;
 
 FILE *out_stream;

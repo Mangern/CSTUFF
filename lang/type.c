@@ -86,18 +86,21 @@ static void register_type_node(node_t* node) {
 
                     if (!is_function && !types_equivalent(node->children[1]->type_info, node->children[2]->type_info)) {
                         // TODO: better error
-                        fprintf(stderr, "Cannot assign %s of type ", node->children[0]->data.identifier_str);
-                        type_print(stderr, node->children[1]->type_info);
-                        fprintf(stderr, " to expression of type ");
-                        type_print(stderr, node->children[2]->type_info);
-                        fprintf(stderr, "\n");
-                        exit(EXIT_FAILURE);
+                        char *msg = 0;
+                        da_strcat(&msg, "Cannot assign ");
+                        da_strcat(&msg, node->children[0]->data.identifier_str);
+                        da_strcat(&msg, " of type ");
+                        type_print(&msg, node->children[1]->type_info);
+                        da_strcat(&msg, " to expression of type ");
+                        type_print(&msg, node->children[2]->type_info);
+                        da_strcat(&msg, "\n");
+                        fail_node(node, "%s", msg);
                     }
                 }
 
                 if (node->children[1]->type != TYPE) {
                     if (node->children[1]->type_info == NULL) {
-                        fail_node(node->children[1], "Could not infer type of expression.")
+                        fail_node(node->children[1], "Could not infer type of expression.");
                     }
                 }
                 node->type_info = node->children[1]->type_info;
@@ -234,17 +237,20 @@ static void register_type_node(node_t* node) {
                     node->type_info = type_create_basic(TYPE_VOID);
                 }
                 if (current_function_type_node == NULL) {
-                    fail("Return statement not allowed outside function");
+                    fail_node(node, "Return statement not allowed outside function");
                 }
                 type_info_t* required_return_type = current_function_type_node->type_info->info.info_function->return_type;
                 // TODO: is broken
                 if (!types_equivalent(node->type_info, required_return_type)) {
-                    fprintf(stderr, "Function '%s', with return type '", current_function_type_node->parent->children[0]->data.identifier_str);
-                    type_print(stderr, required_return_type);
-                    fprintf(stderr, "', cannot return '");
-                    type_print(stderr, node->type_info);
-                    fprintf(stderr, "'\n");
-                    exit(EXIT_FAILURE);
+                    char *msg = 0;
+                    da_strcat(&msg, "Function '");
+                    da_strcat(&msg, current_function_type_node->parent->children[0]->data.identifier_str);
+                    da_strcat(&msg, "', with return type '");
+                    type_print(&msg, required_return_type);
+                    da_strcat(&msg, "', cannot return '");
+                    type_print(&msg, node->type_info);
+                    da_strcat(&msg, "'\n");
+                    fail_node(node, "%s", msg);
                 }
                 return;
             }
@@ -292,12 +298,15 @@ static void register_type_node(node_t* node) {
                                 && node->children[1]->type_info->info.info_basic == TYPE_INT;
 
                             if (!is_ptr_int && !types_equivalent(node->children[0]->type_info, node->children[1]->type_info)) {
-                                fprintf(stderr, "Cannot %s ", opstr);
-                                type_print(stderr, node->children[0]->type_info);
-                                fprintf(stderr, " and ");
-                                type_print(stderr, node->children[1]->type_info);
-                                fprintf(stderr, "\n");
-                                exit(EXIT_FAILURE);
+                                char *msg = 0;
+                                da_strcat(&msg, "Cannot ");
+                                da_strcat(&msg, opstr);
+                                da_strcat(&msg, " ");
+                                type_print(&msg, node->children[0]->type_info);
+                                da_strcat(&msg, " and ");
+                                type_print(&msg, node->children[1]->type_info);
+                                da_strcat(&msg, "\n");
+                                fail_node(node, "%s", msg);
                             }
 
                             node->type_info = node->children[0]->type_info;
@@ -312,12 +321,13 @@ static void register_type_node(node_t* node) {
                     case BINARY_NEQ:
                         {
                             if (!types_equivalent(node->children[0]->type_info, node->children[1]->type_info)) {
-                                fprintf(stderr, "Cannot combine ");
-                                type_print(stderr, node->children[0]->type_info);
-                                fprintf(stderr, " and ");
-                                type_print(stderr, node->children[1]->type_info);
-                                fprintf(stderr, "\n");
-                                exit(EXIT_FAILURE);
+                                char *msg = 0;
+                                da_strcat(&msg, "Cannot combine ");
+                                type_print(&msg, node->children[0]->type_info);
+                                da_strcat(&msg, " and ");
+                                type_print(&msg, node->children[1]->type_info);
+                                da_strcat(&msg, "\n");
+                                fail_node(node, "%s", msg);
                             }
 
                             node->type_info = type_create_basic(TYPE_BOOL);
@@ -329,17 +339,19 @@ static void register_type_node(node_t* node) {
                         {
                             if (node->children[0]->type_info->type_class != TC_BASIC
                               || node->children[0]->type_info->info.info_basic != TYPE_BOOL) {
-                                fprintf(stderr, "Expected bool, got '");
-                                type_print(stderr, node->children[0]->type_info);
-                                fprintf(stderr, "' as a logical operand.\n");
-                                fail_node(node->children[0], "");
+                                char *msg = 0;
+                                da_strcat(&msg, "Expected bool, got '");
+                                type_print(&msg, node->children[0]->type_info);
+                                da_strcat(&msg, "' as a logical operand.\n");
+                                fail_node(node->children[0], "%s", msg);
                             }
                             if (node->children[1]->type_info->type_class != TC_BASIC
                               || node->children[1]->type_info->info.info_basic != TYPE_BOOL) {
-                                fprintf(stderr, "Expected bool, got '");
-                                type_print(stderr, node->children[1]->type_info);
-                                fprintf(stderr, "' as a logical operand.\n");
-                                fail_node(node->children[1], "");
+                                char *msg = 0;
+                                da_strcat(&msg, "Expected bool, got '");
+                                type_print(&msg, node->children[1]->type_info);
+                                da_strcat(&msg, "' as a logical operand.\n");
+                                fail_node(node->children[1], "%s", msg);
                             }
 
                             node->type_info = type_create_basic(TYPE_BOOL);
@@ -425,12 +437,19 @@ static void register_type_node(node_t* node) {
 
                 for (size_t i = 0; i < da_size(args_list->children); ++i) {
                     if (!types_equivalent(args_list->children[i]->type_info, info_function->arg_types->elems[i])) {
-                        fprintf(stderr, "Argument %zu of function %s has the wrong type. Required: '", i+1, function_symbol->name);
-                        type_print(stderr, info_function->arg_types->elems[i]);
-                        fprintf(stderr, "', Got: '");
-                        type_print(stderr, args_list->children[i]->type_info);
-                        fprintf(stderr, "'\n");
-                        fail_node(args_list->children[i], "%s", "");
+                        char buf[1024];
+                        char *msg = 0;
+                        da_strcat(&msg, "Argument ");
+                        sprintf(buf, "%zu", i + 1);
+                        da_strcat(&msg, buf);
+                        da_strcat(&msg, " of function ");
+                        da_strcat(&msg, function_symbol->name);
+                        da_strcat(&msg, " has the wrong type. Required: '");
+                        type_print(&msg, info_function->arg_types->elems[i]);
+                        da_strcat(&msg, "', Got: '");
+                        type_print(&msg, args_list->children[i]->type_info);
+                        da_strcat(&msg, "'\n");
+                        fail_node(args_list->children[i], "%s", msg);
                     }
                 }
 
@@ -450,12 +469,13 @@ static void register_type_node(node_t* node) {
                 register_type_node(node->children[1]);
 
                 if (!types_equivalent(node->children[0]->type_info, node->children[1]->type_info)) {
-                    fprintf(stderr, "Cannot assign expression of type '");
-                    type_print(stderr, node->children[1]->type_info);
-                    fprintf(stderr, "' to element of type '");
-                    type_print(stderr, node->children[0]->type_info);
-                    fprintf(stderr, "'\n");
-                    fail_node(node, "%s", "");
+                    char *msg = 0;
+                    da_strcat(&msg, "Cannot assign expression of type '");
+                    type_print(&msg, node->children[1]->type_info);
+                    da_strcat(&msg, "' to element of type '");
+                    type_print(&msg, node->children[0]->type_info);
+                    da_strcat(&msg, "'\n");
+                    fail_node(node, "%s", msg);
                 }
 
                 // Should it be void or type of assignment?
@@ -468,12 +488,13 @@ static void register_type_node(node_t* node) {
                 register_type_node(node->children[1]);
 
                 if (!can_cast(node->children[1]->type_info, node->children[0]->type_info)) {
-                    fprintf(stderr, "Cannot cast '");
-                    type_print(stderr, node->children[1]->type_info);
-                    fprintf(stderr, "' to '");
-                    type_print(stderr, node->children[0]->type_info);
-                    fprintf(stderr, "'\n");
-                    exit(EXIT_FAILURE);
+                    char *msg = 0;
+                    da_strcat(&msg, "Cannot cast '");
+                    type_print(&msg, node->children[1]->type_info);
+                    da_strcat(&msg, "' to '");
+                    type_print(&msg, node->children[0]->type_info);
+                    da_strcat(&msg, "'\n");
+                    fail_node(node, "%s", node);
                 }
 
                 node->type_info = node->children[0]->type_info;
@@ -505,7 +526,7 @@ static void register_type_node(node_t* node) {
                 // first child has to have boolean type
                 if (node->children[0]->type_info->type_class != TC_BASIC
                  || node->children[0]->type_info->info.info_basic != TYPE_BOOL) {
-                    fail("Condition of if statement must be boolean.");
+                    fail_node(node, "Condition of if statement must be boolean.");
                 }
                 node->type_info = type_create_basic(TYPE_VOID);
             }
@@ -548,7 +569,7 @@ static void register_type_node(node_t* node) {
 
                 if (node->children[0]->type_info->type_class != TC_BASIC
                  || node->children[0]->type_info->info.info_basic != TYPE_BOOL) {
-                    fail("Condition of while statement must be boolean.");
+                    fail_node(node, "Condition of while statement must be boolean.");
                 }
                 node->type_info = type_create_basic(TYPE_VOID);
             }
@@ -592,7 +613,7 @@ static void handle_builtin_function_type(node_t* node, symbol_t* function_symbol
         node_t* args_list= node->children[1];
 
         if (da_size(args_list->children) != 1) {
-            fail("Function %s requires exactly 1 argument, but was called with %zu\n",
+            fail_node(node, "Function %s requires exactly 1 argument, but was called with %zu\n",
                 function_symbol->name,
                 da_size(args_list->children)
             );
@@ -615,10 +636,9 @@ static void handle_builtin_function_type(node_t* node, symbol_t* function_symbol
         node_t* args_list= node->children[1];
 
         if (da_size(args_list->children) != 0) {
-            fprintf(stderr, "Function %s accepts no arguments, but was called with %zu\n",
+            fail_node(node, "Function %s accepts no arguments, but was called with %zu\n",
                 function_symbol->name,
                 da_size(args_list->children));
-            fail_node(node, "");
         }
         return;
     }
@@ -678,9 +698,9 @@ static bool types_equivalent(type_info_t* type_a, type_info_t* type_b) {
 
         return true;
     } else {
-        fprintf(stderr, "Not implemented type class equivalency:\n");
-        type_print(stderr, type_a);
-        fprintf(stderr, "\n");
+        char *msg = 0;
+        type_print(&msg, type_a);
+        fprintf(stderr, "Not implemented type class equivalency: %s\n", msg);
         exit(EXIT_FAILURE);
     }
 }
@@ -795,78 +815,87 @@ static type_info_t* create_type_tagged(size_t sequence_number, type_info_t* type
     return type_info;
 }
 
-void type_print(FILE* stream, type_info_t* type) {
+// Hope we don't get massive type name
+#define TYPE_BUF_SZ 4096
+
+#define daprintf(da, ...) { snprintf(print_buf, TYPE_BUF_SZ, __VA_ARGS__); da_strcat(da, print_buf); }
+
+void type_print(char **str, type_info_t* type) {
+    char print_buf[TYPE_BUF_SZ];
+
     switch (type->type_class) {
         case TC_BASIC:
-            fprintf(stream, "%s", BASIC_TYPE_NAMES[type->info.info_basic]);
+            daprintf(str, "%s", BASIC_TYPE_NAMES[type->info.info_basic]);
             break;
         case TC_ARRAY:
             {
-                type_print(stream, type->info.info_array->subtype);
-                fprintf(stream, "[");
+                type_print(str, type->info.info_array->subtype);
+                da_append(*str, '[');
                 for (size_t i = 0; i < da_size(type->info.info_array->dims); ++i) {
-                    if (i > 0)fprintf(stream, ", ");
-                    fprintf(stream, "%zu", type->info.info_array->dims[i]);
+                    if (i > 0)da_append(*str, ',');
+                    if (i > 0)da_append(*str, ' ');
+
+                    daprintf(str, "%zu", type->info.info_array->dims[i]);
                 }
-                fprintf(stream, "]");
+                da_append(*str, ']');
             }
             break;
         case TC_STRUCT:
             {
-                fprintf(stream, "struct { ");
+                da_strcat(str, "struct { ");
                 for (size_t i = 0; i < da_size(type->info.info_struct->fields); ++i) {
                     if (i > 0)
-                        fprintf(stream, ", ");
+                        da_strcat(str, ", ");
 
                     type_struct_field_t* field = type->info.info_struct->fields[i];
-                    fprintf(stream, "%s: ", field->name);
-                    type_print(stream, field->type);
+                    daprintf(str, "%s: ", field->name);
+                    type_print(str, field->type);
                 }
-                fprintf(stream, " }");
+                da_strcat(str, " }");
             }
             break;
         case TC_STRUCT_FIELD:
             {
-                fprintf(stream, ".%s: ", type->info.info_struct_field->name);
-                type_print(stream, type->info.info_struct_field->type);
-                fprintf(stream, " [offs: %zu]", type->info.info_struct_field->offset);
+                daprintf(str, ".%s: ", type->info.info_struct_field->name);
+                type_print(str, type->info.info_struct_field->type);
+                daprintf(str, " [offs: %zu]", type->info.info_struct_field->offset);
             }
             break;
         case TC_TUPLE:
             {
-                fprintf(stream, "( ");
+                da_strcat(str, "( ");
                 for (size_t i = 0; i < da_size(type->info.info_tuple->elems); ++i) {
-                    if (i > 0)fprintf(stream, ", ");
-                    type_print(stream, type->info.info_tuple->elems[i]);
+                    if (i > 0)da_strcat(str, ", ");
+                    type_print(str, type->info.info_tuple->elems[i]);
                 }
-                fprintf(stream, " )");
+                da_strcat(str, " )");
             }
             break;
         case TC_FUNCTION:
             {
-                fprintf(stream, "( ");
+                da_strcat(str, "( ");
                 for (size_t i = 0; i < da_size(type->info.info_function->arg_types->elems); ++i) {
-                    if (i > 0)fprintf(stream, ", ");
-                    type_print(stream, type->info.info_function->arg_types->elems[i]);
+                    if (i > 0)da_strcat(str, ", ");
+                    type_print(str, type->info.info_function->arg_types->elems[i]);
                 }
-                fprintf(stream, " ) -> ");
-                type_print(stream, type->info.info_function->return_type);
+                da_strcat(str, " ) -> ");
+                type_print(str, type->info.info_function->return_type);
             }
             break;
         case TC_POINTER:
             {
-                fprintf(stream, "*");
-                type_print(stream, type->info.info_pointer->inner);
+                da_strcat(str, "*");
+                type_print(str, type->info.info_pointer->inner);
             }
             break;
         case TC_UNKNOWN:
             {
-                fprintf(stream, "unknown");
+                da_strcat(str, "unknown");
                 break;
             }
         case TC_TAGGED:
             {
-                fprintf(stream, "%s", global_type_table->symbols[type->info.info_tagged->type_id]->name);
+                daprintf(str, "%s", global_type_table->symbols[type->info.info_tagged->type_id]->name);
             }
             break;
     }

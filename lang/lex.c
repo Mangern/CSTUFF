@@ -60,17 +60,22 @@ static size_t matches_operator();
 static void catchup_lines(size_t);
 
 char* CURRENT_FILE_NAME;
+token_t current_token = (token_t){.begin_offset = -1};
 
 void lexer_init(char* file_name, char* file_content) {
     CURRENT_FILE_NAME = file_name;
 
     content = file_content;
     content_size = da_size(content);
-
+    content_ptr = 0;
+    current_line = 0;
+    da_clear(line_start);
+    da_clear(offset_line_number);
     da_append(line_start, 0);
+
+    current_token.begin_offset = -1;
 }
 
-token_t current_token = (token_t){.begin_offset = -1};
 
 token_t lexer_peek() {
     if (current_token.begin_offset == content_ptr) return current_token;

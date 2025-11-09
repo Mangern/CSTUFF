@@ -85,6 +85,6 @@ type_info_t* type_penetrate_tagged(type_info_t *type_info);
 
 size_t type_sizeof(type_info_t*);
 
-void type_print(FILE*, type_info_t*);
+void type_print(char**, type_info_t*);
 
 #endif // TYPE_H

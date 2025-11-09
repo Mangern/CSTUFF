@@ -48,4 +48,6 @@ void* da_reserve_impl(void*, size_t, size_t);
 
 int64_t da_indexof_impl(void* arr, void* elem, size_t elem_size);
 
+void da_strcat(char **da, char *str); 
+void da_strncat(char **da, char *str, size_t n);
 #endif

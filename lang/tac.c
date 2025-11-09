@@ -695,11 +695,13 @@ static void generate_cast_expr(tac_t** list, type_info_t* info_src, size_t addr_
         } else if (info_src->info.info_basic == TYPE_CHAR && info_dst->info.info_basic == TYPE_INT) {
             tac_emit(list, TAC_CAST_CHAR_INT, addr_src, 0, addr_dst);
         } else {
-            fprintf(stderr, "Unhandled basic type conversion: \n");
-            type_print(stderr, info_src);
-            fprintf(stderr, "\n -> \n");
-            type_print(stderr, info_dst);
-            fprintf(stderr, "\n");
+            char *msg = 0;
+            da_strcat(&msg, "Unhandled basic type conversion: \n");
+            type_print(&msg, info_src);
+            da_strcat(&msg, " -> ");
+            type_print(&msg, info_dst);
+            da_strcat(&msg, "\n");
+            fprintf(stderr, "%s", msg);
             assert(false && "Unhandled basic type combo");
         }
         return;

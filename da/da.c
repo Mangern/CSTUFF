@@ -28,3 +28,15 @@ int64_t da_indexof_impl(void* arr, void* elem, size_t elem_size) {
     }
     return -1;
 }
+
+void da_strcat(char **da, char *str) {
+    for (size_t i = 0; str[i] > 0; ++i) {
+        da_append(*da, str[i]);
+    }
+}
+
+void da_strncat(char **da, char *str, size_t n) {
+    for (size_t i = 0; i < n; ++i) {
+        da_append(*da, str[i]);
+    }
+}

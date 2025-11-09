@@ -19,6 +19,7 @@ struct diagnostic_t {
 
 extern jmp_buf FAIL_JMP_ENV;
 extern struct diagnostic_t *diagnostics;
+extern enum FAIL_MODE fail_mode;
 
 // fprintf(stream, "file:line:col: ")
 void print_node_location(FILE* stream, node_t* node);

@@ -8,7 +8,7 @@ def test_file(filename: str, expected_stdout: str, expected_stderr: str):
             return False
 
         if stderr != expected_stderr:
-            print(f"Expected: '{expected_stderr}', got '{stderr}'")
+            print(f"Expected: '\n{expected_stderr}\n', got '\n{stderr}\n'")
             return False
 
         return True

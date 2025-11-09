@@ -116,11 +116,11 @@
 
     {
         "file": "cast.lang",
-        "expect-stderr": "Cannot assign out of type real to expression of type int\n"
+        "expect-stderr": "./test/files/cast.lang:5:5: Cannot assign out of type real to expression of type int\n\n    5 |     out: real = x + y;\n      |     ^~~~~~~~~~~~~~~~~\n"
     },
     {
         "file": "call-type.lang",
-        "expect-stderr": "Argument 1 of function func has the wrong type. Required: 'int', Got: 'real'\n./test/files/call-type.lang:6:10: \n    6 |     func(69.0);\n      |          ^~~~\n"
+        "expect-stderr": "./test/files/call-type.lang:6:10: Argument 1 of function func has the wrong type. Required: 'int', Got: 'real'\n\n    6 |     func(69.0);\n      |          ^~~~\n"
     },
     {
         "file": "err.lang",
