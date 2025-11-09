@@ -259,12 +259,6 @@ void json_obj_put(struct json_obj_t *obj, char *key, struct json_any_t val) {
     da_append(obj->entries, kv);
 }
 
-void da_strncat(char **da, char *str, size_t n) {
-    for (size_t i = 0; i < n; ++i) {
-        da_append(*da, str[i]);
-    }
-}
-
 void json_dumps(char **str, struct json_any_t *json) {
     switch(json->kind) {
     case JSON_NONE:

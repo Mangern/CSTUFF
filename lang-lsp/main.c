@@ -12,8 +12,12 @@
 
 #include "lex.h"
 #include "parser.h"
+#include "symbol.h"
 #include "tree.h"
 #include "fail.h"
+#include "type.h"
+#include "tree_transform.h"
+#include "tac.h"
 
 json_obj_t* range_to_json(range_t range) {
     json_obj_t *range_obj = calloc(1, sizeof(json_obj_t));
@@ -50,6 +54,70 @@ void publish_diagnostics(char *uri) {
     write_notification("textDocument/publishDiagnostics", params);
 
     // TODO: free memory or something
+    da_clear(diagnostics);
+}
+
+void handle_document(char *uri, char *content) {
+    // parse that shit
+    size_t content_len = strlen(content);
+
+    // lexer wants content to be a da.
+    // we also need to convert escaped stuff into the normal stuff
+    char *content_da = {0};
+    da_reserve(content_da, content_len);
+
+    for (size_t i = 0; i < content_len; ++i) {
+        if (i < content_len - 1 && content[i] == '\\') {
+            switch(content[i+1]) {
+                case 'n':
+                    da_append(content_da, '\n');
+                    ++i;
+                    break;
+                case '"':
+                    da_append(content_da, '"');
+                    ++i;
+                    break;
+                default:
+                    LOG("Unhandled escape char %c", content[i+1]);
+                    exit(1);
+            }
+        } else {
+            da_append(content_da, content[i]);
+        }
+    }
+
+
+
+    int err = setjmp(FAIL_JMP_ENV);
+
+    if (!err) {
+        LOG("Init lex");
+        // Not returned from longjmp
+        lexer_init(uri, content_da);
+
+        LOG("Parse");
+
+        parse();
+
+        LOG("Symbol");
+
+        create_symbol_tables();
+
+        LOG("Types");
+
+        register_types();
+
+        LOG("Transform");
+
+        tree_transform(root);
+
+        LOG("Tac");
+
+        // sadly some checks are done in tac as well
+        generate_function_codes();
+    }
+    // publish to flush
+    publish_diagnostics(uri);
 }
 
 void handle_notification(char *method, json_any_t params) {
@@ -62,52 +130,23 @@ void handle_notification(char *method, json_any_t params) {
         }
 
         json_obj_t *text_document = json_obj_get(params.obj, "textDocument").obj;
-
-        // parse that shit
-        char *uri = json_obj_get(text_document, "uri").str;
+        char *uri     = json_obj_get(text_document, "uri").str;
         char *content = json_obj_get(text_document, "text").str;
-        size_t content_len = strlen(content);
-
-        // lexer wants content to be a da.
-        // we also need to convert escaped stuff into the normal stuff
-        char *content_da = {0};
-        da_reserve(content_da, content_len);
-
-        for (size_t i = 0; i < content_len; ++i) {
-            if (i < content_len - 1 && content[i] == '\\') {
-                switch(content[i+1]) {
-                    case 'n':
-                        da_append(content_da, '\n');
-                        ++i;
-                        break;
-                    case '"':
-                        da_append(content_da, '"');
-                        ++i;
-                        break;
-                    default:
-                        LOG("Unhandled escape char %c", content[i+1]);
-                        exit(1);
-                }
-            } else {
-                da_append(content_da, content[i]);
-            }
-        }
-
-        lexer_init(uri, content_da);
-
-        int err = setjmp(FAIL_JMP_ENV);
-
-        if (err) {
-            // returned from longjmp
-            publish_diagnostics(uri);
+        handle_document(uri, content);
+    }
+    if (strcmp(method, "textDocument/didChange") == 0) {
+        if (params.kind != JSON_OBJ) {
+            LOG("Error: missing params");
             return;
         }
 
-        parse();
-        print_tree(LOG_FILE, root);
-
-        fflush(LOG_FILE);
-
+        json_obj_t *text_document = json_obj_get(params.obj, "textDocument").obj;
+        char *uri = json_obj_get(text_document, "uri").str;
+        LOG("%s", uri);
+        json_arr_t *changes = json_obj_get(params.obj, "contentChanges").arr;
+        char *content = json_obj_get(changes->elements[0].obj, "text").str;
+        LOG("%s", content);
+        handle_document(uri, content);
     }
 }
 
@@ -133,6 +172,8 @@ int main() {
     setvbuf(stdin, NULL, _IONBF, 0);
     log_init();
     fail_init_diagnostic();
+
+    LOG("Fail mode: %d", fail_mode);
 
     for (;;) {
         json_obj_t *obj = next_request();
