@@ -128,7 +128,7 @@ static node_t* parse_declaration(node_t* identifier) {
         token_t rbrace_token = peek_expect_advance(LEX_RBRACE);
         // TODO: insert return statement if not exists
         if (da_size(rhs->children) == 0 || rhs->children[da_size(rhs->children)-1]->type != RETURN_STATEMENT) {
-            node_t* fake_return_node = node_create(RETURN_STATEMENT);
+            node_t* fake_return_node = node_create_leaf(RETURN_STATEMENT, rbrace_token);
             // TODO: check if setting rbrace as location makes sense
             fake_return_node->pos = rbrace_token;
             node_add_child(rhs, fake_return_node);
