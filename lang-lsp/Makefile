@@ -1,6 +1,6 @@
 CFLAGS := -g -O2 -Wall -Wextra -I../da/ -I../lang/
 LANG_OBJS := parser.o lex.o tree.o fail.o symbol.o symbol_table.o type.o tree_transform.o tac.o
-OBJS   := main.o json.o json_rpc.o da.o log.o $(LANG_OBJS)
+OBJS   := main.o json.o json_rpc.o da.o log.o semantic_tokens.o util.o $(LANG_OBJS)
 
 langls: $(OBJS)
 	gcc $(CFLAGS) -o $@ $(OBJS)

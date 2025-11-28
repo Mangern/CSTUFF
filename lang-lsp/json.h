@@ -53,6 +53,6 @@ struct json_any_t json_obj_get(struct json_obj_t *obj, char *key);
 void json_obj_put(struct json_obj_t *obj, char *key, struct json_any_t val);
 
 // Str: DA
-void json_dumps(char **str, struct json_any_t *json);
+void json_dumps(char **str, struct json_any_t json);
 
 #endif // JSON_H

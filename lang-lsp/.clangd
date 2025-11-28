@@ -1,2 +1,3 @@
 CompileFlags:
   Add: [-I../da/, -I../lang/, -xc]
+  Remove:[-std=gnu++2b]

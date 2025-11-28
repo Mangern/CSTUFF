@@ -60,7 +60,7 @@ void write_response(int64_t id, json_any_t result) {
     json_obj_put(&msg_obj, "result", result);
 
     char *out = 0;
-    json_dumps(&out, &msg);
+    json_dumps(&out, msg);
 
     fprintf(stdout, "Content-Length: %zu\r\n\r\n", da_size(out));
     fprintf(stdout, "%s", out);
@@ -77,7 +77,7 @@ void write_notification(char *method, json_any_t params) {
     json_obj_put(&msg_obj, "params", params);
 
     char *out = 0;
-    json_dumps(&out, &msg);
+    json_dumps(&out, msg);
 
     fprintf(stdout, "Content-Length: %zu\r\n\r\n", da_size(out));
     fprintf(stdout, "%s", out);

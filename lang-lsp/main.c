@@ -4,34 +4,22 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "log.h"
-#include "json.h"
-#include "json_types.h"
-#include "json_rpc.h"
 #include "da.h"
+#include "json.h"
+#include "json_rpc.h"
+#include "json_types.h"
+#include "log.h"
+#include "semantic_tokens.h"
 
+#include "fail.h"
 #include "lex.h"
 #include "parser.h"
 #include "symbol.h"
-#include "tree.h"
-#include "fail.h"
-#include "type.h"
-#include "tree_transform.h"
 #include "tac.h"
-
-json_obj_t* range_to_json(range_t range) {
-    json_obj_t *range_obj = calloc(1, sizeof(json_obj_t));
-    json_obj_t *start_obj = calloc(1, sizeof(json_obj_t));
-    json_obj_t *end_obj   = calloc(1, sizeof(json_obj_t));
-
-    json_obj_put(start_obj, "line", JSON_ANY_NUM(range.start.line));
-    json_obj_put(start_obj, "character", JSON_ANY_NUM(range.start.character));
-    json_obj_put(end_obj, "line", JSON_ANY_NUM(range.end.line));
-    json_obj_put(end_obj, "character", JSON_ANY_NUM(range.end.character));
-    json_obj_put(range_obj, "start", JSON_ANY_OBJ(start_obj));
-    json_obj_put(range_obj, "end", JSON_ANY_OBJ(end_obj));
-    return range_obj;
-}
+#include "tree.h"
+#include "tree_transform.h"
+#include "type.h"
+#include "util.h"
 
 void publish_diagnostics(char *uri) {
     json_obj_t msg = {0};
@@ -57,6 +45,9 @@ void publish_diagnostics(char *uri) {
     da_clear(diagnostics);
 }
 
+node_t *current_root = 0;
+char *current_uri = 0;
+
 void handle_document(char *uri, char *content) {
     // parse that shit
     size_t content_len = strlen(content);
@@ -75,6 +66,14 @@ void handle_document(char *uri, char *content) {
                     break;
                 case '"':
                     da_append(content_da, '"');
+                    ++i;
+                    break;
+                case '\\':
+                    da_append(content_da, '\\');
+                    ++i;
+                    break;
+                case 't':
+                    da_append(content_da, '\t');
                     ++i;
                     break;
                 default:
@@ -115,6 +114,10 @@ void handle_document(char *uri, char *content) {
 
         // sadly some checks are done in tac as well
         generate_function_codes();
+
+        // should we copy to make sure not deleted?
+        current_root = root;
+        current_uri = uri;
     }
     // publish to flush
     publish_diagnostics(uri);
@@ -159,12 +162,28 @@ void handle_request(int64_t id, char *method, json_any_t params) {
             return;
         }
         json_obj_t capabilities = {0};
+        
         // textDocumentSync == 1 == TextDocumentSyncKind.Full
         json_obj_put(&capabilities, "textDocumentSync", JSON_ANY_NUM(1));
+        json_obj_put(&capabilities, "semanticTokensProvider", JSON_ANY_OBJ(get_semantic_tokens_options()));
         json_obj_t result = {0};
         json_obj_put(&result, "capabilities", JSON_ANY_OBJ(&capabilities));
         write_response(id, JSON_ANY_OBJ(&result));
         return;
+    }
+
+    if (strcmp(method, "textDocument/semanticTokens/full") == 0) {
+        if (params.kind != JSON_OBJ) {
+            LOG("Error: missing params");
+            return;
+        }
+        json_obj_t *text_document = json_obj_get(params.obj, "textDocument").obj;
+
+        char *uri = json_obj_get(text_document, "uri").str;
+
+        if (uri_eq(uri, current_uri)) {
+            handle_semantic_tokens(id, current_root);
+        }
     }
 }
 

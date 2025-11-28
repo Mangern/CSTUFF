@@ -259,8 +259,8 @@ void json_obj_put(struct json_obj_t *obj, char *key, struct json_any_t val) {
     da_append(obj->entries, kv);
 }
 
-void json_dumps(char **str, struct json_any_t *json) {
-    switch(json->kind) {
+void json_dumps(char **str, struct json_any_t json) {
+    switch(json.kind) {
     case JSON_NONE:
         {
             da_strncat(str, "null", 4);
@@ -268,7 +268,7 @@ void json_dumps(char **str, struct json_any_t *json) {
         break;
     case JSON_OBJ:
         {
-            json_obj_t *obj = json->obj;
+            json_obj_t *obj = json.obj;
             da_append(*str, '{');
 
             for (size_t i = 0; i < da_size(obj->entries); ++i) {
@@ -280,14 +280,14 @@ void json_dumps(char **str, struct json_any_t *json) {
                 da_strncat(str, key, strlen(key));
                 da_append(*str, '"');
                 da_append(*str, ':');
-                json_dumps(str, &obj->entries[i].val);
+                json_dumps(str, obj->entries[i].val);
             }
             da_append(*str, '}');
         }
         break;
     case JSON_ARR:
         {
-            json_arr_t *arr = json->arr;
+            json_arr_t *arr = json.arr;
             da_append(*str, '[');
 
             for (size_t i = 0; i < da_size(arr->elements); ++i) {
@@ -295,7 +295,7 @@ void json_dumps(char **str, struct json_any_t *json) {
                     da_append(*str, ',');
                 }
 
-                json_dumps(str, &arr->elements[i]);
+                json_dumps(str, arr->elements[i]);
             }
             da_append(*str, ']');
         }
@@ -305,20 +305,20 @@ void json_dumps(char **str, struct json_any_t *json) {
             // uuh
             char buf[16];
             memset(buf, 0, sizeof buf);
-            sprintf(buf, "%ld", json->num);
+            sprintf(buf, "%ld", json.num);
             da_strncat(str, buf, strlen(buf));
         }
         break;
     case JSON_STR:
         {
             da_append(*str, '"');
-            da_strncat(str, json->str, strlen(json->str));
+            da_strncat(str, json.str, strlen(json.str));
             da_append(*str, '"');
         }
         break;
     case JSON_BOL:
         {
-            if (json->bol == true) {
+            if (json.bol == true) {
                 da_strncat(str, "true", 4);
             } else {
                 da_strncat(str, "false", 5);
