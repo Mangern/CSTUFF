@@ -172,6 +172,9 @@ static node_t* parse_block() {
             // <RETURN> <EXPRESSION>? ';' -> RETURN_STATEMENT[expression]
             lexer_advance();
             node_t* return_node = node_create(RETURN_STATEMENT);
+
+            return_node->pos = token; // store keyword token
+
             if (lexer_peek().type != LEX_SEMICOLON) {
                 node_add_child(return_node, parse_expression());
             }
@@ -238,6 +241,8 @@ static node_t* parse_block() {
             lexer_advance();
             node_t* if_node = node_create(IF_STATEMENT);
 
+            if_node->pos = token; // store keyword token
+
             peek_expect_advance(LEX_LPAREN);
             node_add_child(if_node, parse_expression());
             peek_expect_advance(LEX_RPAREN);
@@ -251,7 +256,10 @@ static node_t* parse_block() {
             if (token.type == LEX_ELSE) {
                 lexer_advance();
 
-                node_add_child(if_node, parse_block());
+                node_t* block_node = parse_block();
+                block_node->pos = token; // store keyword token (ugly edition)
+
+                node_add_child(if_node, block_node);
 
                 peek_expect_advance(LEX_RBRACE);
             }
@@ -261,6 +269,9 @@ static node_t* parse_block() {
             // while (expression) BLOCK
             lexer_advance();
             node_t* while_node = node_create(WHILE_STATEMENT);
+
+            while_node->pos = token; // store keyword token
+
             peek_expect_advance(LEX_LPAREN);
             node_add_child(while_node, parse_expression());
             peek_expect_advance(LEX_RPAREN);
@@ -477,6 +488,7 @@ static node_t* merge_subtrees(token_t operator_token, node_t* lhs, node_t* rhs) 
         } else {
             operator_node = node_create(OPERATOR);
             operator_node->data.operator = lhs_operator;
+            operator_node->pos = operator_token;
         }
         node_add_child(operator_node, lhs);
         node_add_child(operator_node, rhs);
@@ -560,6 +572,9 @@ static node_t* merge_unary_op(token_t operator_token, node_t* rhs) {
     if (rhs->type != OPERATOR || da_size(rhs->children) != 2 || has_precedence(rhs->data.operator, operator)) {
         node_t* operator_node = node_create(OPERATOR);
         operator_node->data.operator = operator;
+
+        operator_node->pos = operator_token; // store keyword token
+
         node_add_child(operator_node, rhs);
 
         return operator_node;
@@ -585,6 +600,7 @@ static node_t* expression_continuation(token_t operator_token, node_t* lhs) {
     if (operator == UNARY_DEREF) {
         node_t* new = node_create(OPERATOR);
         new->data.operator = operator;
+        new->pos = operator_token; // store keyword token
         node_add_child(new, lhs);
 
         token_t nxt = lexer_peek();
@@ -834,6 +850,8 @@ static node_t* parse_block_operation(node_t* lhs_node) {
     node_t* rhs_node = parse_expression();
 
     node_t* operator_node = node_create(OPERATOR);
+
+    operator_node->pos = operator_token;
 
     node_add_child(operator_node, node_deep_copy(lhs_node));
     node_add_child(operator_node, rhs_node);

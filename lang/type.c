@@ -428,7 +428,8 @@ static void register_type_node(node_t* node) {
                 node_t* args_list= node->children[1];
 
                 if (da_size(args_list->children) != da_size(info_function->arg_types->elems)) {
-                    fail("Function %s requires exactly %zu arguments, but was called with %zu\n",
+                    fail_node(args_list, 
+                        "Function %s requires exactly %zu arguments, but was called with %zu",
                         function_symbol->name,
                         da_size(info_function->arg_types->elems),
                         da_size(args_list->children)
