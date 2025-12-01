@@ -177,7 +177,7 @@ token_t lexer_peek() {
         current_token.end_offset = content_ptr + 1;
     } else {
         // TODO: line number information
-        fprintf(stderr, "%s: Unexpected character '%c'\n", location_str(lexer_offset_location(content_ptr)), content[content_ptr]);
+        fail_character(lexer_offset_location(content_ptr), content[content_ptr]);
         exit(1);
     }
     return current_token;

@@ -85,6 +85,25 @@ void fail_token(token_t token) {
     }
 }
 
+void fail_character(location_t loc, char unexpected_char) {
+    if (fail_mode == FAIL_EXIT) {
+        fprintf(stderr, "%s: Unexpected character '%c'\n", location_str(loc), unexpected_char);
+        exit(1);
+    } else {
+        snprintf(fail_buf, FAIL_BUF_SZ, "Unexpected character '%c'\n", unexpected_char);
+        range_t range;
+        range.start = loc;
+        range.end = loc;
+        range.end.character++; // hmm
+        diagnostic_t diag = {
+            .message = strdup(fail_buf),
+            .range = range
+        };
+        da_append(diagnostics, diag);
+        longjmp(FAIL_JMP_ENV, 1);
+    }
+}
+
 void fail_token_expected(token_t token, token_type_t expected) {
     if (fail_mode == FAIL_EXIT) {
         location_t loc;

@@ -1,5 +1,11 @@
+glbl: int;
+func: (x: int) -> void = {
+    println(x);
+}
+square: (x: int) -> int = {
+    return x * x;
+}
 main: () -> void = {
-    if (true && false) {
-        println("Hello");
-    }
+    x := 2 + square(123);
+    func(x);
 }

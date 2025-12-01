@@ -38,4 +38,6 @@ void fail_init_diagnostic();
 void fail_token(token_t);
 void fail_token_expected(token_t, token_type_t);
 
+void fail_character(location_t loc, char);
+
 #endif // FAIL_H
