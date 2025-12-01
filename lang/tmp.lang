@@ -1,11 +1,21 @@
-glbl: int;
-func: (x: int) -> void = {
-    println(x);
-}
-square: (x: int) -> int = {
-    return x * x;
-}
+x: int;
+foo: int[5];
+
 main: () -> void = {
-    x := 2 + square(123);
-    func(x);
+    i: int = 0;
+
+    while (i < 5) {
+        foo[i] = i;
+        i = i + 1;
+    }
+
+    i = 0;
+    while (i < 5) {
+        print(foo[i]);
+        if (i < 4) {
+            print(" ");
+        }
+        i = i + 1;
+    }
+    println();
 }

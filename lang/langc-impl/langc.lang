@@ -71,6 +71,7 @@ read_content: () -> void = {
 };
 
 STRING_PRINTLN: *int;
+STRING_PRINT: *int;
 STRING_INT: *int;
 STRING_VOID: *int;
 
@@ -88,6 +89,16 @@ string_table_init: () -> void = {
     ST_LIT = 1;
 
     // bruhest moment
+    {
+        STRING_PRINT    = alloc(int, 6);
+        STRING_PRINT[0] = cast(int, 'p');
+        STRING_PRINT[1] = cast(int, 'r');
+        STRING_PRINT[2] = cast(int, 'i');
+        STRING_PRINT[3] = cast(int, 'n');
+        STRING_PRINT[4] = cast(int, 't');
+        STRING_PRINT[5] = 0;
+    }
+
     {
         STRING_PRINTLN    = alloc(int, 8);
         STRING_PRINTLN[0] = cast(int, 'p');
@@ -187,6 +198,7 @@ TOK_ARROW  : int;
 TOK_INT    : int;
 TOK_IF     : int;
 TOK_ELSE   : int;
+TOK_WHILE  : int;
 TOK_RETURN : int;
 
 operator_prec: *int;
@@ -207,11 +219,12 @@ lex_init: () -> void = {
     TOK_INT    = 259;
     TOK_IF     = 260;
     TOK_ELSE   = 261;
-    TOK_RETURN = 262;
-    TOK_LEQ    = 263;
-    TOK_GEQ    = 264;
-    TOK_EQ     = 265;
-    TOK_NEQ    = 266;
+    TOK_WHILE  = 262;
+    TOK_RETURN = 263;
+    TOK_LEQ    = 264;
+    TOK_GEQ    = 265;
+    TOK_EQ     = 266;
+    TOK_NEQ    = 267;
 
     operator_prec = alloc(int, 512);
     // 10 * (17 - original C implementation precedence)
@@ -357,6 +370,34 @@ lex_matches_else: () -> int = {
     return 4;
 }
 
+lex_matches_while: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'w')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'h')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'i')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'l')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'e')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr < nbuf && lex_isidchar(buf[ptr])) {
+        return 0;
+    }
+    return 5;
+}
+
 lex_matches_return: () -> int = {
     ptr := lex_ptr;
     if (ptr >= nbuf || buf[ptr] != cast(int, 'r')) {
@@ -474,16 +515,16 @@ lex_peek: () -> int = {
         return cur_tok;
     }
 
-    match = lex_matches_return();
+    match = lex_matches_while();
     if (match > 0) {
-        cur_tok = TOK_RETURN;
+        cur_tok = TOK_WHILE;
         cur_tok_end = cur_tok_beg + match;
         return cur_tok;
     }
 
-    match = lex_matches_id();
+    match = lex_matches_return();
     if (match > 0) {
-        cur_tok = TOK_ID;
+        cur_tok = TOK_RETURN;
         cur_tok_end = cur_tok_beg + match;
         return cur_tok;
     }
@@ -530,6 +571,14 @@ lex_peek: () -> int = {
         return cur_tok;
     }
 
+// I think identifier should be checked last
+    match = lex_matches_id();
+    if (match > 0) {
+        cur_tok = TOK_ID;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
     cur_tok = buf[lex_ptr];
     cur_tok_end = cur_tok_beg + 1;
     return cur_tok;
@@ -571,6 +620,10 @@ tok_print: (t: int) -> void = {
     }
     if (t == TOK_ELSE) {
         println("else");
+        return;
+    }
+    if (t == TOK_WHILE) {
+        println("while");
         return;
     }
     if (t == TOK_RETURN) {
@@ -628,6 +681,7 @@ NODE_LIT_STR: int; // leaf
 NODE_LIT_INT: int; // leaf
 NODE_BINOP  : int; // [expression, expression]
 NODE_IF     : int; // [expr, expr] | [expr, expr, expr]
+NODE_WHILE  : int; // [expr, expr]
 NODE_RETURN : int; // [] | [expr]
 NODE_INDEX  : int; // [identifier, expr] 
 
@@ -816,8 +870,9 @@ parser_init: () -> void = {
     NODE_LIT_INT = 8;
     NODE_BINOP   = 9;
     NODE_IF      = 10;
-    NODE_RETURN  = 11;
-    NODE_INDEX   = 12;
+    NODE_WHILE   = 11;
+    NODE_RETURN  = 12;
+    NODE_INDEX   = 13;
 
 }
 
@@ -907,7 +962,7 @@ parse_declaration: (id_node: int) -> int = {
 
     if (token == cast(int, '=')) {
         lex_advance();
-        node_add_child(decl_node, parse_expression());
+        node_add_child(decl_node, parse_whileif_body());
         return decl_node;
     }
 
@@ -928,7 +983,7 @@ parse_declaration: (id_node: int) -> int = {
 
     token = lex_peek();
 
-    node_add_child(decl_node, parse_expression());
+    node_add_child(decl_node, parse_whileif_body());
 
     return decl_node;
 }
@@ -949,10 +1004,11 @@ parse_block: () -> int = {
 
         expect_semicolon := !(
              (token == TOK_IF)
+          || (token == TOK_WHILE)
           || (token == cast(int, '{'))
         );
 
-        node_add_child(block_node, parse_expression());
+        node_add_child(block_node, parse_statement());
 
         if (expect_semicolon) {
             peek_expect_advance(cast(int, ';'));
@@ -1048,7 +1104,7 @@ parse_paren_expr: () -> int = {
 parse_if_expr: () -> int = {
     peek_expect_advance(TOK_IF);
     cond := parse_paren_expr();
-    body := parse_expression();
+    body := parse_whileif_body();
     token := lex_peek();
 
     if_node := node_create(NODE_IF);
@@ -1061,6 +1117,30 @@ parse_if_expr: () -> int = {
         node_add_child(if_node, else_body);
     }
     return if_node;
+}
+
+parse_while_expr: () -> int = {
+    peek_expect_advance(TOK_WHILE);
+    cond := parse_paren_expr();
+    body := parse_whileif_body();
+
+    while_node := node_create(NODE_WHILE);
+    node_add_child(while_node, cond);
+    node_add_child(while_node, body);
+    return while_node;
+}
+
+parse_whileif_body: () -> int = {
+    token := lex_peek();
+
+    if (token == cast(int, '{')) {
+        lex_advance();
+        block_node := parse_block();
+        peek_expect_advance(cast(int, '}'));
+        return block_node;
+    }
+
+    return parse_expression();
 }
 
 parse_return_expr: () -> int = {
@@ -1081,9 +1161,6 @@ parse_return_expr: () -> int = {
 //     ::= lit_int
 //     ::= lit_str
 //     ::= parenexpr
-//     ::= block
-//     ::= ifexpr
-//     ::= returnexpr
 parse_primary_expr: () -> int = {
     token := lex_peek();
 
@@ -1108,21 +1185,6 @@ parse_primary_expr: () -> int = {
     if (token == TOK_ID) {
         return parse_identifier_expr();
     }
-    if (token == cast(int, '{')) {
-        lex_advance();
-        block_node := parse_block();
-        peek_expect_advance(cast(int, '}'));
-        return block_node;
-    }
-
-    if (token == TOK_IF) {
-        return parse_if_expr();
-    }
-
-    if (token == TOK_RETURN) {
-        return parse_return_expr();
-    }
-
 
     print("parse_primary_expr unhandled token: ");
     tok_print(token);
@@ -1154,6 +1216,31 @@ parse_expr_rhs: (expr_prec: int, lhs: int) -> int = {
         lhs = op_node;
     }
     return lhs;
+}
+
+parse_statement: () -> int = {
+    token := lex_peek();
+
+    if (token == TOK_IF) {
+        return parse_if_expr();
+    }
+
+    if (token == TOK_WHILE) {
+        return parse_while_expr();
+    }
+
+    if (token == TOK_RETURN) {
+        return parse_return_expr();
+    }
+
+    if (token == cast(int, '{')) {
+        lex_advance();
+        block_node := parse_block();
+        peek_expect_advance(cast(int, '}'));
+        return block_node;
+    }
+
+    return parse_expression();
 }
 
 // expression
@@ -1251,7 +1338,8 @@ TYPE_ARR: int;   // subtype: subtype, length: length
 TYPE_STRLIT: int; // nothing
 
 // basic variants
-TYPE_B_INT: int;
+TYPE_B_INT:  int;
+TYPE_B_BOOL: int;
 
 
 // type table
@@ -1300,7 +1388,8 @@ symbol_table_init: () -> void = {
     TYPE_STRLIT  = 5;
 
     // subtype variants
-    TYPE_B_INT = 0;
+    TYPE_B_INT  = 0;
+    TYPE_B_BOOL = 1;
 
     scope_parent = alloc(int, 1);
     scope_syms = alloc(*int, 1);
@@ -1430,6 +1519,16 @@ type_is_int: (typeid: int) -> bool = {
         return false;
     }
     if (type_data_subtype[typeid] != TYPE_B_INT) {
+        return false;
+    }
+    return true;
+}
+
+type_is_bool: (typeid: int) -> bool = {
+    if (type_class[typeid] != TYPE_BASIC) {
+        return false;
+    }
+    if (type_data_subtype[typeid] != TYPE_B_BOOL) {
         return false;
     }
     return true;
@@ -1775,6 +1874,10 @@ CURRENT_FUNC_BLOCK: int;
 resolve_symbols: (root: int) -> void = {
     // builtin functions
     {
+        print_idx := string_table_add(STRING_PRINT, 5);
+        symbol_table_insert(-1, print_idx, 0, type_create_func(type_create(TYPE_VOID), -1));
+    }
+    {
         println_idx := string_table_add(STRING_PRINTLN, 7);
         symbol_table_insert(-1, println_idx, 0, type_create_func(type_create(TYPE_VOID), -1));
     }
@@ -2033,8 +2136,7 @@ resolve_node: (node: int, scope: int) -> void = {
             println();
             exit := 1 / 0;
         }
-
-        node_data_type[node] = node_data_type[lhs];
+        set_operator_type(node, node_data_type[lhs], node_data_type[rhs]);
         return;
     }
 
@@ -2107,8 +2209,45 @@ resolve_node: (node: int, scope: int) -> void = {
         return;
     }
 
-    if ( (node_type[node] == NODE_IF)
-      || (node_type[node] == NODE_BLOCK)
+    if (node_type[node] == NODE_IF) {
+        i := 0;
+        while (i < node_children_sz[node]) {
+            resolve_node(children[i], new_scope);
+            i += 1;
+        }
+
+        cond_node := children[0];
+
+        if (!type_is_bool(node_data_type[cond_node])) {
+            print("if-condition must be bool, not ");
+            type_print(node_data_type[cond_node]);
+            println();
+            exit := 1 / 0;
+        }
+        node_data_type[node] = type_create(TYPE_VOID);
+
+        return;
+    }
+    if (node_type[node] == NODE_WHILE) {
+        i := 0;
+        while (i < node_children_sz[node]) {
+            resolve_node(children[i], new_scope);
+            i += 1;
+        }
+
+        cond_node := children[0];
+
+        if (!type_is_bool(node_data_type[cond_node])) {
+            print("while-condition must be bool, not ");
+            type_print(node_data_type[cond_node]);
+            println();
+            exit := 1 / 0;
+        }
+        node_data_type[node] = type_create(TYPE_VOID);
+        return;
+    }
+
+    if ( (node_type[node] == NODE_BLOCK)
       || (node_type[node] == NODE_LIST)
     ) {
 
@@ -2130,6 +2269,33 @@ resolve_node: (node: int, scope: int) -> void = {
     node_print(node);
     println();
     exit := 1/ 0;
+}
+
+// kinda assumes validity is checked
+set_operator_type: (operator_node: int, lhs_type: int, rhs_type: int) -> void = {
+    op := node_data_op[operator_node];
+
+    if ( op == cast(int, '=')
+      || op == cast(int, '+')
+      || op == cast(int, '-')
+      || op == cast(int, '*')
+      || op == cast(int, '/')
+      || op == cast(int, '%')) {
+        node_data_type[operator_node] = lhs_type;
+        return;
+    }
+
+    if ( op == cast(int, '<')
+      || op == cast(int, '>')
+      || op == TOK_EQ
+      || op == TOK_NEQ
+      || op == TOK_LEQ
+      || op == TOK_GEQ ) {
+        node_data_type[operator_node] = type_create_basic(TYPE_B_BOOL);
+        return;
+    }
+
+    println("set_operator_type unhandled operator:", op);
 }
 
 // ==================== GEN ====================
@@ -2351,6 +2517,11 @@ generate_node: (node: int) -> void = {
         return;
     }
 
+    if (node_type[node] == NODE_WHILE) {
+        generate_while(node);
+        return;
+    }
+
     if (node_type[node] == NODE_DECL) {
         generate_decl(node);
         return;
@@ -2387,6 +2558,14 @@ generate_function_call: (node: int) -> void = {
     id_node := children[0];
 
     id_stridx := node_data_str[id_node];
+
+    if (streq(string_table[id_stridx],
+        STRING_PRINT,
+        string_table_len[id_stridx])
+    ) {
+        generate_call_print(children[1]);
+        return;
+    }
 
     if (streq(
         string_table[id_stridx], 
@@ -2469,7 +2648,64 @@ generate_call_println: (args_node: int) -> void = {
     }
 
     println("    movq $'\\n', %rdi");
+    println("    pushq %rbp");
+    println("    movq %rsp, %rbp");
+    println("    andq $-16, %rsp");
     println("    call putchar");
+    println("    movq %rbp, %rsp");
+    println("    popq %rbp");
+ 
+}
+
+generate_call_print: (args_node: int) -> void = {
+    args := node_children[args_node];
+
+    i := 0;
+    while (i < node_children_sz[args_node]) {
+        if (i > 0) {
+            println("    movq $' ', %rdi");
+            // align stuff
+            println("    pushq %rbp");
+            println("    movq %rsp, %rbp");
+            println("    andq $-16, %rsp");
+            println("    call putchar");
+            println("    movq %rbp, %rsp");
+            println("    popq %rbp");
+        }
+
+        arg := args[i];
+
+        generate_expression(arg);
+        println("    movq %rax, %rsi");
+
+        while (true) {
+            // TODO: type checking and not this mess
+            if (type_is_strlit(node_data_type[arg])) {
+                println("    leaq strout(%rip), %rdi");
+                break;
+            }
+
+            if (type_is_int(node_data_type[arg])) {
+                println("    leaq intout(%rip), %rdi");
+                break;
+            }
+
+            println("Unhandled node type println");
+            print("Violating: ");
+            node_print(arg);
+            println();
+            exit := 1 / 0;
+        }
+        println("    movq $1, %rax");
+        // align stuff
+        println("    pushq %rbp");
+        println("    movq %rsp, %rbp");
+        println("    andq $-16, %rsp");
+        println("    call printf");
+        println("    movq %rbp, %rsp");
+        println("    popq %rbp");
+        i += 1;
+    }
 }
 
 // expects: lhs in %rcx, rhs in %rax
@@ -2601,8 +2837,19 @@ generate_expression: (node: int) -> void = {
         return;
     }
 
+    if (node_type[node] == NODE_WHILE) {
+        generate_while(node);
+        return;
+    }
+
+
     if (node_type[node] == NODE_RETURN) {
         generate_return(node);
+        return;
+    }
+
+    if (node_type[node] == NODE_ASSIGN) {
+        generate_assign(node);
         return;
     }
 
@@ -2679,6 +2926,30 @@ generate_if: (node: int) -> void = {
     println(":");
 }
 
+generate_while: (node: int) -> void = {
+    children := node_children[node];
+
+    cur_while_start := gen_next_label();
+    cur_while_end   := gen_next_label();
+    print("WHILE");
+    print(cur_while_start);
+    println(":");
+    generate_expression(children[0]);
+
+    println("    cmpq $0, %rax");
+    print("    je ENDWHILE");
+    println(cur_while_end);
+
+    generate_expression(children[1]);
+
+    print("    jmp WHILE");
+    println(cur_while_start);
+
+    print("ENDWHILE");
+    print(cur_while_end);
+    println(":");
+}
+
 generate_return: (node: int) -> void = {
     children := node_children[node];
     if (node_children_sz[node] > 0) {
@@ -2699,7 +2970,7 @@ generate_assign: (node: int) -> void = {
     if (node_type[lhs] == NODE_ID) {
         generate_expression(rhs);
         print("    movq %rax, ");
-        emit_sym_access(node_data_sym[rhs]);
+        emit_sym_access(node_data_sym[lhs]);
         println();
         return;
     }
@@ -2780,6 +3051,10 @@ gen_next_label: () -> int = {
 type_print_basic: (basic_variant: int) -> void = {
     if (basic_variant == TYPE_B_INT) {
         print("int");
+        return;
+    }
+    if (basic_variant == TYPE_B_BOOL) {
+        print("bool");
         return;
     }
 
@@ -2893,6 +3168,10 @@ node_print: (node: int) -> void = {
     }
     if (typ == NODE_IF) {
         print("IF ");
+        return;
+    }
+    if (typ == NODE_WHILE) {
+        print("WHILE ");
         return;
     }
     if (typ == NODE_RETURN) {
