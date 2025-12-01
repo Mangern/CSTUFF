@@ -1284,6 +1284,8 @@ symbol_table_scope: *int;
 symbol_table_decl_node: *int;
 // sequence number in function
 symbol_table_seq: *int;
+// offset from rbp (local vars ONLY)
+symbol_table_offs: *int;
 symbol_table_sz: int;
 symbol_table_cap: int;
 
@@ -1392,6 +1394,37 @@ type_create_func: (ret_type: int, num_args: int) -> int = {
     return typeid;
 }
 
+// Return size of a type in bytes
+type_sizeof: (typeid: int) -> int = {
+    tc := type_class[typeid];
+
+    if (tc == TYPE_VOID) {
+        // Hmm
+        return 0;
+    }
+
+    if (tc == TYPE_BASIC) {
+        if (type_data_subtype[typeid] == TYPE_B_INT) {
+            // "long"
+            return 8;
+        }
+
+        println("Unhandled basic type in type_sizeof:", type_data_subtype[typeid]);
+        exit := 1 / 0;
+    }
+
+    if (tc == TYPE_ARR) {
+        subsize := type_sizeof(type_data_subtype[typeid]);
+        return subsize * type_data_length[typeid];
+    }
+
+    println("Unhandled type class in type_sizeof:", tc);
+    type_print(typeid);
+    println();
+    exit := 1 / 0;
+    return 0;
+}
+
 type_is_int: (typeid: int) -> bool = {
     if (type_class[typeid] != TYPE_BASIC) {
         return false;
@@ -1408,6 +1441,10 @@ type_is_strlit: (typeid: int) -> bool = {
 
 type_is_func: (typeid: int) -> bool = {
     return type_class[typeid] == TYPE_FUNC;
+}
+
+type_is_arr: (typeid: int) -> bool = {
+    return type_class[typeid] == TYPE_ARR;
 }
 
 type_get_type: (type_node: int) -> int = {
@@ -1645,6 +1682,7 @@ symbol_table_insert: (decl_node: int, stridx: int, scope: int, symtype: int) -> 
         new_table_scope     := alloc(int, new_cap);
         new_table_seq       := alloc(int, new_cap);
         new_table_decl_node := alloc(int, new_cap);
+        new_table_offs      := alloc(int, new_cap);
 
         i := 0;
         while (i < symbol_table_cap) {
@@ -1653,6 +1691,7 @@ symbol_table_insert: (decl_node: int, stridx: int, scope: int, symtype: int) -> 
             new_table_scope[i]     = symbol_table_scope[i];
             new_table_seq[i]       = symbol_table_seq[i];
             new_table_decl_node[i] = symbol_table_decl_node[i];
+            new_table_offs[i]      = symbol_table_offs[i];
             i += 1;
         }
 
@@ -1662,6 +1701,7 @@ symbol_table_insert: (decl_node: int, stridx: int, scope: int, symtype: int) -> 
             delete(symbol_table_scope);
             delete(symbol_table_seq);
             delete(symbol_table_decl_node);
+            delete(symbol_table_offs);
         }
 
         symbol_table_str       = new_table_str;
@@ -1669,6 +1709,7 @@ symbol_table_insert: (decl_node: int, stridx: int, scope: int, symtype: int) -> 
         symbol_table_scope     = new_table_scope;
         symbol_table_seq       = new_table_seq;
         symbol_table_decl_node = new_table_decl_node;
+        symbol_table_offs      = new_table_offs;
         symbol_table_cap       = new_cap;
     }
 
@@ -1679,7 +1720,6 @@ symbol_table_insert: (decl_node: int, stridx: int, scope: int, symtype: int) -> 
     symbol_table_type[symidx]      = symtype;
     symbol_table_scope[symidx]     = scope;
     symbol_table_decl_node[symidx] = decl_node;
-
     symbol_table_scope_append(scope, symidx);
 
     return symidx;
@@ -1832,6 +1872,7 @@ resolve_symbols: (root: int) -> void = {
     }
 }
 
+// Resolve symbols and register types!
 resolve_node: (node: int, scope: int) -> void = {
     children := node_children[node];
     if (node_type[node] == NODE_DECL) {
@@ -2026,12 +2067,43 @@ resolve_node: (node: int, scope: int) -> void = {
 
         if (!types_equivalent(node_data_type[lhs], node_data_type[rhs])) {
             print("Cannot assign ");
-            type_print(rhs);
+            type_print(node_data_type[rhs]);
             print(" to type ");
-            type_print(lhs);
+            type_print(node_data_type[lhs]);
             println();
             exit := 1 / 0;
         }
+        // should it inherit type?
+        node_data_type[node] = node_data_type[lhs];
+        return;
+    }
+
+    if (node_type[node] == NODE_INDEX) {
+        id_node := children[0];
+        expr_node := children[1];
+        resolve_node(id_node, new_scope);
+        resolve_node(expr_node, new_scope);
+
+        id_type := node_data_type[id_node];
+        expr_type := node_data_type[expr_node];
+        if (!type_is_arr(id_type)) {
+            print("Cannot index non-array '");
+            string_table_print(node_data_str[id_node]);
+            println("'");
+            exit := 1 / 0;
+        }
+
+        if (!type_is_int(expr_type)) {
+            print("Cannot index array '");
+            string_table_print(node_data_str[id_node]);
+            print("' using non-integral data type ");
+            type_print(expr_type);
+            println();
+            exit := 1 / 0;
+        }
+
+        // an indexed element gets type == subtype of arr
+        node_data_type[node] = type_data_subtype[id_type];
         return;
     }
 
@@ -2104,22 +2176,18 @@ generate_code: (root: int) -> void = {
         global_syms := scope_syms[0];
         while (i < scope_szs[0]) {
             sym := global_syms[i];
+            sym_type := symbol_table_type[sym];
 
-            if (type_is_func(symbol_table_type[sym])) {
+            if (type_is_func(sym_type)
+             || type_is_strlit(sym_type)) {
                 i += 1;
                 continue;
             }
+            print(".");
+            string_table_print(symbol_table_str[sym]);
+            println(": .zero", type_sizeof(sym_type));
 
-            if (type_is_int(symbol_table_type[sym])) {
-                print(".");
-                string_table_print(symbol_table_str[sym]);
-                println(": .zero 8");
-                i += 1;
-                continue;
-            }
-
-            println("Unhandled global symbol type:", symbol_table_type[sym]);
-            exit := 1 / 0;
+            i += 1;
         }
     }
 
@@ -2221,7 +2289,8 @@ generate_function_code: (func_scope: int, id_node: int, type_node: int, body_nod
         while (sym < symbol_table_sz) {
             sc := symbol_table_scope[sym];
             if (scope_is_parent(func_scope, sc)) {
-                local_space += 8; // TODO: type sizeof
+                local_space += type_sizeof(symbol_table_type[sym]);
+                symbol_table_offs[sym] = -local_space;
             }
             sym += 1;
         }
@@ -2356,7 +2425,13 @@ generate_call_println: (args_node: int) -> void = {
     while (i < node_children_sz[args_node]) {
         if (i > 0) {
             println("    movq $' ', %rdi");
+            // align stuff
+            println("    pushq %rbp");
+            println("    movq %rsp, %rbp");
+            println("    andq $-16, %rsp");
             println("    call putchar");
+            println("    movq %rbp, %rsp");
+            println("    popq %rbp");
         }
 
         arg := args[i];
@@ -2538,6 +2613,26 @@ generate_expression: (node: int) -> void = {
         return;
     }
 
+    if (node_type[node] == NODE_INDEX) {
+        // load the boi in %rax
+        children := node_children[node];
+        id_node := children[0];
+        expr_node := children[1];
+
+        // get our index
+        generate_expression(expr_node);
+
+        print("    leaq ");
+        emit_sym_access(node_data_sym[id_node]);
+        println(", %rcx");
+        sz := type_sizeof(type_data_subtype[node_data_type[id_node]]);
+        println("    leaq (%rcx, %rax,", sz, "), %rcx");
+
+        // end goal: memory address of indexed item in rcx
+        println("    movq (%rcx), %rax");
+        return;
+    }
+
     print("generate_expression unhandled node type: ");
     node_print(node);
     println();
@@ -2595,37 +2690,63 @@ generate_return: (node: int) -> void = {
     println(".epilogue");
 }
 
+// TODO: we could benefit from some lvalue-rvalue stuff here
 generate_assign: (node: int) -> void = {
     children := node_children[node];
     lhs := children[0];
+    rhs := children[1];
 
     if (node_type[lhs] == NODE_ID) {
-        generate_expression(children[1]);
+        generate_expression(rhs);
         print("    movq %rax, ");
-        emit_sym_access(node_data_sym[children[0]]);
+        emit_sym_access(node_data_sym[rhs]);
         println();
         return;
     }
+    
+    if (node_type[lhs] == NODE_INDEX) {
+        lhs_children := node_children[lhs];
+        id_node := lhs_children[0];
+        expr_node := lhs_children[1];
+
+        // get our index
+        generate_expression(expr_node);
+
+        print("    leaq ");
+        emit_sym_access(node_data_sym[id_node]);
+        println(", %rcx");
+        sz := type_sizeof(type_data_subtype[node_data_type[id_node]]);
+        println("    leaq (%rcx, %rax,", sz, "), %rcx");
+        // address where we want to store is in %rcx
+        println("    pushq %rcx");
+        generate_expression(rhs);
+        println("    popq %rcx");
+        // store it
+        println("    movq %rax, (%rcx)");
+        // as a nice side effect, the value stored is also in %rax at this point ...
+        return;
+    }
+
     print("Unhandled lhs type in generate_assign: ");
     node_print(lhs);
     println();
     exit := 1 / 0;
 }
 
+emit_global_sym_access: (sym: int) -> void = {
+    // global
+    print(".");
+    string_table_print(symbol_table_str[sym]);
+    print("(%rip)");
+    return;
+}
+
 emit_sym_access: (sym: int) -> void = {
     if (symbol_table_scope[sym] == 0) {
-        // global
-        print(".");
-        string_table_print(symbol_table_str[sym]);
-        print("(%rip)");
+        emit_global_sym_access(sym);
         return;
     }
-
-    seq := symbol_table_seq[sym];
-
-    offs := - (seq + 1) * 8;
-
-    print(offs);
+    print(symbol_table_offs[sym]);
     print("(%rbp)");
 }
 
@@ -2674,9 +2795,9 @@ type_print: (typeid: int) -> void = {
         return;
     }
     if (tc == TYPE_BASIC) {
-        print("basic[");
+        print("basic<");
         type_print_basic(type_data_subtype[typeid]);
-        print("]");
+        print(">");
         return;
     }
     if (tc == TYPE_FUNC) {
@@ -2778,6 +2899,10 @@ node_print: (node: int) -> void = {
         print("RETURN");
         return;
     }
+    if (typ == NODE_INDEX) {
+        print("INDEX");
+        return;
+    }
     print("????");
 }
 
@@ -2790,9 +2915,8 @@ print_tree: (node: int, indent: int) -> void = {
         }
     }
     node_print(node);
-    print(" <");
+    print(" :: ");
     type_print(node_data_type[node]);
-    print(">");
     println();
 
     i := 0;
@@ -2846,7 +2970,10 @@ main: () -> void = {
 
     symbol_table_init();
 
+
     resolve_symbols(root);
+
+    //print_tree(root, 0);
 
     //print_symbols();
 
