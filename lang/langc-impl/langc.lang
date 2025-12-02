@@ -275,6 +275,7 @@ lex_init: () -> void = {
     operator_prec[TOK_AMOD]       = 30;
     operator_prec[TOK_OR]         = 50;
     operator_prec[TOK_AND]        = 60;
+    operator_prec[cast(int, '!')] = 150;
 }
 
 
@@ -952,6 +953,7 @@ NODE_CALL    : int; // [identifier, list[expression]]
 NODE_LIT_STR : int; // leaf
 NODE_LIT_INT : int; // leaf
 NODE_LIT_BOOL: int;
+NODE_UNOP    : int; // [expression]
 NODE_BINOP   : int; // [expression, expression]
 NODE_IF      : int; // [expr, expr] | [expr, expr, expr]
 NODE_WHILE   : int; // [expr, expr]
@@ -1166,12 +1168,12 @@ parser_init: () -> void = {
     NODE_LIT_STR  = 7;
     NODE_LIT_INT  = 8;
     NODE_LIT_BOOL = 9;
-    NODE_BINOP    = 10;
-    NODE_IF       = 11;
-    NODE_WHILE    = 12;
-    NODE_RETURN   = 13;
-    NODE_INDEX    = 14;
-
+    NODE_UNOP     = 10;
+    NODE_BINOP    = 11;
+    NODE_IF       = 12;
+    NODE_WHILE    = 13;
+    NODE_RETURN   = 14;
+    NODE_INDEX    = 15;
 }
 
 parse_type: () -> int = {
@@ -1513,7 +1515,7 @@ parse_expr_rhs: (expr_prec: int, lhs: int) -> int = {
         }
         // token is guaranteed to be an operator
         lex_advance();
-        rhs := parse_primary_expr();
+        rhs := parse_unary_expr();
 
         next_prec := get_tok_precedence(lex_peek());
         if (prec < next_prec) {
@@ -1556,10 +1558,24 @@ parse_statement: () -> int = {
     return parse_expression();
 }
 
+parse_unary_expr: () -> int = {
+    token := lex_peek();
+
+    if (token == cast(int, '!')) {
+        lex_advance();
+        subexpr := parse_unary_expr();
+        unary_node := node_create(NODE_UNOP);
+        node_data_op[unary_node] = token;
+        node_add_child(unary_node, subexpr);
+        return unary_node;
+    }
+    return parse_primary_expr();
+}
+
 // expression
 //     ::= primary [binop, primary]*
 parse_expression: () -> int = {
-    lhs := parse_primary_expr();
+    lhs := parse_unary_expr();
     return parse_expr_rhs(0, lhs);
 }
 
@@ -2502,6 +2518,24 @@ resolve_node: (node: int, scope: int) -> void = {
         return;
     }
 
+    if (node_type[node] == NODE_UNOP) {
+        sub := children[0];
+        resolve_node(sub, new_scope);
+
+        if (node_data_op[node] == cast(int, '!')) {
+            if (!type_is_bool(node_data_type[sub])) {
+                print("Operator ! can only be applied to boolean expressions, not: ");
+                type_print(node_data_type[sub]);
+                println();
+                exit := 1 / 0;
+            }
+            node_data_type[node] = node_data_type[sub];
+            return;
+        }
+        println("Unhandled unary operator:", node_data_op[node]);
+        exit := 1 / 0;
+    }
+
     if (node_type[node] == NODE_RETURN) {
         ret_type: int;
         if (node_children_sz[node] == 0) {
@@ -3074,6 +3108,19 @@ generate_call_print: (args_node: int) -> void = {
     }
 }
 
+// expect subexpression in %rcx
+generate_unop: (op: int) -> void = {
+    if (op == cast(int, '!')) {
+        println("    xor %rax, %rax");
+        println("    test %rcx, %rcx");
+        println("    sete %al");
+        return;
+    }
+
+    println("generate_unop unhandled operator: ", cast(char, op));
+    exit := 1 / 0;
+}
+
 // expects: lhs in %rcx, rhs in %rax
 // result in %rax
 generate_binop: (op: int) -> void = {
@@ -3227,6 +3274,14 @@ generate_expression: (node: int) -> void = {
             print("0");
         }
         println(", %rax");
+        return;
+    }
+
+    if (node_type[node] == NODE_UNOP) {
+        children := node_children[node];
+        generate_expression(children[0]);
+        println("    movq %rax, %rcx");
+        generate_unop(node_data_op[node]);
         return;
     }
 
@@ -3597,9 +3652,22 @@ node_print: (node: int) -> void = {
         print(")");
         return;
     }
+    if (typ == NODE_UNOP) {
+        print("UNOP ");
+        if (node_data_op[node] < 255) {
+            print(cast(char, node_data_op[node]));
+        } else {
+            tok_print(node_data_op[node]);
+        }
+        return;
+    }
     if (typ == NODE_BINOP) {
         print("BINOP ");
-        print(cast(char, node_data_op[node]));
+        if (node_data_op[node] < 255) {
+            print(cast(char, node_data_op[node]));
+        } else {
+            tok_print(node_data_op[node]);
+        }
         return;
     }
     if (typ == NODE_ASSIGN) {
