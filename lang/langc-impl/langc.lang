@@ -1513,7 +1513,7 @@ parse_if_expr: () -> int = {
 
     if (token == TOK_ELSE) {
         lex_advance();
-        else_body := parse_expression();
+        else_body := parse_whileif_body();
         node_add_child(if_node, else_body);
     }
     return if_node;

@@ -8,7 +8,7 @@ main: () -> void = {
         i += 1;
     }
 
-    println(x); // should print 69 but it prints 123
+    println(x);
 
     i = 0;
     while (i < 6) {
