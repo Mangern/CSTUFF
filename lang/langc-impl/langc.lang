@@ -74,6 +74,7 @@ STRING_PRINTLN: *int;
 STRING_PRINT: *int;
 STRING_INT: *int;
 STRING_VOID: *int;
+STRING_BOOL: *int;
 
 ST_ID: int;
 ST_LIT: int;
@@ -126,6 +127,15 @@ string_table_init: () -> void = {
         STRING_VOID[2] = cast(int, 'i');
         STRING_VOID[3] = cast(int, 'd');
         STRING_VOID[4] = 0;
+    }
+
+    {
+        STRING_BOOL = alloc(int, 5);
+        STRING_BOOL[0] = cast(int, 'b');
+        STRING_BOOL[1] = cast(int, 'o');
+        STRING_BOOL[2] = cast(int, 'o');
+        STRING_BOOL[3] = cast(int, 'l');
+        STRING_BOOL[4] = 0;
     }
 }
 
@@ -196,6 +206,8 @@ TOK_ID     : int;
 TOK_STR    : int;
 TOK_ARROW  : int;
 TOK_INT    : int;
+TOK_TRUE   : int;
+TOK_FALSE  : int;
 TOK_IF     : int;
 TOK_ELSE   : int;
 TOK_WHILE  : int;
@@ -209,6 +221,8 @@ TOK_ASUB   : int;
 TOK_AMUL   : int;
 TOK_ADIV   : int;
 TOK_AMOD   : int;
+TOK_OR     : int;
+TOK_AND    : int;
 
 operator_prec: *int;
 
@@ -222,19 +236,23 @@ lex_init: () -> void = {
     TOK_STR    = 257;
     TOK_ARROW  = 258;
     TOK_INT    = 259;
-    TOK_IF     = 260;
-    TOK_ELSE   = 261;
-    TOK_WHILE  = 262;
-    TOK_RETURN = 263;
-    TOK_LEQ    = 264;
-    TOK_GEQ    = 265;
-    TOK_EQ     = 266;
-    TOK_NEQ    = 267;
-    TOK_AADD   = 268;
-    TOK_ASUB   = 269;
-    TOK_AMUL   = 270;
-    TOK_ADIV   = 271;
-    TOK_AMOD   = 272;
+    TOK_TRUE   = 260;
+    TOK_FALSE  = 261;
+    TOK_IF     = 262;
+    TOK_ELSE   = 263;
+    TOK_WHILE  = 264;
+    TOK_RETURN = 265;
+    TOK_LEQ    = 266;
+    TOK_GEQ    = 267;
+    TOK_EQ     = 268;
+    TOK_NEQ    = 269;
+    TOK_AADD   = 270;
+    TOK_ASUB   = 271;
+    TOK_AMUL   = 272;
+    TOK_ADIV   = 273;
+    TOK_AMOD   = 274;
+    TOK_OR     = 275;
+    TOK_AND    = 276;
 
     operator_prec = alloc(int, 512);
     // 10 * (17 - original C implementation precedence)
@@ -255,6 +273,8 @@ lex_init: () -> void = {
     operator_prec[TOK_AMUL]       = 30;
     operator_prec[TOK_ADIV]       = 30;
     operator_prec[TOK_AMOD]       = 30;
+    operator_prec[TOK_OR]         = 50;
+    operator_prec[TOK_AND]        = 60;
 }
 
 
@@ -343,6 +363,58 @@ lex_matches_int: () -> int = {
     }
 
     return ptr - lex_ptr;
+}
+
+lex_matches_true: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 't')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'r')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'u')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'e')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr < nbuf && lex_isidchar(buf[ptr])) {
+        return 0;
+    }
+    return 4;
+}
+
+lex_matches_false: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'f')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'a')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'l')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 's')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'e')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr < nbuf && lex_isidchar(buf[ptr])) {
+        return 0;
+    }
+    return 5;
 }
 
 lex_matches_if: () -> int = {
@@ -553,6 +625,30 @@ lex_matches_amod: () -> int = {
     return 2;
 }
 
+lex_matches_or: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '|')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '|')) {
+        return 0;
+    }
+    return 2;
+}
+
+lex_matches_and: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '&')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '&')) {
+        return 0;
+    }
+    return 2;
+}
+
 lex_peek: () -> int = {
     match: int;
     if (cur_tok_beg == lex_ptr) {
@@ -614,6 +710,20 @@ lex_peek: () -> int = {
     match = lex_matches_int();
     if (match > 0) {
         cur_tok = TOK_INT;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_true();
+    if (match > 0) {
+        cur_tok = TOK_TRUE;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_false();
+    if (match > 0) {
+        cur_tok = TOK_FALSE;
         cur_tok_end = cur_tok_beg + match;
         return cur_tok;
     }
@@ -681,7 +791,21 @@ lex_peek: () -> int = {
         return cur_tok;
     }
 
-// I think identifier should be checked last
+    match = lex_matches_or();
+    if (match > 0) {
+        cur_tok = TOK_OR;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_and();
+    if (match > 0) {
+        cur_tok = TOK_AND;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    // I think identifier should be checked last
     match = lex_matches_id();
     if (match > 0) {
         cur_tok = TOK_ID;
@@ -776,6 +900,24 @@ tok_print: (t: int) -> void = {
         println("%=");
         return;
     }
+    if (t == TOK_OR) {
+        println("||");
+        return;
+    }
+    if (t == TOK_AND) {
+        println("&&");
+        return;
+    }
+
+    if (t == TOK_TRUE) {
+        println("true");
+        return;
+    }
+
+    if (t == TOK_FALSE) {
+        println("false");
+        return;
+    }
 
     println("???");
 }
@@ -800,20 +942,21 @@ peek_expect_advance: (expected: int) -> int = {
 TYPEID_UNKNOWN: int;
 
 // Node types
-NODE_LIST   : int; // [any, ...]
-NODE_ID     : int; // leaf
-NODE_DECL   : int; // [identifier, type] | [identifier, type?, expr]
-NODE_ASSIGN : int; // [something, expression]
-NODE_TYPE   : int; // [identifier] | [list[declaration], type] (func) | [identifier, int_literal] (array)
-NODE_BLOCK  : int; // list
-NODE_CALL   : int; // [identifier, list[expression]]
-NODE_LIT_STR: int; // leaf
-NODE_LIT_INT: int; // leaf
-NODE_BINOP  : int; // [expression, expression]
-NODE_IF     : int; // [expr, expr] | [expr, expr, expr]
-NODE_WHILE  : int; // [expr, expr]
-NODE_RETURN : int; // [] | [expr]
-NODE_INDEX  : int; // [identifier, expr] 
+NODE_LIST    : int; // [any, ...]
+NODE_ID      : int; // leaf
+NODE_DECL    : int; // [identifier, type] | [identifier, type?, expr]
+NODE_ASSIGN  : int; // [something, expression]
+NODE_TYPE    : int; // [identifier] | [list[declaration], type] (func) | [identifier, int_literal] (array)
+NODE_BLOCK   : int; // list
+NODE_CALL    : int; // [identifier, list[expression]]
+NODE_LIT_STR : int; // leaf
+NODE_LIT_INT : int; // leaf
+NODE_LIT_BOOL: int;
+NODE_BINOP   : int; // [expression, expression]
+NODE_IF      : int; // [expr, expr] | [expr, expr, expr]
+NODE_WHILE   : int; // [expr, expr]
+NODE_RETURN  : int; // [] | [expr]
+NODE_INDEX   : int; // [identifier, expr] 
 
 node_da_cap: int;
 node_da_sz: int;
@@ -828,6 +971,8 @@ node_children_sz : *int;
 node_data_str : *int;
 // optional integer literal
 node_data_int : *int;
+// optional bool literal
+node_data_bool : *int;
 // optional operator
 node_data_op  : *int;
 // optional symbol id
@@ -849,6 +994,7 @@ node_create: (ntype: int) -> int = {
         new_children_sz := alloc(int, new_cap);
         new_data_str := alloc(int, new_cap);
         new_data_int := alloc(int, new_cap);
+        new_data_bool := alloc(int, new_cap);
         new_data_op := alloc(int, new_cap);
         new_data_sym := alloc(int, new_cap);
         new_data_block_scope := alloc(int, new_cap);
@@ -863,6 +1009,7 @@ node_create: (ntype: int) -> int = {
             new_children_sz[i] = node_children_sz[i];
             new_data_str[i] = node_data_str[i];
             new_data_int[i] = node_data_int[i];
+            new_data_bool[i] = node_data_bool[i];
             new_data_op[i] = node_data_op[i];
             new_data_sym[i] = node_data_sym[i];
             new_data_block_scope[i] = node_data_block_scope[i];
@@ -878,6 +1025,7 @@ node_create: (ntype: int) -> int = {
             delete(node_children_sz);
             delete(node_data_str);
             delete(node_data_int);
+            delete(node_data_bool);
             delete(node_data_op);
             delete(node_data_sym);
             delete(node_data_block_scope);
@@ -891,6 +1039,7 @@ node_create: (ntype: int) -> int = {
         node_children_sz = new_children_sz;
         node_data_str = new_data_str;
         node_data_int = new_data_int;
+        node_data_bool = new_data_bool;
         node_data_op = new_data_op;
         node_data_sym = new_data_sym;
         node_data_block_scope = new_data_block_scope;
@@ -1007,20 +1156,21 @@ decl_get_body: (decl_node: int) -> int = {
 }
 
 parser_init: () -> void = {
-    NODE_LIST    = 0;
-    NODE_ID      = 1;
-    NODE_DECL    = 2;
-    NODE_ASSIGN  = 3;
-    NODE_TYPE    = 4;
-    NODE_BLOCK   = 5;
-    NODE_CALL    = 6;
-    NODE_LIT_STR = 7;
-    NODE_LIT_INT = 8;
-    NODE_BINOP   = 9;
-    NODE_IF      = 10;
-    NODE_WHILE   = 11;
-    NODE_RETURN  = 12;
-    NODE_INDEX   = 13;
+    NODE_LIST     = 0;
+    NODE_ID       = 1;
+    NODE_DECL     = 2;
+    NODE_ASSIGN   = 3;
+    NODE_TYPE     = 4;
+    NODE_BLOCK    = 5;
+    NODE_CALL     = 6;
+    NODE_LIT_STR  = 7;
+    NODE_LIT_INT  = 8;
+    NODE_LIT_BOOL = 9;
+    NODE_BINOP    = 10;
+    NODE_IF       = 11;
+    NODE_WHILE    = 12;
+    NODE_RETURN   = 13;
+    NODE_INDEX    = 14;
 
 }
 
@@ -1324,6 +1474,20 @@ parse_primary_expr: () -> int = {
         node_set_intdata(int_node);
         lex_advance();
         return int_node;
+    }
+
+    if (token == TOK_TRUE) {
+        bool_node := node_create(NODE_LIT_BOOL);
+        node_data_bool[bool_node] = 1;
+        lex_advance();
+        return bool_node;
+    }
+
+    if (token == TOK_FALSE) {
+        bool_node := node_create(NODE_LIT_BOOL);
+        node_data_bool[bool_node] = 0;
+        lex_advance();
+        return bool_node;
     }
 
     if (token == cast(int, '(')) {
@@ -1680,8 +1844,9 @@ type_sizeof: (typeid: int) -> int = {
     }
 
     if (tc == TYPE_BASIC) {
-        if (type_data_subtype[typeid] == TYPE_B_INT) {
-            // "long"
+        if (type_data_subtype[typeid] == TYPE_B_INT
+         || type_data_subtype[typeid] == TYPE_B_BOOL) {
+            // don't know
             return 8;
         }
 
@@ -1760,6 +1925,11 @@ type_get_type: (type_node: int) -> int = {
 
         if (streq(string_table[id_stridx], STRING_VOID, 4)) {
             node_data_type[type_node] = type_create(TYPE_VOID);
+            return node_data_type[type_node];
+        }
+
+        if (streq(string_table[id_stridx], STRING_BOOL, 4)) {
+            node_data_type[type_node] = type_create_basic(TYPE_B_BOOL);
             return node_data_type[type_node];
         }
 
@@ -2237,6 +2407,11 @@ resolve_node: (node: int, scope: int) -> void = {
         return;
     }
 
+    if (node_type[node] == NODE_LIT_BOOL) {
+        node_data_type[node] = type_create_basic(TYPE_B_BOOL);
+        return;
+    }
+
     if (node_type[node] == NODE_LIT_STR) {
         node_data_type[node] = type_create(TYPE_STRLIT);
         return;
@@ -2477,7 +2652,9 @@ set_operator_type: (operator_node: int, lhs_type: int, rhs_type: int) -> void = 
       || op == TOK_EQ
       || op == TOK_NEQ
       || op == TOK_LEQ
-      || op == TOK_GEQ ) {
+      || op == TOK_GEQ
+      || op == TOK_OR 
+      || op == TOK_AND) {
         node_data_type[operator_node] = type_create_basic(TYPE_B_BOOL);
         return;
     }
@@ -2807,13 +2984,14 @@ generate_call_println: (args_node: int) -> void = {
         println("    movq %rax, %rsi");
 
         while (true) {
-            // TODO: type checking and not this mess
             if (type_is_strlit(node_data_type[arg])) {
                 println("    leaq strout(%rip), %rdi");
                 break;
             }
 
-            if (type_is_int(node_data_type[arg])) {
+            // TODO: bool could have a pretty string printed
+            if (type_is_int(node_data_type[arg])
+              || type_is_bool(node_data_type[arg])) {
                 println("    leaq intout(%rip), %rdi");
                 break;
             }
@@ -2867,13 +3045,13 @@ generate_call_print: (args_node: int) -> void = {
         println("    movq %rax, %rsi");
 
         while (true) {
-            // TODO: type checking and not this mess
             if (type_is_strlit(node_data_type[arg])) {
                 println("    leaq strout(%rip), %rdi");
                 break;
             }
 
-            if (type_is_int(node_data_type[arg])) {
+            if (type_is_int(node_data_type[arg])
+              || type_is_bool(node_data_type[arg])) {
                 println("    leaq intout(%rip), %rdi");
                 break;
             }
@@ -2977,6 +3155,53 @@ generate_binop: (op: int) -> void = {
     exit := 1 / 0;
 }
 
+generate_or_or_and: (node: int) -> void = {
+    children := node_children[node];
+    lhs := children[0];
+    rhs := children[1];
+    if (node_data_op[node] == TOK_OR) {
+        shortcut_lab := gen_next_label();
+
+        // A
+        generate_expression(lhs);
+        println("    cmpq $0, %rax");
+        print(  "    jne ORSHORTCUT");
+        println(shortcut_lab);
+
+        // if A is false, evaluate B
+        generate_expression(rhs);
+
+        // at this point %rax should contain the correct stuff
+        print("ORSHORTCUT");
+        print(shortcut_lab);
+        println(":");
+        return;
+    }
+
+    if (node_data_op[node] == TOK_AND) {
+        shortcut_lab := gen_next_label();
+
+        // A
+        generate_expression(lhs);
+        println("    cmpq $0, %rax");
+        print(  "    je ANDSHORTCUT");
+        println(shortcut_lab);
+
+        // if A is true, evaluate B
+        generate_expression(rhs);
+
+        // at this point %rax should contain the correct stuff
+        print("ANDSHORTCUT");
+        print(shortcut_lab);
+        println(":");
+        return;
+    }
+
+    println("Unexpected token in generate_or_or_and");
+    tok_print(node_data_op[node]);
+    exit := 1 / 0;
+}
+
 // Place result of computation in rax
 generate_expression: (node: int) -> void = {
     if (node_type[node] == NODE_LIT_STR) {
@@ -2994,7 +3219,24 @@ generate_expression: (node: int) -> void = {
         return;
     }
 
+    if (node_type[node] == NODE_LIT_BOOL) {
+        print("    movq $");
+        if (node_data_bool[node]!=0) {
+            print("1");
+        } else {
+            print("0");
+        }
+        println(", %rax");
+        return;
+    }
+
     if (node_type[node] == NODE_BINOP) {
+        if (node_data_op[node] == TOK_OR
+         || node_data_op[node] == TOK_AND) {
+            // special handling for short-circuiting
+            generate_or_or_and(node);
+            return;
+        }
         children := node_children[node];
         generate_expression(children[0]);
         println("    pushq %rax");
@@ -3342,6 +3584,16 @@ node_print: (node: int) -> void = {
     if (typ == NODE_LIT_INT) {
         print("LIT_INT (");
         print(node_data_int[node]);
+        print(")");
+        return;
+    }
+    if (typ == NODE_LIT_BOOL) {
+        print("LIT_BOOL (");
+        if (node_data_bool[node]!=0) {
+            print("true");
+        } else {
+            print("false");
+        }
         print(")");
         return;
     }
