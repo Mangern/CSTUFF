@@ -200,12 +200,17 @@ TOK_IF     : int;
 TOK_ELSE   : int;
 TOK_WHILE  : int;
 TOK_RETURN : int;
+TOK_LEQ    : int;
+TOK_GEQ    : int;
+TOK_EQ     : int;
+TOK_NEQ    : int;
+TOK_AADD   : int;
+TOK_ASUB   : int;
+TOK_AMUL   : int;
+TOK_ADIV   : int;
+TOK_AMOD   : int;
 
 operator_prec: *int;
-TOK_LEQ: int;
-TOK_GEQ: int;
-TOK_EQ : int;
-TOK_NEQ: int;
 
 
 lex_init: () -> void = {
@@ -225,6 +230,11 @@ lex_init: () -> void = {
     TOK_GEQ    = 265;
     TOK_EQ     = 266;
     TOK_NEQ    = 267;
+    TOK_AADD   = 268;
+    TOK_ASUB   = 269;
+    TOK_AMUL   = 270;
+    TOK_ADIV   = 271;
+    TOK_AMOD   = 272;
 
     operator_prec = alloc(int, 512);
     // 10 * (17 - original C implementation precedence)
@@ -240,6 +250,11 @@ lex_init: () -> void = {
     operator_prec[TOK_EQ]         = 70;
     operator_prec[TOK_NEQ]        = 70;
     operator_prec[cast(int, '=')] = 30;
+    operator_prec[TOK_AADD]       = 30;
+    operator_prec[TOK_ASUB]       = 30;
+    operator_prec[TOK_AMUL]       = 30;
+    operator_prec[TOK_ADIV]       = 30;
+    operator_prec[TOK_AMOD]       = 30;
 }
 
 
@@ -478,6 +493,66 @@ lex_matches_neq: () -> int = {
     return 2;
 }
 
+lex_matches_aadd: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '+')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '=')) {
+        return 0;
+    }
+    return 2;
+}
+
+lex_matches_asub: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '-')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '=')) {
+        return 0;
+    }
+    return 2;
+}
+
+lex_matches_amul: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '*')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '=')) {
+        return 0;
+    }
+    return 2;
+}
+
+lex_matches_adiv: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '/')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '=')) {
+        return 0;
+    }
+    return 2;
+}
+
+lex_matches_amod: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '%')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '=')) {
+        return 0;
+    }
+    return 2;
+}
+
 lex_peek: () -> int = {
     match: int;
     if (cur_tok_beg == lex_ptr) {
@@ -571,6 +646,41 @@ lex_peek: () -> int = {
         return cur_tok;
     }
 
+    match = lex_matches_aadd();
+    if (match > 0) {
+        cur_tok = TOK_AADD;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_asub();
+    if (match > 0) {
+        cur_tok = TOK_ASUB;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_amul();
+    if (match > 0) {
+        cur_tok = TOK_AMUL;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_adiv();
+    if (match > 0) {
+        cur_tok = TOK_ADIV;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_amod();
+    if (match > 0) {
+        cur_tok = TOK_AMOD;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
 // I think identifier should be checked last
     match = lex_matches_id();
     if (match > 0) {
@@ -644,6 +754,26 @@ tok_print: (t: int) -> void = {
     }
     if (t == TOK_NEQ) {
         println("!=");
+        return;
+    }
+    if (t == TOK_AADD) {
+        println("+=");
+        return;
+    }
+    if (t == TOK_ASUB) {
+        println("-=");
+        return;
+    }
+    if (t == TOK_AMUL) {
+        println("*=");
+        return;
+    }
+    if (t == TOK_ADIV) {
+        println("/=");
+        return;
+    }
+    if (t == TOK_AMOD) {
+        println("%=");
         return;
     }
 
@@ -815,6 +945,24 @@ node_add_child: (parent: int, child: int) -> void = {
     dst[sz] = child;
 
     node_children_sz[parent] += 1;
+}
+
+// deep copy 
+node_dup: (node: int) -> int = {
+    new_node := node_create(node_type[node]);
+    children := node_children[node];
+    i := 0;
+    while (i < node_children_sz[node]) {
+        node_add_child(new_node, node_dup(children[i]));
+        i += 1;
+    }
+    node_data_str[new_node] = node_data_str[node];
+    node_data_int[new_node] = node_data_int[node];
+    node_data_op[new_node]  = node_data_op[node];
+    node_data_sym[new_node] = node_data_op[node];
+    node_data_block_scope[new_node] = node_data_op[node];
+    node_data_type[new_node] = node_data_type[node];
+    return new_node;
 }
 
 node_set_idstr: (node: int) -> void = {
@@ -1188,6 +1336,7 @@ parse_primary_expr: () -> int = {
 
     print("parse_primary_expr unhandled token: ");
     tok_print(token);
+    exit := 1 / 0;
     return 0;
 }
 
@@ -1299,9 +1448,47 @@ parse_simplify: (node: int) -> void = {
         i += 1;
     }
 
-    if (node_type[node] == NODE_BINOP && node_data_op[node] == cast(int, '=')) {
-        // assignment
-        node_type[node] = NODE_ASSIGN;
+    if (node_type[node] == NODE_BINOP) {
+        node_op := node_data_op[node];
+
+        if (node_op == cast(int, '=')) {
+            // assignment
+            node_type[node] = NODE_ASSIGN;
+        }
+        if (node_op == TOK_AADD
+         || node_op == TOK_ASUB
+         || node_op == TOK_AMUL
+         || node_op == TOK_ADIV
+         || node_op == TOK_AMUL) {
+            new_op: int;
+
+            if (node_op == TOK_AADD) {
+                new_op = cast(int, '+');
+            }
+            if (node_op == TOK_ASUB) {
+                new_op = cast(int, '-');
+            }
+            if (node_op == TOK_AMUL) {
+                new_op = cast(int, '*');
+            }
+            if (node_op == TOK_ADIV) {
+                new_op = cast(int, '/');
+            }
+            if (node_op == TOK_AMOD) {
+                new_op = cast(int, '%');
+            }
+
+            lhs := children[0];
+            rhs := children[1];
+            new_node := node_create(NODE_BINOP);
+            node_data_op[new_node] = new_op;
+            // x += foo
+            // -> x = (x + foo)
+            node_add_child(new_node, node_dup(lhs));
+            node_add_child(new_node, rhs);
+            children[1] = new_node;
+            node_type[node] = NODE_ASSIGN;
+        }
     }
 
     if (node_type[node] == NODE_DECL) {
@@ -2296,6 +2483,7 @@ set_operator_type: (operator_node: int, lhs_type: int, rhs_type: int) -> void = 
     }
 
     println("set_operator_type unhandled operator:", op);
+    exit := 1 / 0;
 }
 
 // ==================== GEN ====================
@@ -3248,7 +3436,6 @@ main: () -> void = {
     root := parse();
 
     symbol_table_init();
-
 
     resolve_symbols(root);
 
