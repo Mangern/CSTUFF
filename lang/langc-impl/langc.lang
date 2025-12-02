@@ -223,6 +223,7 @@ TOK_ADIV   : int;
 TOK_AMOD   : int;
 TOK_OR     : int;
 TOK_AND    : int;
+TOK_BREAK  : int;
 
 operator_prec: *int;
 
@@ -253,6 +254,7 @@ lex_init: () -> void = {
     TOK_AMOD   = 274;
     TOK_OR     = 275;
     TOK_AND    = 276;
+    TOK_BREAK  = 277;
 
     operator_prec = alloc(int, 512);
     // 10 * (17 - original C implementation precedence)
@@ -650,6 +652,34 @@ lex_matches_and: () -> int = {
     return 2;
 }
 
+lex_matches_break: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'b')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'r')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'e')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'a')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'k')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr < nbuf && lex_isidchar(buf[ptr])) {
+        return 0;
+    }
+    return 5;
+}
+
 lex_peek: () -> int = {
     match: int;
     if (cur_tok_beg == lex_ptr) {
@@ -718,6 +748,13 @@ lex_peek: () -> int = {
     match = lex_matches_true();
     if (match > 0) {
         cur_tok = TOK_TRUE;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_break();
+    if (match > 0) {
+        cur_tok = TOK_BREAK;
         cur_tok_end = cur_tok_beg + match;
         return cur_tok;
     }
@@ -919,6 +956,11 @@ tok_print: (t: int) -> void = {
         println("false");
         return;
     }
+    
+    if (t == TOK_BREAK) {
+        println("break");
+        return;
+    }
 
     println("???");
 }
@@ -959,6 +1001,7 @@ NODE_IF      : int; // [expr, expr] | [expr, expr, expr]
 NODE_WHILE   : int; // [expr, expr]
 NODE_RETURN  : int; // [] | [expr]
 NODE_INDEX   : int; // [identifier, expr] 
+NODE_BREAK   : int; // leaf
 
 node_da_cap: int;
 node_da_sz: int;
@@ -1174,6 +1217,7 @@ parser_init: () -> void = {
     NODE_WHILE    = 13;
     NODE_RETURN   = 14;
     NODE_INDEX    = 15;
+    NODE_BREAK    = 16;
 }
 
 parse_type: () -> int = {
@@ -1546,6 +1590,11 @@ parse_statement: () -> int = {
 
     if (token == TOK_RETURN) {
         return parse_return_expr();
+    }
+
+    if (token == TOK_BREAK) {
+        lex_advance();
+        return node_create(NODE_BREAK);
     }
 
     if (token == cast(int, '{')) {
@@ -2557,6 +2606,11 @@ resolve_node: (node: int, scope: int) -> void = {
         return;
     }
 
+    if (node_type[node] == NODE_BREAK) {
+        node_data_type[node] = type_create(TYPE_VOID);
+        return;
+    }
+
     if (node_type[node] == NODE_ASSIGN) {
         lhs := children[0];
         rhs := children[1];
@@ -2701,8 +2755,12 @@ set_operator_type: (operator_node: int, lhs_type: int, rhs_type: int) -> void = 
 LABEL_COUNTER: int;
 
 curr_func_gen_sym: int;
+curr_while_end: int;
 
 generate_code: (root: int) -> void = {
+
+    // setup
+    curr_while_end = -1;
 
     { // string data. Consts?
         println(".section .rodata");
@@ -2938,6 +2996,11 @@ generate_node: (node: int) -> void = {
 
     if (node_type[node] == NODE_RETURN) {
         generate_return(node);
+        return;
+    }
+
+    if (node_type[node] == NODE_BREAK) {
+        generate_break(node);
         return;
     }
 
@@ -3333,6 +3396,11 @@ generate_expression: (node: int) -> void = {
         return;
     }
 
+    if (node_type[node] == NODE_BREAK) {
+        generate_break(node);
+        return;
+    }
+
     if (node_type[node] == NODE_ASSIGN) {
         generate_assign(node);
         return;
@@ -3414,8 +3482,10 @@ generate_if: (node: int) -> void = {
 generate_while: (node: int) -> void = {
     children := node_children[node];
 
+    old_while_end := curr_while_end;
+
     cur_while_start := gen_next_label();
-    cur_while_end   := gen_next_label();
+    curr_while_end   = gen_next_label();
     print("WHILE");
     print(cur_while_start);
     println(":");
@@ -3423,7 +3493,7 @@ generate_while: (node: int) -> void = {
 
     println("    cmpq $0, %rax");
     print("    je ENDWHILE");
-    println(cur_while_end);
+    println(curr_while_end);
 
     generate_expression(children[1]);
 
@@ -3431,8 +3501,10 @@ generate_while: (node: int) -> void = {
     println(cur_while_start);
 
     print("ENDWHILE");
-    print(cur_while_end);
+    print(curr_while_end);
     println(":");
+
+    curr_while_end = old_while_end;
 }
 
 generate_return: (node: int) -> void = {
@@ -3444,6 +3516,15 @@ generate_return: (node: int) -> void = {
     print("    jmp .");
     string_table_print(symbol_table_str[curr_func_gen_sym]);
     println(".epilogue");
+}
+
+generate_break: (node: int) -> void = {
+    if (curr_while_end == -1) {
+        println("Unexpected break outside loop");
+        exit := 1 / 0;
+    }
+    print("    jmp ENDWHILE");
+    println(curr_while_end);
 }
 
 // TODO: we could benefit from some lvalue-rvalue stuff here
@@ -3688,6 +3769,10 @@ node_print: (node: int) -> void = {
     }
     if (typ == NODE_INDEX) {
         print("INDEX");
+        return;
+    }
+    if (typ == NODE_BREAK) {
+        print("BREAK");
         return;
     }
     print("????");
