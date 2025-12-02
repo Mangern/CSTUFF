@@ -5,4 +5,5 @@ lexer-test
 parser-test
 symbol-type-test
 example-files/aoc2024/**/*.txt
+example-files/aoc2025/**/*.txt
 langself

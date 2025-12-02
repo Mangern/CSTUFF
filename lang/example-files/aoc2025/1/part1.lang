@@ -1,0 +1,83 @@
+EOF: char;
+buf: char[100];
+nbuf: int;
+
+getnum: () -> int = {
+    res := 0;
+
+    i := 1;
+
+    while (i < nbuf) {
+        val := cast(int, buf[i]) - cast(int, '0');
+        res *= 10;
+        res += val;
+        i += 1;
+    }
+
+    return res;
+}
+
+readline: () -> bool = {
+    c := readchar();
+    if (c == EOF) {
+        return false;
+    }
+
+    nbuf = 0;
+
+    while (c != '\n') {
+        buf[nbuf] = c;
+        nbuf += 1;
+
+        c = readchar();
+    }
+
+    return true;
+}
+main: () -> void = {
+    EOF = cast(char, 255);
+
+    cnt := 0;
+    rot := 50;
+    while (true) {
+        if (!readline()) {
+            break;
+        }
+        c := buf[0];
+        num := getnum();
+
+        if (c == 'L') {
+            around := num / 100;
+            //cnt += around;
+            num %= 100;
+            if (rot - num <= 0) {
+                //cnt += 1;
+            }
+            rot -= num;
+            if (rot < 0) {
+                rot += 100;
+            }
+            if (rot == 0) {
+                cnt += 1;
+            }
+        } else {
+            around := num / 100;
+            //cnt += around;
+            num %= 100;
+            if (rot + num >= 100) {
+                //cnt += 1;
+            }
+            rot += num;
+            if (rot >= 100) {
+                rot -= 100;
+            }
+            if (rot == 0) {
+                cnt += 1;
+            }
+        }
+
+        println(rot);
+    }
+
+    println("Answer:", cnt);
+}
