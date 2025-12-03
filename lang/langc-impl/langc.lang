@@ -2051,17 +2051,17 @@ parse_for_expr: () -> int = {
     return for_node;
 }
 
+// TODO: remove if conclusion is that statement is stable
 parse_whileif_body: () -> int = {
-    token := lex_peek();
+    //token := lex_peek();
+    //if (token == cast(int, '{')) {
+    //    lex_advance();
+    //    block_node := parse_block();
+    //    peek_expect_advance(cast(int, '}'));
+    //    return block_node;
+    //}
 
-    if (token == cast(int, '{')) {
-        lex_advance();
-        block_node := parse_block();
-        peek_expect_advance(cast(int, '}'));
-        return block_node;
-    }
-
-    return parse_expression();
+    return parse_statement();
 }
 
 parse_return_expr: () -> int = {
