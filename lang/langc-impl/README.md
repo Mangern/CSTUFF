@@ -32,18 +32,18 @@ Not matching expected output on error.
 -    [ ] `cast.lang`
 -    [ ] `charlit.lang`
 -    [x] `continue.lang`
--    [ ] `edge.lang`
+-    [x] `edge.lang`
 -    [x] `err.lang`
 -    [x] `euler3.lang`
 -    [x] `geqleq.lang`
 -    [x] `hello.lang`
 -    [x] `infer.lang`
 -    [ ] `many-args.lang`
--    [ ] `memory.lang`
+-    [x] `memory.lang`
 -    [x] `new-syntax.lang`
 -    [x] `opassign.lang`
 -    [x] `operators.lang`
--    [ ] `pointer.lang`
+-    [x] `pointer.lang`
 -    [ ] `real.lang`
 -    [x] `rec.lang`
 -    [x] `scope.lang`
