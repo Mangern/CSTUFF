@@ -23,6 +23,7 @@ through stdin and stdout.
 ## Passing tests
 Not matching expected output on error.
 
+-    [x] `rule110.lang`
 -    [ ] `arr-2d.lang`
 -    [x] `arr.lang`
 -    [x] `boolean_op.lang`
@@ -36,18 +37,17 @@ Not matching expected output on error.
 -    [x] `euler3.lang`
 -    [x] `geqleq.lang`
 -    [x] `hello.lang`
--    [ ] `infer.lang`
--    [ ] `libc.lang`
+-    [x] `infer.lang`
 -    [ ] `many-args.lang`
 -    [ ] `memory.lang`
 -    [x] `new-syntax.lang`
--    [ ] `opassign.lang`
+-    [x] `opassign.lang`
 -    [x] `operators.lang`
 -    [ ] `pointer.lang`
 -    [ ] `real.lang`
 -    [x] `rec.lang`
 -    [x] `scope.lang`
--    [ ] `sieve.lang`
+-    [x] `sieve.lang`
 -    [x] `simple-expr.lang`
 -    [x] `simple-func.lang`
 -    [x] `simple-if.lang`

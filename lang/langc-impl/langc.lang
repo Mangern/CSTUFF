@@ -225,6 +225,9 @@ TOK_OR       : int;
 TOK_AND      : int;
 TOK_BREAK    : int;
 TOK_CONTINUE : int;
+TOK_NEG      : int; // really just -
+TOK_STAR     : int; // really just *
+TOK_DEREF    : int; // .*
 
 operator_prec: *int;
 
@@ -257,9 +260,12 @@ lex_init: () -> void = {
     TOK_AND      = 276;
     TOK_BREAK    = 277;
     TOK_CONTINUE = 278;
+    TOK_NEG      = 289;
+    TOK_STAR     = 290;
+    TOK_DEREF    = 291;
 
     operator_prec = alloc(int, 512);
-    // 10 * (17 - original C implementation precedence)
+    // 10 * (17 - original lang implementation in C precedence)
     operator_prec[cast(int, '+')] = 110;
     operator_prec[cast(int, '-')] = 110;
     operator_prec[cast(int, '*')] = 120;
@@ -271,15 +277,18 @@ lex_init: () -> void = {
     operator_prec[TOK_GEQ]        = 80;
     operator_prec[TOK_EQ]         = 70;
     operator_prec[TOK_NEQ]        = 70;
-    operator_prec[cast(int, '=')] = 30;
-    operator_prec[TOK_AADD]       = 30;
-    operator_prec[TOK_ASUB]       = 30;
-    operator_prec[TOK_AMUL]       = 30;
-    operator_prec[TOK_ADIV]       = 30;
-    operator_prec[TOK_AMOD]       = 30;
-    operator_prec[TOK_OR]         = 50;
-    operator_prec[TOK_AND]        = 60;
-    operator_prec[cast(int, '!')] = 150;
+    operator_prec[cast(int, '=')] = 10;
+    operator_prec[TOK_AADD]       = 10;
+    operator_prec[TOK_ASUB]       = 10;
+    operator_prec[TOK_AMUL]       = 10;
+    operator_prec[TOK_ADIV]       = 10;
+    operator_prec[TOK_AMOD]       = 10;
+    operator_prec[TOK_OR]         = 20;
+    operator_prec[TOK_AND]        = 30;
+    operator_prec[cast(int, '!')] = 140;
+    operator_prec[TOK_NEG]        = 140;
+    operator_prec[TOK_STAR]       = 140;
+    operator_prec[TOK_DEREF]      = 150;
 }
 
 
@@ -311,6 +320,14 @@ lex_matches_arrow: () -> bool = {
     }
 
     return cast(char, buf[lex_ptr]) == '-' && cast(char, buf[lex_ptr + 1]) == '>';
+}
+
+lex_matches_deref: () -> bool = {
+    if (lex_ptr + 1 >= nbuf) {
+        return false;
+    }
+
+    return cast(char, buf[lex_ptr]) == '.' && cast(char, buf[lex_ptr + 1]) == '*';
 }
 
 lex_isidchar: (c: int) -> bool = {
@@ -745,6 +762,12 @@ lex_peek: () -> int = {
         return cur_tok;
     }
 
+    if (lex_matches_deref()) {
+        cur_tok = TOK_DEREF;
+        cur_tok_end = cur_tok_beg + 2;
+        return cur_tok;
+    }
+
     match = lex_matches_if();
     if (match > 0) {
         cur_tok = TOK_IF;
@@ -912,107 +935,117 @@ lex_advance: () -> void = {
 
 tok_print: (t: int) -> void = {
     if (isascii(t)) {
-        println(cast(char, t));
+        print(cast(char, t));
         return;
     }
     if (t == TOK_EOF) {
-        println("<EOF>");
+        print("<EOF>");
         return;
     }
     if (t == TOK_ID) {
-        println("<identifier>");
+        print("<identifier>");
         return;
     }
     if (t == TOK_STR) {
-        println("<string>");
+        print("<string>");
         return;
     }
     if (t == TOK_ARROW) {
-        println("->");
+        print("->");
         return;
     }
     if (t == TOK_INT) {
-        println("<integer>");
+        print("<integer>");
         return;
     }
     if (t == TOK_IF) {
-        println("if");
+        print("if");
         return;
     }
     if (t == TOK_ELSE) {
-        println("else");
+        print("else");
         return;
     }
     if (t == TOK_WHILE) {
-        println("while");
+        print("while");
         return;
     }
     if (t == TOK_RETURN) {
-        println("return");
+        print("return");
         return;
     }
     if (t == TOK_LEQ) {
-        println("<=");
+        print("<=");
         return;
     }
     if (t == TOK_GEQ) {
-        println(">=");
+        print(">=");
         return;
     }
     if (t == TOK_EQ) {
-        println("==");
+        print("==");
         return;
     }
     if (t == TOK_NEQ) {
-        println("!=");
+        print("!=");
         return;
     }
     if (t == TOK_AADD) {
-        println("+=");
+        print("+=");
         return;
     }
     if (t == TOK_ASUB) {
-        println("-=");
+        print("-=");
         return;
     }
     if (t == TOK_AMUL) {
-        println("*=");
+        print("*=");
         return;
     }
     if (t == TOK_ADIV) {
-        println("/=");
+        print("/=");
         return;
     }
     if (t == TOK_AMOD) {
-        println("%=");
+        print("%=");
         return;
     }
     if (t == TOK_OR) {
-        println("||");
+        print("||");
         return;
     }
     if (t == TOK_AND) {
-        println("&&");
+        print("&&");
         return;
     }
 
     if (t == TOK_TRUE) {
-        println("true");
+        print("true");
         return;
     }
 
     if (t == TOK_FALSE) {
-        println("false");
+        print("false");
         return;
     }
     
     if (t == TOK_BREAK) {
-        println("break");
+        print("break");
         return;
     }
 
     if (t == TOK_CONTINUE) {
-        println("continue");
+        print("continue");
+        return;
+    }
+
+    if (t == TOK_NEG) {
+        print("-");
+        return;
+    }
+
+    if (t == TOK_DEREF) {
+        print(".*");
         return;
     }
 
@@ -1024,8 +1057,10 @@ peek_expect_advance: (expected: int) -> int = {
     if (token != expected) {
         print("Unexpected token: ");
         tok_print(token);
+        println();
         print("Expected: ");
         tok_print(expected);
+        println();
         exit := 1 / 0;
     }
     lex_advance();
@@ -1035,8 +1070,19 @@ peek_expect_advance: (expected: int) -> int = {
 // ==================== PARSE ====================
 
 // "Forward declare" here
-// global type?
 TYPEID_UNKNOWN: int;
+
+TYPE_UNKNOWN: int;
+TYPE_VOID: int;
+TYPE_BASIC: int; // subtype: basic variant
+TYPE_FUNC: int;  // subtype: return type, length: num args (-1: variadic), argtypes: argument types
+TYPE_ARR: int;   // subtype: subtype, length: length
+TYPE_STRLIT: int; // nothing
+TYPE_PTR: int; // subtype: subtype
+
+// basic variants
+TYPE_B_INT:  int;
+TYPE_B_BOOL: int;
 
 // Node types
 NODE_LIST     : int; // [any, ...]
@@ -1056,7 +1102,9 @@ NODE_WHILE    : int; // [expr, expr]
 NODE_RETURN   : int; // [] | [expr]
 NODE_INDEX    : int; // [identifier, expr] 
 NODE_BREAK    : int; // leaf
-NODE_CONTINUE : int;
+NODE_CONTINUE : int; // leaf
+NODE_ADDROF   : int; // [expr]
+NODE_DEREF    : int; // [expr]
 
 node_da_cap: int;
 node_da_sz: int;
@@ -1081,6 +1129,8 @@ node_data_sym : *int;
 node_data_block_scope: *int;
 // after a while it becomes mandatory: type
 node_data_type: *int;
+// type class hints from parsing stage
+node_parse_tc: *int;
 
 node_create: (ntype: int) -> int = {
     if (node_da_sz == node_da_cap) {
@@ -1099,6 +1149,7 @@ node_create: (ntype: int) -> int = {
         new_data_sym := alloc(int, new_cap);
         new_data_block_scope := alloc(int, new_cap);
         new_data_type := alloc(int, new_cap);
+        new_parse_tc := alloc(int, new_cap);
 
         // copy data to new buffers
         i := 0;
@@ -1114,6 +1165,7 @@ node_create: (ntype: int) -> int = {
             new_data_sym[i] = node_data_sym[i];
             new_data_block_scope[i] = node_data_block_scope[i];
             new_data_type[i] = node_data_type[i];
+            new_parse_tc[i] = node_parse_tc[i];
             i += 1;
         }
 
@@ -1130,6 +1182,7 @@ node_create: (ntype: int) -> int = {
             delete(node_data_sym);
             delete(node_data_block_scope);
             delete(node_data_type);
+            delete(node_parse_tc);
         }
 
         // update
@@ -1144,6 +1197,7 @@ node_create: (ntype: int) -> int = {
         node_data_sym = new_data_sym;
         node_data_block_scope = new_data_block_scope;
         node_data_type = new_data_type;
+        node_parse_tc = new_parse_tc;
 
         node_da_cap = new_cap;
     }
@@ -1157,6 +1211,7 @@ node_create: (ntype: int) -> int = {
     node_children_sz[ret] = 0;
     node_data_sym[ret] = 0;
     node_data_type[ret] = 0;
+    node_parse_tc[ret] = TYPE_UNKNOWN;
 
     node_da_sz += 1;
     return ret;
@@ -1274,15 +1329,33 @@ parser_init: () -> void = {
     NODE_INDEX    = 15;
     NODE_BREAK    = 16;
     NODE_CONTINUE = 17;
+    NODE_ADDROF   = 18;
+    NODE_DEREF    = 19;
+
+    TYPE_UNKNOWN = 0;
+    TYPE_VOID    = 1;
+    TYPE_BASIC   = 2;
+    TYPE_FUNC    = 3;
+    TYPE_ARR     = 4;
+    TYPE_STRLIT  = 5;
+    TYPE_PTR     = 6;
+
+    // subtype variants
+    TYPE_B_INT  = 0;
+    TYPE_B_BOOL = 1;
+
 }
 
 parse_type: () -> int = {
     type_node := node_create(NODE_TYPE);
+    node_parse_tc[type_node] = TYPE_BASIC;
 
     token := lex_peek();
     if (token == cast(int, '(')) {
         // function type
         lex_advance();
+
+        node_parse_tc[type_node] = TYPE_FUNC;
 
         // TODO: argument list
         decl_list_node := node_create(NODE_LIST);
@@ -1318,9 +1391,20 @@ parse_type: () -> int = {
         return type_node;
     }
 
+    if (token == cast(int, '*')) {
+        // pointer_type
+        lex_advance();
+        node_parse_tc[type_node] = TYPE_PTR;
+
+        subtype_node := parse_type();
+        node_add_child(type_node, subtype_node);
+        return type_node;
+    }
+
     if (token != TOK_ID) {
         print("Unexpected token: ");
         tok_print(token);
+        println();
         exit := 1 / 0;
     }
 
@@ -1334,11 +1418,13 @@ parse_type: () -> int = {
     token = lex_peek();
 
     if (token == cast(int, '[')) {
+        // array type
         lex_advance();
 
         supertype_node := node_create(NODE_TYPE);
+        node_parse_tc[supertype_node] = TYPE_ARR;
+
         node_add_child(supertype_node, type_node);
-        type_node = supertype_node;
 
         int_lit := peek_expect_advance(TOK_INT);
         int_node := node_create(NODE_LIT_INT);
@@ -1346,8 +1432,8 @@ parse_type: () -> int = {
         node_add_child(type_node, int_node);
 
         peek_expect_advance(cast(int, ']'));
+        return supertype_node;
     }
-
     return type_node;
 }
 
@@ -1668,6 +1754,7 @@ parse_statement: () -> int = {
     return parse_expression();
 }
 
+// unary ::= [unop]* postfix
 parse_unary_expr: () -> int = {
     token := lex_peek();
 
@@ -1679,11 +1766,44 @@ parse_unary_expr: () -> int = {
         node_add_child(unary_node, subexpr);
         return unary_node;
     }
-    return parse_primary_expr();
+
+    if (token == cast(int, '-')) {
+        lex_advance();
+        subexpr := parse_unary_expr();
+        unary_node := node_create(NODE_UNOP);
+        node_data_op[unary_node] = TOK_NEG;
+        node_add_child(unary_node, subexpr);
+        return unary_node;
+    }
+
+    if (token == cast(int, '*')) {
+        lex_advance();
+        subexpr := parse_unary_expr();
+        addrof_node := node_create(NODE_ADDROF);
+        node_add_child(addrof_node, subexpr);
+        return addrof_node;
+    }
+
+    return parse_postfix_expr();
+}
+
+// postfix ::= primary [postfix_op]
+// TODO: what about multiple postfix ops
+parse_postfix_expr: () -> int = {
+    expr := parse_primary_expr();
+    token := lex_peek();
+    if (token == TOK_DEREF) {
+        lex_advance();
+        deref_node := node_create(NODE_DEREF);
+        node_add_child(deref_node, expr);
+        return deref_node;
+    }
+
+    return expr;
 }
 
 // expression
-//     ::= primary [binop, primary]*
+//     ::= unary [binop, unary]*
 parse_expression: () -> int = {
     lhs := parse_unary_expr();
     return parse_expr_rhs(0, lhs);
@@ -1719,7 +1839,8 @@ parse: () -> int = {
 
         print("Unexpected token: ");
         tok_print(tok);
-        //exit := 1 / 0;
+        println();
+        exit := 1 / 0;
         lex_advance();
     }
 
@@ -1749,7 +1870,7 @@ parse_simplify: (node: int) -> void = {
          || node_op == TOK_ASUB
          || node_op == TOK_AMUL
          || node_op == TOK_ADIV
-         || node_op == TOK_AMUL) {
+         || node_op == TOK_AMOD) {
             new_op: int;
 
             if (node_op == TOK_AADD) {
@@ -1807,18 +1928,6 @@ parse_simplify: (node: int) -> void = {
 }
 
 // ==================== SYMBOL ====================
-TYPE_UNKNOWN: int;
-TYPE_VOID: int;
-TYPE_BASIC: int; // subtype: basic variant
-TYPE_FUNC: int;  // subtype: return type, length: num args (-1: variadic), argtypes: argument types
-TYPE_ARR: int;   // subtype: subtype, length: length
-TYPE_STRLIT: int; // nothing
-
-// basic variants
-TYPE_B_INT:  int;
-TYPE_B_BOOL: int;
-
-
 // type table
 type_table_sz: int;
 type_table_cap: int;
@@ -1857,17 +1966,6 @@ symbol_table_cap: int;
 symbol_table_seq_counter: int;
 
 symbol_table_init: () -> void = {
-    TYPE_UNKNOWN = 0;
-    TYPE_VOID    = 1;
-    TYPE_BASIC   = 2;
-    TYPE_FUNC    = 3;
-    TYPE_ARR     = 4;
-    TYPE_STRLIT  = 5;
-
-    // subtype variants
-    TYPE_B_INT  = 0;
-    TYPE_B_BOOL = 1;
-
     scope_parent = alloc(int, 1);
     scope_syms = alloc(*int, 1);
     scope_szs = alloc(int, 1);
@@ -1943,6 +2041,12 @@ type_create_array: (subtype_id: int, length: int) -> int = {
     return typeid;
 }
 
+type_create_ptr: (subtype_id: int) -> int = {
+    typeid := type_create(TYPE_PTR);
+    type_data_subtype[typeid] = subtype_id;
+    return typeid;
+}
+
 type_create_func: (ret_type: int, num_args: int) -> int = {
     typeid := type_create(TYPE_FUNC);
     type_data_subtype[typeid] = ret_type;
@@ -1985,11 +2089,20 @@ type_sizeof: (typeid: int) -> int = {
         return subsize * type_data_length[typeid];
     }
 
+    if (tc == TYPE_PTR) {
+        // yes.
+        return 8;
+    }
+
     println("Unhandled type class in type_sizeof:", tc);
     type_print(typeid);
     println();
     exit := 1 / 0;
     return 0;
+}
+
+type_is_unknown: (typeid: int) -> bool = {
+    return type_class[typeid] == TYPE_UNKNOWN;
 }
 
 type_is_int: (typeid: int) -> bool = {
@@ -2024,12 +2137,22 @@ type_is_arr: (typeid: int) -> bool = {
     return type_class[typeid] == TYPE_ARR;
 }
 
+type_is_ptr: (typeid: int) -> bool = {
+    return type_class[typeid] == TYPE_PTR;
+}
+
 type_get_type: (type_node: int) -> int = {
     if (node_data_type[type_node] != TYPEID_UNKNOWN) {
         return node_data_type[type_node];
     }
 
     children := node_children[type_node];
+
+    if (node_parse_tc[type_node] == TYPE_PTR) {
+        subtype := type_get_type(children[0]);
+        node_data_type[type_node] = type_create_ptr(subtype);
+        return node_data_type[type_node];
+    }
 
     if (node_children_sz[type_node] == 1) {
         id_node := children[0];
@@ -2041,9 +2164,9 @@ type_get_type: (type_node: int) -> int = {
             exit := 1 / 0;
         }
 
-        // streq: (str_a: *int, str_b: *int, len: int) -> bool
         id_stridx := node_data_str[id_node];
 
+        // streq: (str_a: *int, str_b: *int, len: int) -> bool
         if (streq(string_table[id_stridx], STRING_INT, 3)) {
             node_data_type[type_node] = type_create_basic(TYPE_B_INT);
             return node_data_type[type_node];
@@ -2071,11 +2194,6 @@ type_get_type: (type_node: int) -> int = {
     if (node_type[ch1] == NODE_LIT_INT) {
         // array type
         subtype := type_get_type(ch0);
-
-        if (!type_is_int(subtype)) {
-            println("Unhandled type", subtype, "as array subtype");
-            exit := 1 / 0;
-        }
 
         node_data_type[type_node] = type_create_array(subtype, node_data_int[ch1]);
         return node_data_type[type_node];
@@ -2147,6 +2265,13 @@ types_equivalent: (type_a: int, type_b: int) -> bool = {
             return false;
         }
         if (type_data_length[type_a] != type_data_length[type_b]) {
+            return false;
+        }
+        return true;
+    }
+
+    if (tc == TYPE_PTR) {
+        if (!types_equivalent(type_data_subtype[type_a], type_data_subtype[type_b])) {
             return false;
         }
         return true;
@@ -2398,6 +2523,8 @@ resolve_symbols: (root: int) -> void = {
 
     while (i < node_children_sz[root]) {
         child := children[i];
+        decl_children := node_children[child];
+        id_node := decl_children[0];
         body := decl_get_body(child);
         if (body >= 0) {
             symbol_table_seq_counter = 0;
@@ -2436,22 +2563,40 @@ resolve_symbols: (root: int) -> void = {
                 }
             } else {
                 resolve_node(body, 0);
-                if (node_data_type[body] == TYPEID_UNKNOWN) {
-                    if (decl_type == TYPEID_UNKNOWN) {
-                        print("Unable to infer type for: ");
-                        print_tree(child, 2);
-                        println();
-                        exit := 1 / 0;
-                    }
+                inferred_type := node_data_type[body];
+
+                if (type_is_unknown(decl_type) && type_is_unknown(inferred_type)) {
+                    print("Unable to infer type for variable: ");
+                    string_table_print(node_data_str[id_node]);
+                    println();
+                    exit := 1 / 0;
+                }
+                if (type_is_unknown(decl_type)) {
+                    decl_type = inferred_type;
+                    node_data_type[id_node] = decl_type;
+                    sym := node_data_sym[id_node];
+                    symbol_table_type[sym] = decl_type;
+                    node_data_type[child] = decl_type;
+                }
+                else { if (type_is_unknown(inferred_type)) {
                     node_data_type[body] = decl_type;
+                    inferred_type = decl_type;
                 } else {
                     if (!types_equivalent(decl_type, node_data_type[body])) {
                         println("Mismatching types in declaration: ");
                         print_tree(child, 2);
                         println();
+                        print("Decl type: ");
+                        type_print(decl_type);
+                        print(" (");
+                        print(decl_type);
+                        println(")");
+                        print("Body type: ");
+                        type_print(node_data_type[body]);
+                        println();
                         exit := 1 / 0;
                     }
-                }
+                }}
             }
         }
         i += 1;
@@ -2483,33 +2628,31 @@ resolve_node: (node: int, scope: int) -> void = {
         if (body >= 0) {
             inferred_type := node_data_type[body];
 
-            if (decl_type == TYPEID_UNKNOWN && inferred_type == TYPEID_UNKNOWN) {
+            if (type_is_unknown(decl_type) && type_is_unknown(inferred_type)) {
                 print("Unable to infer type for variable: ");
                 string_table_print(node_data_str[id_node]);
                 println();
                 exit := 1 / 0;
             }
-            else {
-                if (decl_type == TYPEID_UNKNOWN) {
-                    decl_type = inferred_type;
-                    node_data_type[node] = decl_type;
-                }
-                else { if (inferred_type == TYPEID_UNKNOWN) {
-                    node_data_type[body] = decl_type;
-                    inferred_type = decl_type;
-                } else {
-                    if (!types_equivalent(decl_type, inferred_type)) {
-                        print("Variable: '");
-                        string_table_print(node_data_str[id_node]);
-                        print("' was declared with type: ");
-                        type_print(decl_type);
-                        print(" but assigned to expression of type: ");
-                        type_print(inferred_type);
-                        println();
-                        exit := 1 / 0;
-                    }
-                }}
+            if (type_is_unknown(decl_type)) {
+                decl_type = inferred_type;
+                node_data_type[node] = decl_type;
             }
+            else { if (type_is_unknown(inferred_type)) {
+                node_data_type[body] = decl_type;
+                inferred_type = decl_type;
+            } else {
+                if (!types_equivalent(decl_type, inferred_type)) {
+                    print("Variable: '");
+                    string_table_print(node_data_str[id_node]);
+                    print("' was declared with type: ");
+                    type_print(decl_type);
+                    print(" but assigned to expression of type: ");
+                    type_print(inferred_type);
+                    println();
+                    exit := 1 / 0;
+                }
+            }}
         }
 
         idx := symbol_table_insert(node, id_str, scope, decl_type);
@@ -2642,7 +2785,20 @@ resolve_node: (node: int, scope: int) -> void = {
             node_data_type[node] = node_data_type[sub];
             return;
         }
-        println("Unhandled unary operator:", node_data_op[node]);
+
+        if (node_data_op[node] == TOK_NEG) {
+            if (!type_is_int(node_data_type[sub])) {
+                print("Operator - can only be applied to numerical expressions, not: ");
+                type_print(node_data_type[sub]);
+                println();
+                exit := 1 / 0;
+            }
+            node_data_type[node] = node_data_type[sub];
+            return;
+        }
+
+        println("Unhandled unary operator: ");
+        tok_print(node_data_op[node]);
         exit := 1 / 0;
     }
 
@@ -2763,6 +2919,36 @@ resolve_node: (node: int, scope: int) -> void = {
         return;
     }
 
+    if (node_type[node] == NODE_ADDROF) {
+        // TODO: subexpr should be lvalue or something
+        ch0 := children[0];
+        resolve_node(ch0, new_scope);
+        subtype := node_data_type[ch0];
+        if (type_is_unknown(subtype)) {
+            println("Taking address of unknown type!");
+            node_print(node);
+            println();
+            exit := 1 / 0;
+        }
+
+        node_data_type[node] = type_create_ptr(subtype);
+        return;
+    }
+
+    if (node_type[node] == NODE_DEREF) {
+        ch0 := children[0];
+        resolve_node(ch0, new_scope);
+        subtype := node_data_type[ch0];
+        if (!type_is_ptr(subtype)) {
+            print("Cannot dereference non-pointer type: ");
+            type_print(subtype);
+            println();
+            exit := 1 / 0;
+        }
+        node_data_type[node] = type_data_subtype[subtype];
+        return;
+    }
+
     if ( (node_type[node] == NODE_BLOCK)
       || (node_type[node] == NODE_LIST)
     ) {
@@ -2813,7 +2999,9 @@ set_operator_type: (operator_node: int, lhs_type: int, rhs_type: int) -> void = 
         return;
     }
 
-    println("set_operator_type unhandled operator:", op);
+    print("set_operator_type unhandled operator:");
+    tok_print(op);
+    println();
     exit := 1 / 0;
 }
 
@@ -2832,6 +3020,7 @@ generate_code: (root: int) -> void = {
         println(".section .rodata");
         println("strout: .asciz \"%s\"");
         println("intout: .asciz \"%ld\"");
+        println("ptrout: .asciz \"%p\"");
 
         i := 0;
         while (i < string_table_sz) {
@@ -3159,6 +3348,11 @@ generate_call_println: (args_node: int) -> void = {
                 break;
             }
 
+            if (type_is_ptr(node_data_type[arg])) {
+                println("    leaq ptrout(%rip), %rdi");
+                break;
+            }
+
             println("Unhandled node type println");
             print("Violating: ");
             node_print(arg);
@@ -3219,6 +3413,11 @@ generate_call_print: (args_node: int) -> void = {
                 break;
             }
 
+            if (type_is_ptr(node_data_type[arg])) {
+                println("    leaq ptrout(%rip), %rdi");
+                break;
+            }
+
             println("Unhandled node type println");
             print("Violating: ");
             node_print(arg);
@@ -3243,6 +3442,12 @@ generate_unop: (op: int) -> void = {
         println("    xor %rax, %rax");
         println("    test %rcx, %rcx");
         println("    sete %al");
+        return;
+    }
+
+    if (op == TOK_NEG) {
+        println("    neg %rcx");
+        println("    movq %rcx, %rax");
         return;
     }
 
@@ -3509,6 +3714,16 @@ generate_expression: (node: int) -> void = {
         return;
     }
 
+    if (node_type[node] == NODE_ADDROF) {
+        generate_addrof(node);
+        return;
+    }
+
+    if (node_type[node] == NODE_DEREF) {
+        generate_deref(node);
+        return;
+    }
+
     print("generate_expression unhandled node type: ");
     node_print(node);
     println();
@@ -3649,10 +3864,44 @@ generate_assign: (node: int) -> void = {
         return;
     }
 
+    if (node_type[lhs] == NODE_DEREF) {
+        lhs_children := node_children[lhs];
+        generate_expression(lhs_children[0]);
+        println("    pushq %rax");
+        generate_expression(rhs);
+        println("    popq %rcx");
+        println("    movq %rax, (%rcx)");
+        return;
+    }
+
     print("Unhandled lhs type in generate_assign: ");
     node_print(lhs);
     println();
     exit := 1 / 0;
+}
+
+// put an address in %rax
+generate_addrof: (node: int) -> void = {
+    children := node_children[node];
+    child := children[0];
+
+    if (node_type[child] != NODE_ID) {
+        println("Not something we can take the address of!");
+        node_print(child);
+        println();
+        exit := 1 / 0;
+    }
+
+    print("    leaq ");
+    emit_sym_access(node_data_sym[child]);
+    println(", %rax");
+}
+
+generate_deref: (node: int) -> void = {
+    children := node_children[node];
+    generate_expression(children[0]);
+    // now we have something looking like a pointer in %rax
+    println("    movq (%rax), %rax");
 }
 
 emit_global_sym_access: (sym: int) -> void = {
@@ -3755,6 +4004,12 @@ type_print: (typeid: int) -> void = {
         return;
     }
 
+    if (tc == TYPE_PTR) {
+        print("*");
+        type_print(type_data_subtype[typeid]);
+        return;
+    }
+
     if (tc == TYPE_UNKNOWN) {
         print("?");
         return;
@@ -3820,20 +4075,12 @@ node_print: (node: int) -> void = {
     }
     if (typ == NODE_UNOP) {
         print("UNOP ");
-        if (node_data_op[node] < 255) {
-            print(cast(char, node_data_op[node]));
-        } else {
-            tok_print(node_data_op[node]);
-        }
+        tok_print(node_data_op[node]);
         return;
     }
     if (typ == NODE_BINOP) {
         print("BINOP ");
-        if (node_data_op[node] < 255) {
-            print(cast(char, node_data_op[node]));
-        } else {
-            tok_print(node_data_op[node]);
-        }
+        tok_print(node_data_op[node]);
         return;
     }
     if (typ == NODE_ASSIGN) {
@@ -3862,6 +4109,14 @@ node_print: (node: int) -> void = {
     }
     if (typ == NODE_CONTINUE) {
         print("CONTINUE");
+        return;
+    }
+    if (typ == NODE_ADDROF) {
+        print("ADDROF");
+        return;
+    }
+    if (typ == NODE_DEREF) {
+        print("DEREF");
         return;
     }
     print("????");
