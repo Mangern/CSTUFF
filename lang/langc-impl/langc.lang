@@ -2447,14 +2447,14 @@ parse_simplify: (node: int) -> void = {
         postnode := children[2];
         bodynode := children[3];
 
-        // make a new body including the post stuff
-        new_bodynode := node_create(NODE_BLOCK);
-        node_add_child(new_bodynode, bodynode);
-        node_add_child(new_bodynode, postnode);
+        // to ensure body cannot fuck with post expression, put it in a block
+        new_body := node_create(NODE_BLOCK);
+        node_add_child(new_body, bodynode);
 
         while_node := node_create(NODE_WHILE);
         node_add_child(while_node, condnode);
-        node_add_child(while_node, new_bodynode);
+        node_add_child(while_node, new_body);
+        node_add_child(while_node, postnode);
 
         // to ensure a new scope is created
         node_type[node] = NODE_BLOCK;
@@ -3693,6 +3693,7 @@ LABEL_COUNTER: int;
 
 curr_func_gen_sym: int;
 curr_while_label: int;
+curr_while_has_post: bool;
 
 RAX: int;
 RBX: int;
@@ -3717,6 +3718,7 @@ generate_code: (root: int) -> void = {
     // setup
     {
         curr_while_label = -1;
+        curr_while_has_post = false;
         RAX = 0;
         RBX = 1;
         RCX = 2;
@@ -4752,8 +4754,10 @@ generate_while: (node: int) -> void = {
     children := node_children[node];
 
     old_while_label := curr_while_label;
+    old_while_has_post := curr_while_has_post;
 
     curr_while_label   = gen_next_label();
+    curr_while_has_post = node_children_sz[node] > 2;
     print(".WHILE");
     print(curr_while_label);
     println(":");
@@ -4765,6 +4769,14 @@ generate_while: (node: int) -> void = {
 
     generate_expression(children[1]);
 
+    if (curr_while_has_post) {
+        print(".POSTWHILE");
+        print(curr_while_label);
+        println(":");
+
+        generate_expression(children[2]);
+    }
+
     print("    jmp .WHILE");
     println(curr_while_label);
 
@@ -4774,6 +4786,7 @@ generate_while: (node: int) -> void = {
 
     // using the builtin stack machine like a boss
     curr_while_label = old_while_label;
+    curr_while_has_post = old_while_has_post;
 }
 
 generate_return: (node: int) -> void = {
@@ -4801,8 +4814,13 @@ generate_continue: (node: int) -> void = {
         println("Unexpected break outside loop");
         exit := 1 / 0;
     }
-    print("    jmp .WHILE");
-    println(curr_while_label);
+    if (curr_while_has_post) {
+        print("    jmp .POSTWHILE");
+        println(curr_while_label);
+    } else {
+        print("    jmp .WHILE");
+        println(curr_while_label);
+    }
 }
 
 // TODO: we could benefit from some lvalue-rvalue stuff here
