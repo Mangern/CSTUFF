@@ -5,7 +5,13 @@ outfile="tmp"
 
 if [ $status -eq 0 ]; then
     printf "%s\n" "$ret" | gcc -xassembler -o $outfile -
-    ./$outfile
+    gccstat=$?
+    if [ $gccstat -eq 0 ]; then
+        ./$outfile
+    else
+        echo "Assembler failed"
+        printf "%s\n" "$ret"
+    fi
 else
     echo "Failed with message:"
     printf "%s\n" "$ret"

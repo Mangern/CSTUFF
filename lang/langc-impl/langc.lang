@@ -257,6 +257,13 @@ TOK_ALLOC    : int;
 TOK_DELETE   : int;
 TOK_CHAR     : int;
 TOK_CAST     : int;
+TOK_PLUSX2   : int;
+TOK_MINUSX2  : int;
+TOK_PREADD   : int; // for operators
+TOK_POSTADD  : int; // for operators
+TOK_PRESUB   : int; // for operators
+TOK_POSTSUB  : int; // for operators
+TOK_FOR      : int; 
 
 operator_prec: *int;
 
@@ -296,6 +303,13 @@ lex_init: () -> void = {
     TOK_DELETE   = 293;
     TOK_CHAR     = 294;
     TOK_CAST     = 295;
+    TOK_PLUSX2   = 296;
+    TOK_MINUSX2  = 297;
+    TOK_PREADD   = 298;
+    TOK_POSTADD  = 299;
+    TOK_PRESUB   = 300;
+    TOK_POSTSUB  = 301;
+    TOK_FOR      = 302;
 
     operator_prec = alloc(int, 512);
     // 10 * (17 - original lang implementation in C precedence)
@@ -322,6 +336,10 @@ lex_init: () -> void = {
     operator_prec[TOK_NEG]        = 140;
     operator_prec[TOK_STAR]       = 140;
     operator_prec[TOK_DEREF]      = 150;
+    operator_prec[TOK_PREADD]     = 140;
+    operator_prec[TOK_POSTADD]     = 150;
+    operator_prec[TOK_PRESUB]     = 140;
+    operator_prec[TOK_POSTSUB]     = 150;
 }
 
 
@@ -576,6 +594,26 @@ lex_matches_while: () -> int = {
     return 5;
 }
 
+lex_matches_for: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'f')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'o')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'r')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr < nbuf && lex_isidchar(buf[ptr])) {
+        return 0;
+    }
+    return 3;
+}
+
 lex_matches_return: () -> int = {
     ptr := lex_ptr;
     if (ptr >= nbuf || buf[ptr] != cast(int, 'r')) {
@@ -711,6 +749,30 @@ lex_matches_amod: () -> int = {
     }
     ptr += 1;
     if (ptr >= nbuf || buf[ptr] != cast(int, '=')) {
+        return 0;
+    }
+    return 2;
+}
+
+lex_matches_plusx2: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '+')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '+')) {
+        return 0;
+    }
+    return 2;
+}
+
+lex_matches_minusx2: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '-')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '-')) {
         return 0;
     }
     return 2;
@@ -942,6 +1004,13 @@ lex_peek: () -> int = {
         return cur_tok;
     }
 
+    match = lex_matches_for();
+    if (match > 0) {
+        cur_tok = TOK_FOR;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
     match = lex_matches_return();
     if (match > 0) {
         cur_tok = TOK_RETURN;
@@ -1082,6 +1151,20 @@ lex_peek: () -> int = {
         return cur_tok;
     }
 
+    match = lex_matches_plusx2();
+    if (match > 0) {
+        cur_tok = TOK_PLUSX2;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_minusx2();
+    if (match > 0) {
+        cur_tok = TOK_MINUSX2;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
     match = lex_matches_or();
     if (match > 0) {
         cur_tok = TOK_OR;
@@ -1149,6 +1232,10 @@ tok_print: (t: int) -> void = {
     }
     if (t == TOK_WHILE) {
         print("while");
+        return;
+    }
+    if (t == TOK_FOR) {
+        print("for");
         return;
     }
     if (t == TOK_RETURN) {
@@ -1250,6 +1337,19 @@ tok_print: (t: int) -> void = {
         return;
     }
 
+    if (t == TOK_PLUSX2
+     || t == TOK_PREADD
+     || t == TOK_POSTADD) {
+        print("++");
+        return;
+    }
+    if (t == TOK_MINUSX2
+     || t == TOK_PRESUB
+     || t == TOK_POSTSUB) {
+        print("--");
+        return;
+    }
+
     println("???");
 }
 
@@ -1302,6 +1402,7 @@ NODE_UNOP     : int; // [expression]
 NODE_BINOP    : int; // [expression, expression]
 NODE_IF       : int; // [expr, expr] | [expr, expr, expr]
 NODE_WHILE    : int; // [expr, expr]
+NODE_FOR      : int; // [expr, expr, expr]
 NODE_RETURN   : int; // [] | [expr]
 NODE_INDEX    : int; // [identifier, expr] 
 NODE_BREAK    : int; // leaf
@@ -1580,15 +1681,16 @@ parser_init: () -> void = {
     NODE_BINOP    = 12;
     NODE_IF       = 13;
     NODE_WHILE    = 14;
-    NODE_RETURN   = 15;
-    NODE_INDEX    = 16;
-    NODE_BREAK    = 17;
-    NODE_CONTINUE = 18;
-    NODE_ADDROF   = 19;
-    NODE_DEREF    = 20;
-    NODE_ALLOC    = 21;
-    NODE_DELETE   = 22;
-    NODE_CAST     = 23;
+    NODE_FOR      = 15;
+    NODE_RETURN   = 16;
+    NODE_INDEX    = 17;
+    NODE_BREAK    = 18;
+    NODE_CONTINUE = 19;
+    NODE_ADDROF   = 20;
+    NODE_DEREF    = 21;
+    NODE_ALLOC    = 22;
+    NODE_DELETE   = 23;
+    NODE_CAST     = 24;
 
     TYPE_UNKNOWN = 0;
     TYPE_VOID    = 1;
@@ -1749,6 +1851,7 @@ parse_block: () -> int = {
         expect_semicolon := !(
              (token == TOK_IF)
           || (token == TOK_WHILE)
+          || (token == TOK_FOR)
           || (token == cast(int, '{'))
         );
 
@@ -1794,9 +1897,6 @@ parse_identifier_expr: () -> int = {
     }
     if (token == cast(int, ':')) {
         return parse_declaration(id_node);
-    }
-    if (token == cast(int, '[')) {
-        return parse_indexing(id_node);
     }
     return id_node;
 }
@@ -1864,9 +1964,9 @@ parse_function_call: (id_node: int) -> int = {
     return call_node;
 }
 
-parse_indexing: (id_node: int) -> int = {
+parse_indexing: (node: int) -> int = {
     indexing_node := node_create(NODE_INDEX);
-    node_add_child(indexing_node, id_node);
+    node_add_child(indexing_node, node);
 
     peek_expect_advance(cast(int, '['));
     node_add_child(indexing_node, parse_expression());
@@ -1911,6 +2011,44 @@ parse_while_expr: () -> int = {
     node_add_child(while_node, cond);
     node_add_child(while_node, body);
     return while_node;
+}
+
+parse_for_expr: () -> int = {
+    peek_expect_advance(TOK_FOR);
+    for_node := node_create(NODE_FOR);
+
+    peek_expect_advance(cast(int, '('));
+
+    token := lex_peek();
+    if (token == cast(int, ';')) {
+        node_add_child(for_node, node_create(NODE_BLOCK));
+    } else {
+        node_add_child(for_node, parse_statement());
+    }
+    peek_expect_advance(cast(int, ';'));
+    token = lex_peek();
+
+    if (token == cast(int, ';')) {
+        empty_cond := node_create(NODE_LIT_BOOL);
+        node_data_bool[empty_cond] = 1;
+        node_add_child(for_node, empty_cond);
+    } else {
+        node_add_child(for_node, parse_statement());
+    }
+    peek_expect_advance(cast(int, ';'));
+    token = lex_peek();
+
+    if (token == cast(int, ')')) {
+        node_add_child(for_node, node_create(NODE_BLOCK));
+    } else {
+        node_add_child(for_node, parse_statement());
+    }
+    peek_expect_advance(cast(int, ')'));
+
+    body := parse_whileif_body();
+    node_add_child(for_node, body);
+
+    return for_node;
 }
 
 parse_whileif_body: () -> int = {
@@ -2050,6 +2188,10 @@ parse_statement: () -> int = {
         return parse_while_expr();
     }
 
+    if (token == TOK_FOR) {
+        return parse_for_expr();
+    }
+
     if (token == TOK_RETURN) {
         return parse_return_expr();
     }
@@ -2104,6 +2246,24 @@ parse_unary_expr: () -> int = {
         return addrof_node;
     }
 
+    if (token == TOK_PLUSX2) {
+        lex_advance();
+        subexpr := parse_unary_expr();
+        unary_node := node_create(NODE_UNOP);
+        node_data_op[unary_node] = TOK_PREADD;
+        node_add_child(unary_node, subexpr);
+        return unary_node;
+    }
+
+    if (token == TOK_MINUSX2) {
+        lex_advance();
+        subexpr := parse_unary_expr();
+        unary_node := node_create(NODE_UNOP);
+        node_data_op[unary_node] = TOK_PRESUB;
+        node_add_child(unary_node, subexpr);
+        return unary_node;
+    }
+
     return parse_postfix_expr();
 }
 
@@ -2111,12 +2271,39 @@ parse_unary_expr: () -> int = {
 // TODO: what about multiple postfix ops
 parse_postfix_expr: () -> int = {
     expr := parse_primary_expr();
-    token := lex_peek();
-    if (token == TOK_DEREF) {
-        lex_advance();
-        deref_node := node_create(NODE_DEREF);
-        node_add_child(deref_node, expr);
-        return deref_node;
+    while (true) {
+        token := lex_peek();
+        if (token == TOK_DEREF) {
+            lex_advance();
+            deref_node := node_create(NODE_DEREF);
+            node_add_child(deref_node, expr);
+            expr = deref_node;
+            continue;
+        }
+
+        if (token == cast(int, '[')) {
+            expr = parse_indexing(expr);
+            continue;
+        }
+
+        if (token == TOK_PLUSX2) {
+            lex_advance();
+            unary_node := node_create(NODE_UNOP);
+            node_data_op[unary_node] = TOK_POSTADD;
+            node_add_child(unary_node, expr);
+            expr = unary_node;
+            continue;
+        }
+
+        if (token == TOK_MINUSX2) {
+            lex_advance();
+            unary_node := node_create(NODE_UNOP);
+            node_data_op[unary_node] = TOK_POSTSUB;
+            node_add_child(unary_node, expr);
+            return unary_node;
+        }
+
+        break;
     }
 
     return expr;
@@ -2220,6 +2407,7 @@ parse_simplify: (node: int) -> void = {
             children[1] = new_node;
             node_type[node] = NODE_ASSIGN;
         }
+        return;
     }
 
     if (node_type[node] == NODE_DECL) {
@@ -2244,6 +2432,39 @@ parse_simplify: (node: int) -> void = {
                 }
             }
         }
+        return;
+    }
+
+    if (node_type[node] == NODE_FOR) {
+        // turn this shit into a while loop
+        if (node_children_sz[node] != 4) {
+            println("Expected 'for' to have exactly 4 children");
+            exit := 1 / 0;
+        }
+        children := node_children[node];
+        prenode := children[0];
+        condnode := children[1];
+        postnode := children[2];
+        bodynode := children[3];
+
+        // make a new body including the post stuff
+        new_bodynode := node_create(NODE_BLOCK);
+        node_add_child(new_bodynode, bodynode);
+        node_add_child(new_bodynode, postnode);
+
+        while_node := node_create(NODE_WHILE);
+        node_add_child(while_node, condnode);
+        node_add_child(while_node, new_bodynode);
+
+        // to ensure a new scope is created
+        node_type[node] = NODE_BLOCK;
+        // prenode stays the same
+        children[1] = while_node;
+        children[2] = 0;
+        children[3] = 0;
+        node_children_sz[node] = 2;
+
+        return;
     }
 }
 
@@ -3174,8 +3395,18 @@ resolve_node: (node: int, scope: int) -> void = {
             return;
         }
 
-        println("Unhandled unary operator: ");
+        if (node_data_op[node] == TOK_PREADD
+         || node_data_op[node] == TOK_POSTADD
+         || node_data_op[node] == TOK_PRESUB
+         || node_data_op[node] == TOK_POSTSUB) {
+            tok_print(node_data_op[node]);
+            println(" is not supported yet");
+            exit := 1 / 0;
+        }
+
+        print("Unhandled unary operator: ");
         tok_print(node_data_op[node]);
+        println();
         exit := 1 / 0;
     }
 
@@ -4142,7 +4373,9 @@ generate_unop: (op: int) -> void = {
         return;
     }
 
-    println("generate_unop unhandled operator: ", cast(char, op));
+    print("generate_unop unhandled operator: ");
+    tok_print(op);
+    println();
     exit := 1 / 0;
 }
 
@@ -4408,9 +4641,6 @@ generate_expression: (node: int) -> void = {
         expr_node := children[1];
         sym := node_data_sym[id_node];
 
-        // get our index
-        generate_expression(expr_node);
-
         if (type_is_arr(id_type)) {
             print("    leaq ");
             emit_sym_access(sym);
@@ -4419,15 +4649,19 @@ generate_expression: (node: int) -> void = {
 
         if (type_is_ptr(id_type)) {
             // assume that the boi is 8 byte
-            print("    movq ");
-            emit_sym_access(sym);
-            println(", %rcx");
+            generate_expression(id_node);
+            println("    movq %rax, %rcx");
         }
 
         if (!type_is_arr(id_type) && !type_is_ptr(id_type)) {
             println("Fix this: index can only handle pointer and array");
             exit := 1 / 0;
         }
+
+        println("    pushq %rcx");
+        // get our index
+        generate_expression(expr_node);
+        println("    popq %rcx");
 
         sz := type_sizeof(type_data_subtype[node_data_type[id_node]]);
         println("    leaq (%rcx, %rax,", sz, "), %rcx");
@@ -4597,9 +4831,6 @@ generate_assign: (node: int) -> void = {
         id_type := node_data_type[id_node];
         expr_node := lhs_children[1];
 
-        // get our index
-        generate_expression(expr_node);
-
         if (type_is_arr(id_type)) {
             print("    leaq ");
             emit_sym_access(node_data_sym[id_node]);
@@ -4607,15 +4838,21 @@ generate_assign: (node: int) -> void = {
         }
 
         if (type_is_ptr(id_type)) {
-            print("    movq ");
-            emit_sym_access(node_data_sym[id_node]);
-            println(", %rcx");
+            generate_expression(id_node);
+            println("    movq %rax, %rcx");
         }
 
         if (!type_is_arr(id_type) && !type_is_ptr(id_type)) {
             println("Fix this: index can only handle pointer and array");
             exit := 1 / 0;
         }
+
+        println("    pushq %rcx");
+
+        // get our index
+        generate_expression(expr_node);
+
+        println("    popq %rcx");
 
         sz := type_sizeof(type_data_subtype[node_data_type[id_node]]);
         println("    leaq (%rcx, %rax,", sz, "), %rcx");
@@ -4973,6 +5210,10 @@ node_print: (node: int) -> void = {
         print("WHILE ");
         return;
     }
+    if (typ == NODE_FOR) {
+        print("FOR ");
+        return;
+    }
     if (typ == NODE_RETURN) {
         print("RETURN");
         return;
@@ -5075,6 +5316,8 @@ main: () -> void = {
     root := parse();
 
     symbol_table_init();
+
+    //print_tree(root, 0);
 
     resolve_symbols(root);
 
