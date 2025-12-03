@@ -1,0 +1,111 @@
+EOF: char;
+buf: char[100];
+nbuf: int;
+rangel: int;
+ranger: int;
+ninvalid: int;
+invalids: int[1000000];
+
+bufstoi: (idx: int, cnt: int) -> int = {
+    ret := 0;
+
+    i := 0;
+    while (i < cnt) {
+        ret *= 10;
+        ret += cast(int, buf[idx + i]) - cast(int, '0');
+        i += 1;
+    }
+    return ret;
+}
+
+readrange: () -> bool = {
+    c := readchar();
+    if (c == EOF || c == '\n') {
+        return false;
+    }
+
+    nbuf = 0;
+    dashidx := 0;
+    while (c != ',' && c != EOF && c != '\n') {
+        buf[nbuf] = c;
+        if (c == '-') {
+            dashidx = nbuf;
+        }
+        nbuf += 1;
+        c = readchar();
+    }
+
+    rangel = bufstoi(0, dashidx);
+    ranger = bufstoi(dashidx+1, nbuf - dashidx - 1);
+
+    return true;
+}
+
+numdigs: (x: int) -> int = {
+    ret := 0;
+    while (x > 0) {
+        ret += 1;
+        x /= 10;
+    }
+    return ret;
+}
+
+generate_invalids: () -> void = {
+    i := 1;
+    while (i < 1000000) {
+        n := numdigs(i);
+        mul := 1;
+        j := 0;
+        while (j < n) {
+            mul *= 10;
+            j += 1;
+        }
+        inv := i * mul + i;
+        invalids[ninvalid] = inv;
+        ninvalid += 1;
+        i += 1;
+    }
+}
+
+// find smallest invalid >= x
+invalids_lb: (x: int) -> int = {
+    lo := 0;
+    hi := ninvalid;
+
+    while (lo < hi) {
+        mid := (lo + hi) / 2;
+
+        if (invalids[mid] < x) {
+            lo = mid + 1;
+        } else {
+            hi = mid;
+        }
+    }
+
+    return lo;
+}
+
+main: () -> void = {
+    EOF = cast(char, 255);
+
+    generate_invalids();
+
+    println("Generated", ninvalid, "invalids");
+
+    ans := 0;
+    while (readrange()) {
+        begin_inv := invalids_lb(rangel);
+        end_inv   := invalids_lb(ranger+1);
+        i := begin_inv;
+
+        if (ranger+1 > invalids[ninvalid - 1]) {
+            println("We have too few!!!");
+        }
+        while (i < end_inv) {
+            ans += invalids[i];
+            i += 1;
+        }
+    }
+
+    println(ans);
+}
