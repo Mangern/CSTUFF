@@ -3097,32 +3097,28 @@ resolve_symbols: (root: int) -> void = {
                     println();
                     exit := 1 / 0;
                 }
+
                 if (type_is_unknown(decl_type)) {
                     decl_type = inferred_type;
                     node_data_type[id_node] = decl_type;
                     sym := node_data_sym[id_node];
                     symbol_table_type[sym] = decl_type;
                     node_data_type[child] = decl_type;
-                }
-                else { if (type_is_unknown(inferred_type)) {
+                } else if (type_is_unknown(inferred_type)) {
                     node_data_type[body] = decl_type;
                     inferred_type = decl_type;
                 } else {
                     if (!types_equivalent(decl_type, node_data_type[body])) {
-                        println("Mismatching types in declaration: ");
-                        print_tree(child, 2);
-                        println();
-                        print("Decl type: ");
+                        print("Variable '");
+                        string_table_print(node_data_str[id_node]);
+                        print("' was declared with type: ");
                         type_print(decl_type);
-                        print(" (");
-                        print(decl_type);
-                        println(")");
-                        print("Body type: ");
-                        type_print(node_data_type[body]);
+                        print(" but assigned to expression of type: ");
+                        type_print(inferred_type);
                         println();
                         exit := 1 / 0;
                     }
-                }}
+                }
             }
         }
     }
@@ -3163,7 +3159,7 @@ resolve_node: (node: int, scope: int) -> void = {
                 decl_type = inferred_type;
                 node_data_type[node] = decl_type;
             }
-            else { if (type_is_unknown(inferred_type)) {
+            else if (type_is_unknown(inferred_type)) {
                 node_data_type[body] = decl_type;
                 inferred_type = decl_type;
             } else {
@@ -3177,7 +3173,7 @@ resolve_node: (node: int, scope: int) -> void = {
                     println();
                     exit := 1 / 0;
                 }
-            }}
+            }
         }
 
         idx := symbol_table_insert(node, id_str, scope, decl_type);
@@ -4221,28 +4217,18 @@ generate_call_print: (args_node: int) -> void = {
         REGS(RSI, sz);
         println();
 
-        while (true) {
-            if (type_is_strlit(node_data_type[arg])) {
-                println("    leaq strout(%rip), %rdi");
-                break;
-            }
-
-            if (type_is_int(node_data_type[arg])
-              || type_is_bool(node_data_type[arg])) {
-                println("    leaq intout(%rip), %rdi");
-                break;
-            }
-
-            if (type_is_ptr(node_data_type[arg])) {
-                println("    leaq ptrout(%rip), %rdi");
-                break;
-            }
-
-            if (type_is_char(node_data_type[arg])) {
-                println("    leaq charout(%rip), %rdi");
-                break;
-            }
-
+        if (type_is_strlit(node_data_type[arg])) {
+            println("    leaq strout(%rip), %rdi");
+        } else if (
+            type_is_int(node_data_type[arg])
+            || type_is_bool(node_data_type[arg])) 
+        {
+            println("    leaq intout(%rip), %rdi");
+        } else if (type_is_ptr(node_data_type[arg])) {
+            println("    leaq ptrout(%rip), %rdi");
+        } else if (type_is_char(node_data_type[arg])) {
+            println("    leaq charout(%rip), %rdi");
+        } else {
             println("Unhandled node type println");
             print("Violating: ");
             node_print(arg);
