@@ -4,7 +4,8 @@ nbuf: int;
 
 // ==================== STD ====================
 isspace: (c: int) -> bool = {
-    return c == 10 || c == 32;
+    // \n, ' ', \t
+    return c == 10 || c == 32 || c == 9;
 }
 
 isascii: (c: int) -> bool = {
@@ -1933,9 +1934,9 @@ parse_primary_expr: () -> int = {
         return parse_identifier_expr();
     }
 
-    print("parse_primary_expr unhandled token: ");
+    print("parse_primary_expr unhandled token: '");
     tok_print(token);
-    println();
+    println("'");
     exit := 1 / 0;
     return 0;
 }
@@ -3463,13 +3464,13 @@ generate_code: (root: int) -> void = {
     println("    movq %rsp, %rbp");
     println("    andq $-16, %rsp");
     println("    call .main");
-	println("    movq %rbp, %rsp");
-	println("    popq %rbp");
-	println("    movq $0, %rdi");
-	println("    pushq %rbp");
-	println("    movq %rsp, %rbp");
-	println("    andq $-16, %rsp");
-	println("    call exit");
+    println("    movq %rbp, %rsp");
+    println("    popq %rbp");
+    println("    movq $0, %rdi");
+    println("    pushq %rbp");
+    println("    movq %rsp, %rbp");
+    println("    andq $-16, %rsp");
+    println("    call exit");
     println(".global main");
 }
 
