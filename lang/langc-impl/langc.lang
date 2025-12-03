@@ -33,26 +33,22 @@ isdigit: (c: int) -> bool = {
 }
 
 streq: (str_a: *int, str_b: *int, len: int) -> bool = {
-    i := 0;
-    while (i < len) {
+    for (i := 0; i < len; i += 1) {
         if (str_a[i] != str_b[i]) {
             return false;
         }
         if (str_a[i] == 0 && str_b[i] == 0) {
             return true;
         }
-        i += 1;
     }
     return true;
 }
 
 stoi: (str: *int, len: int) -> int = {
     res := 0;
-    i := 0;
-    while (i < len) {
+    for (i := 0; i < len; i += 1) {
         res *= 10;
         res += str[i] - cast(int, '0');
-        i += 1;
     }
     return res;
 }
@@ -174,12 +170,11 @@ string_table_add: (str_buf: *int, len: int) -> int = {
         new_table := alloc(*int, new_cap);
         new_table_len := alloc(int, new_cap);
         new_table_type := alloc(int, new_cap);
-        i := 0;
-        while (i < string_table_cap) {
+
+        for (i := 0; i < string_table_cap; i += 1) {
             new_table[i] = string_table[i];
             new_table_len[i] = string_table_len[i];
             new_table_type[i] = string_table_type[i];
-            i += 1;
         }
 
         if (string_table_cap > 0) {
@@ -201,10 +196,8 @@ string_table_add: (str_buf: *int, len: int) -> int = {
 
     dst := string_table[stridx];
 
-    i := 0;
-    while (i < len) {
+    for (i := 0; i < len; i += 1) {
         dst[i] = str_buf[i];
-        i += 1;
     }
 
     return stridx;
@@ -213,10 +206,8 @@ string_table_add: (str_buf: *int, len: int) -> int = {
 string_table_print: (stridx: int) -> void = {
     len := string_table_len[stridx];
     str := string_table[stridx];
-    i := 0;
-    while (i < len) {
+    for (i := 0; i < len; i += 1) {
         print(cast(char, str[i]));
-        i += 1;
     }
 }
 
@@ -1462,8 +1453,7 @@ node_create: (ntype: int) -> int = {
         new_parse_tc := alloc(int, new_cap);
 
         // copy data to new buffers
-        i := 0;
-        while (i < node_da_cap) {
+        for (i := 0; i < node_da_cap; i += 1) {
             new_type[i] = node_type[i];
             new_children[i] = node_children[i];
             new_children_cap[i] = node_children_cap[i];
@@ -1477,7 +1467,6 @@ node_create: (ntype: int) -> int = {
             new_data_block_scope[i] = node_data_block_scope[i];
             new_data_type[i] = node_data_type[i];
             new_parse_tc[i] = node_parse_tc[i];
-            i += 1;
         }
 
         // free old
@@ -1544,10 +1533,8 @@ node_add_child: (parent: int, child: int) -> void = {
         new_children := alloc(int, new_cap);
         old_children := node_children[parent];
 
-        i := 0;
-        while (i < cap) {
+        for (i := 0; i < cap; i += 1) {
             new_children[i] = old_children[i];
-            i += 1;
         }
 
         if (cap != 0) {
@@ -1568,10 +1555,8 @@ node_add_child: (parent: int, child: int) -> void = {
 node_dup: (node: int) -> int = {
     new_node := node_create(node_type[node]);
     children := node_children[node];
-    i := 0;
-    while (i < node_children_sz[node]) {
+    for (i := 0; i < node_children_sz[node]; i += 1) {
         node_add_child(new_node, node_dup(children[i]));
-        i += 1;
     }
     node_data_str[new_node] = node_data_str[node];
     node_data_int[new_node] = node_data_int[node];
@@ -2360,10 +2345,8 @@ parse: () -> int = {
 parse_simplify: (node: int) -> void = {
     children := node_children[node];
 
-    i := 0;
-    while (i < node_children_sz[node]) {
+    for (i := 0; i < node_children_sz[node]; i += 1) {
         parse_simplify(children[i]);
-        i += 1;
     }
 
     if (node_type[node] == NODE_BINOP) {
@@ -2533,14 +2516,11 @@ type_create: (tc: int) -> int = {
         new_data_length := alloc(int, new_cap);
         new_data_argtypes := alloc(*int, new_cap);
 
-        i := 0;
-
-        while (i < type_table_cap) {
+        for (i := 0; i < type_table_cap; i += 1) {
             new_class[i] = type_class[i];
             new_data_subtype[i] = type_data_subtype[i];
             new_data_length[i] = type_data_length[i];
             new_data_argtypes[i] = type_data_argtypes[i];
-            i += 1;
         }
 
         if (type_table_cap != 0) {
@@ -2595,10 +2575,8 @@ type_create_func: (ret_type: int, num_args: int) -> int = {
     if (num_args > 0) {
         argtypes = alloc(int, num_args);
     }
-    i := 0;
-    while (i < num_args) {
+    for (i := 0; i < num_args; i += 1) {
         argtypes[i] = TYPEID_UNKNOWN;
-        i += 1;
     }
     type_data_argtypes[typeid] = argtypes;
     return typeid;
@@ -2771,8 +2749,7 @@ type_get_type: (type_node: int) -> int = {
         argtypes := type_data_argtypes[typeid];
 
         decls := node_children[ch0];
-        i := 0;
-        while (i < num_args) {
+        for (i := 0; i < num_args; i += 1) {
             decl := decls[i];
             decl_children := node_children[decl];
             decl_type_node := decl_children[1];
@@ -2792,8 +2769,6 @@ type_get_type: (type_node: int) -> int = {
 
             decl_type := type_get_type(decl_type_node);
             argtypes[i] = decl_type;
-
-            i += 1;
         }
 
         node_data_type[type_node] = typeid;
@@ -2882,9 +2857,7 @@ symbol_table_lookup: (stridx: int, scope: int) -> int = {
     while (true) {
         syms := scope_syms[scope];
 
-        i := 0;
-
-        while (i < scope_szs[scope]) {
+        for (i := 0; i < scope_szs[scope]; i += 1) {
             sym := syms[i];
 
             intable_stridx := symbol_table_str[sym];
@@ -2894,8 +2867,6 @@ symbol_table_lookup: (stridx: int, scope: int) -> int = {
                     return sym;
                 }
             }
-
-            i += 1;
         }
 
         if (scope == 0) {
@@ -2921,11 +2892,8 @@ symbol_table_scope_append: (scope: int, symidx: int) -> void = {
         new_data_syms := alloc(int, new_cap);
         old_data_syms := scope_syms[scope];
 
-        i := 0;
-
-        while (i < cap) {
+        for (i := 0; i < cap; i += 1) {
             new_data_syms[i] = old_data_syms[i];
-            i += 1;
         }
 
         if (cap > 0) {
@@ -2955,15 +2923,13 @@ symbol_table_insert: (decl_node: int, stridx: int, scope: int, symtype: int) -> 
         new_table_decl_node := alloc(int, new_cap);
         new_table_offs      := alloc(int, new_cap);
 
-        i := 0;
-        while (i < symbol_table_cap) {
+        for (i := 0; i < symbol_table_cap; i += 1) {
             new_table_str[i]       = symbol_table_str[i];
             new_table_type[i]      = symbol_table_type[i];
             new_table_scope[i]     = symbol_table_scope[i];
             new_table_seq[i]       = symbol_table_seq[i];
             new_table_decl_node[i] = symbol_table_decl_node[i];
             new_table_offs[i]      = symbol_table_offs[i];
-            i += 1;
         }
 
         if (symbol_table_cap > 0) {
@@ -3009,14 +2975,11 @@ symbol_table_scope_add: (par: int) -> int = {
         new_data_szs := alloc(int, new_cap);
         new_data_caps := alloc(int, new_cap);
 
-        i := 0;
-
-        while (i < scope_cap) {
+        for (i := 0; i < scope_cap; i += 1) {
             new_data_parent[i] = scope_parent[i];
             new_data_syms[i] = scope_syms[i];
             new_data_szs[i] = scope_szs[i];
             new_data_caps[i] = scope_caps[i];
-            i += 1;
         }
 
         if (scope_cap > 0) {
@@ -3061,10 +3024,9 @@ resolve_symbols: (root: int) -> void = {
 
     // register top level
 
-    i := 0;
     children := node_children[root];
 
-    while (i < node_children_sz[root]) {
+    for (i := 0; i < node_children_sz[root]; i += 1) {
         child := children[i];
         if (node_type[child] != NODE_DECL) {
             print("Unhandled root node type in resolve_symbols: ");
@@ -3082,14 +3044,10 @@ resolve_symbols: (root: int) -> void = {
         idx := symbol_table_insert(child, id_str, 0, decl_type);
         node_data_sym[id_node] = idx;
         node_data_type[id_node] = decl_type;
-
-        i += 1;
     }
 
     // register all blocks
-    i = 0;
-
-    while (i < node_children_sz[root]) {
+    for (i := 0; i < node_children_sz[root]; i += 1) {
         child := children[i];
         decl_children := node_children[child];
         id_node := decl_children[0];
@@ -3167,7 +3125,6 @@ resolve_symbols: (root: int) -> void = {
                 }}
             }
         }
-        i += 1;
     }
 }
 
@@ -3278,10 +3235,8 @@ resolve_node: (node: int, scope: int) -> void = {
     }
 
     if (node_type[node] == NODE_CALL) {
-        i := 0;
-        while (i < node_children_sz[node]) {
+        for (i := 0; i < node_children_sz[node]; i += 1) {
             resolve_node(children[i], new_scope);
-            i += 1;
         }
 
         func_id_node := children[0];
@@ -3299,8 +3254,7 @@ resolve_node: (node: int, scope: int) -> void = {
                 println("' requires", type_data_length[func_type], "args but was called with", num_arg_nodes);
                 exit := 1 / 0;
             }
-            i := 0;
-            while (i < num_arg_nodes) {
+            for (i := 0; i < num_arg_nodes; i += 1) {
                 arg_node := arg_nodes[i];
                 arg_type := node_data_type[arg_node];
                 req_type := req_argtypes[i];
@@ -3315,7 +3269,6 @@ resolve_node: (node: int, scope: int) -> void = {
                     println();
                     exit := 1 / 0;
                 }
-                i += 1;
             }
         }
         // call expression gets type == return type of func
@@ -3491,10 +3444,8 @@ resolve_node: (node: int, scope: int) -> void = {
     }
 
     if (node_type[node] == NODE_IF) {
-        i := 0;
-        while (i < node_children_sz[node]) {
+        for (i := 0; i < node_children_sz[node]; i += 1) {
             resolve_node(children[i], new_scope);
-            i += 1;
         }
 
         cond_node := children[0];
@@ -3510,10 +3461,8 @@ resolve_node: (node: int, scope: int) -> void = {
         return;
     }
     if (node_type[node] == NODE_WHILE) {
-        i := 0;
-        while (i < node_children_sz[node]) {
+        for (i := 0; i < node_children_sz[node]; i += 1) {
             resolve_node(children[i], new_scope);
-            i += 1;
         }
 
         cond_node := children[0];
@@ -3636,10 +3585,8 @@ resolve_node: (node: int, scope: int) -> void = {
       || (node_type[node] == NODE_LIST)
     ) {
 
-        i := 0;
-        while (i < node_children_sz[node]) {
+        for (i := 0; i < node_children_sz[node]; i += 1) {
             resolve_node(children[i], new_scope);
-            i += 1;
         }
         if (node_type[node] != NODE_BLOCK) {
             node_data_type[node] = type_create(TYPE_VOID);
@@ -3745,26 +3692,20 @@ generate_code: (root: int) -> void = {
         println("ptrout: .asciz \"%p\"");
         println("charout: .asciz \"%c\"");
 
-        i := 0;
-        while (i < string_table_sz) {
+        for (i := 0; i < string_table_sz; i += 1) {
             if (string_table_type[i] != ST_LIT) {
-                i += 1;
                 continue;
             }
             print("string");
             print(i);
             print(":  .asciz \"");
 
-            j := 0;
 
             str := string_table[i];
-            while (j < string_table_len[i]) {
+            for (j := 0; j < string_table_len[i]; j += 1) {
                 print(cast(char, str[j]));
-                j += 1;
             }
             println("\"");
-
-            i += 1;
         }
     }
 
@@ -3772,32 +3713,25 @@ generate_code: (root: int) -> void = {
         println(".section .bss");
         println(".align 8");
 
-        i := 0;
-
         global_syms := scope_syms[0];
-        while (i < scope_szs[0]) {
+        for (i := 0; i < scope_szs[0]; i += 1) {
             sym := global_syms[i];
             sym_type := symbol_table_type[sym];
 
             if (type_is_func(sym_type)
              || type_is_strlit(sym_type)) {
-                i += 1;
                 continue;
             }
             print(".");
             string_table_print(symbol_table_str[sym]);
             println(": .zero", type_sizeof(sym_type));
-
-            i += 1;
         }
     }
 
     println(".text");
 
-    i := 0;
-
     root_children := node_children[root];
-    while (i < node_children_sz[root]) {
+    for (i := 0; i < node_children_sz[root]; i += 1) {
         child := root_children[i];
         child_children := node_children[child];
 
@@ -3818,8 +3752,6 @@ generate_code: (root: int) -> void = {
             println("Not implemented: root decl node type");
             exit := 1 / 0;
         }
-
-        i += 1;
     }
 
     // entrypoint
@@ -4068,20 +4000,18 @@ generate_function_code: (func_scope: int, id_node: int, type_node: int, body_nod
     local_space := 0;
     {
         // make some stack space
-        sym := 0;
         if (func_scope == 0) {
             println("Something went wrong");
             exit := 1 / 0;
         }
 
 
-        while (sym < symbol_table_sz) {
+        for (sym := 0; sym < symbol_table_sz; sym += 1) {
             sc := symbol_table_scope[sym];
             if (scope_is_parent(func_scope, sc)) {
                 local_space += type_sizeof(symbol_table_type[sym]);
                 symbol_table_offs[sym] = -local_space;
             }
-            sym += 1;
         }
 
         // align
@@ -4096,8 +4026,7 @@ generate_function_code: (func_scope: int, id_node: int, type_node: int, body_nod
         // args
         type_children := node_children[type_node];
         args_list := node_children[type_children[0]];
-        i := 0;
-        while (i < node_children_sz[type_children[0]]) {
+        for (i := 0; i < node_children_sz[type_children[0]]; i += 1) {
             decl := args_list[i];
             decl_children := node_children[decl];
             id_node := decl_children[0];
@@ -4110,17 +4039,13 @@ generate_function_code: (func_scope: int, id_node: int, type_node: int, body_nod
             print(", ");
             emit_sym_access(sym);
             println();
-
-            i += 1;
         }
     }
 
     body_children := node_children[body_node];
 
-    i := 0;
-    while (i < node_children_sz[body_node]) {
+    for (i := 0; i < node_children_sz[body_node]; i += 1) {
         generate_expression(body_children[i]);
-        i += 1;
     }
 
     print(".");
@@ -4166,14 +4091,12 @@ generate_function_call: (node: int) -> void = {
     call_arg_list_node := children[1];
     call_args := node_children[call_arg_list_node];
 
-    i := 0;
-
-    while (i < node_children_sz[call_arg_list_node]) {
-        // TODO: caller saved eeee
+    // TODO: stack args.
+    i: int;
+    for (i = 0; i < node_children_sz[call_arg_list_node]; i += 1) {
         generate_expression(call_args[i]);
         sz := type_sizeof(node_data_type[call_args[i]]);
         println("    pushq %rax");
-        i += 1;
     }
 
     while (i > 0) {
@@ -4194,8 +4117,7 @@ generate_function_call: (node: int) -> void = {
 generate_call_println: (args_node: int) -> void = {
     args := node_children[args_node];
 
-    i := 0;
-    while (i < node_children_sz[args_node]) {
+    for (i := 0; i < node_children_sz[args_node]; i += 1) {
         if (i > 0) {
             println("    movq $' ', %rdi");
             // align stuff
@@ -4258,7 +4180,6 @@ generate_call_println: (args_node: int) -> void = {
         println("    call printf");
         println("    movq %rbp, %rsp");
         println("    popq %rbp");
-        i += 1;
     }
 
     println("    movq $'\\n', %rdi");
@@ -4274,8 +4195,7 @@ generate_call_println: (args_node: int) -> void = {
 generate_call_print: (args_node: int) -> void = {
     args := node_children[args_node];
 
-    i := 0;
-    while (i < node_children_sz[args_node]) {
+    for (i := 0; i < node_children_sz[args_node]; i += 1) {
         if (i > 0) {
             println("    movq $' ', %rdi");
             // align stuff
@@ -4337,7 +4257,6 @@ generate_call_print: (args_node: int) -> void = {
         println("    call printf");
         println("    movq %rbp, %rsp");
         println("    popq %rbp");
-        i += 1;
     }
 }
 
@@ -4582,10 +4501,8 @@ generate_expression: (node: int) -> void = {
     if (node_type[node] == NODE_BLOCK) {
         children := node_children[node];
 
-        i := 0;
-        while (i < node_children_sz[node]) {
+        for (i := 0; i < node_children_sz[node]; i += 1) {
             generate_expression(children[i]);
-            i += 1;
         }
         return;
     }
@@ -5103,13 +5020,11 @@ type_print: (typeid: int) -> void = {
     if (tc == TYPE_FUNC) {
         print("(");
         argt := type_data_argtypes[typeid];
-        i := 0;
-        while (i < type_data_length[typeid]) {
+        for (i := 0; i < type_data_length[typeid]; i += 1) {
             if (i > 0) {
                 print(",");
             }
             type_print(argt[i]);
-            i += 1;
         }
         print(")");
         print("->");
@@ -5273,10 +5188,8 @@ node_print: (node: int) -> void = {
 
 print_tree: (node: int, indent: int) -> void = {
     {
-        i := 0;
-        while (i < indent) {
+        for (i := 0; i < indent; i += 1) {
             print(" ");
-            i += 1;
         }
     }
     node_print(node);
@@ -5284,11 +5197,9 @@ print_tree: (node: int, indent: int) -> void = {
     type_print(node_data_type[node]);
     println();
 
-    i := 0;
     children := node_children[node];
-    while (i < node_children_sz[node]) {
+    for (i := 0; i < node_children_sz[node]; i += 1) {
         print_tree(children[i], indent + 2);
-        i += 1;
     }
 }
 
@@ -5302,23 +5213,16 @@ print_symbol: (sym: int) -> void = {
 }
 
 print_symbols: () -> void = {
-    scope := 0;
-
-    while (scope < scope_sz) {
+    for (scope := 0; scope < scope_sz; scope += 1) {
         syms := scope_syms[scope];
         println("Scope", scope, ":");
 
-        i := 0;
-        while (i < scope_szs[scope]) {
+        for (i := 0; i < scope_szs[scope]; i += 1) {
             sym := syms[i];
             print("  ");
             print_symbol(sym);
             println();
-
-            i += 1;
         }
-
-        scope += 1;
     }
 }
 
