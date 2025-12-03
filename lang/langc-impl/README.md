@@ -30,7 +30,7 @@ Not matching expected output on error.
 -    [x] `break.lang`
 -    [ ] `call-type.lang`
 -    [ ] `cast.lang`
--    [ ] `charlit.lang`
+-    [x] `charlit.lang`
 -    [x] `continue.lang`
 -    [x] `edge.lang`
 -    [x] `err.lang`

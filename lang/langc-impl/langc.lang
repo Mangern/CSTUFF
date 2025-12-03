@@ -75,6 +75,7 @@ STRING_PRINT: *int;
 STRING_INT: *int;
 STRING_VOID: *int;
 STRING_BOOL: *int;
+STRING_CHAR: *int;
 
 ST_ID: int;
 ST_LIT: int;
@@ -136,6 +137,15 @@ string_table_init: () -> void = {
         STRING_BOOL[2] = cast(int, 'o');
         STRING_BOOL[3] = cast(int, 'l');
         STRING_BOOL[4] = 0;
+    }
+
+    {
+        STRING_CHAR = alloc(int, 5);
+        STRING_CHAR[0] = cast(int, 'c');
+        STRING_CHAR[1] = cast(int, 'h');
+        STRING_CHAR[2] = cast(int, 'a');
+        STRING_CHAR[3] = cast(int, 'r');
+        STRING_CHAR[4] = 0;
     }
 }
 
@@ -230,6 +240,7 @@ TOK_STAR     : int; // really just *
 TOK_DEREF    : int; // .*
 TOK_ALLOC    : int;
 TOK_DELETE   : int;
+TOK_CHAR     : int;
 
 operator_prec: *int;
 
@@ -267,6 +278,7 @@ lex_init: () -> void = {
     TOK_DEREF    = 291;
     TOK_ALLOC    = 292;
     TOK_DELETE   = 293;
+    TOK_CHAR     = 294;
 
     operator_prec = alloc(int, 512);
     // 10 * (17 - original lang implementation in C precedence)
@@ -388,6 +400,42 @@ lex_matches_int: () -> int = {
         return 0;
     }
 
+    return ptr - lex_ptr;
+}
+
+lex_matches_char: () -> int = {
+    ptr := lex_ptr;
+    if (buf[ptr] != cast(int, '\'')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf) {
+        println("Unexpected EOF when parsing char literal!");
+        exit := 1 / 0;
+        return 0;
+    }
+    if (buf[ptr] == cast(int, '\\')) {
+        ptr += 1;
+        if (ptr >= nbuf) {
+            println("Unexpected EOF when parsing char literal!");
+            exit := 1 / 0;
+            return 0;
+        }
+    }
+    ptr += 1;
+    if (ptr >= nbuf) {
+        println("Unexpected EOF when parsing char literal!");
+        exit := 1 / 0;
+        return 0;
+    }
+
+    if (buf[ptr] != cast(int, '\'')) {
+        println("Unclosed char literal!");
+        println(cast(char, buf[ptr]));
+        exit := 1 / 0;
+        return 0;
+    }
+    ptr += 1;
     return ptr - lex_ptr;
 }
 
@@ -874,6 +922,13 @@ lex_peek: () -> int = {
         return cur_tok;
     }
 
+    match = lex_matches_char();
+    if (match > 0) {
+        cur_tok = TOK_CHAR;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
     match = lex_matches_true();
     if (match > 0) {
         cur_tok = TOK_TRUE;
@@ -1137,6 +1192,11 @@ tok_print: (t: int) -> void = {
         return;
     }
 
+    if (t == TOK_CHAR) {
+        print("<char>");
+        return;
+    }
+
     println("???");
 }
 
@@ -1171,6 +1231,7 @@ TYPE_PTR: int; // subtype: subtype
 // basic variants
 TYPE_B_INT:  int;
 TYPE_B_BOOL: int;
+TYPE_B_CHAR: int;
 
 // Node types
 NODE_LIST     : int; // [any, ...]
@@ -1182,7 +1243,8 @@ NODE_BLOCK    : int; // list
 NODE_CALL     : int; // [identifier, list[expression]]
 NODE_LIT_STR  : int; // leaf
 NODE_LIT_INT  : int; // leaf
-NODE_LIT_BOOL : int;
+NODE_LIT_BOOL : int; // leaf
+NODE_LIT_CHAR : int; // leaf
 NODE_UNOP     : int; // [expression]
 NODE_BINOP    : int; // [expression, expression]
 NODE_IF       : int; // [expr, expr] | [expr, expr, expr]
@@ -1211,6 +1273,8 @@ node_data_str : *int;
 node_data_int : *int;
 // optional bool literal
 node_data_bool : *int;
+// optional char literal
+node_data_char: *char;
 // optional operator
 node_data_op  : *int;
 // optional symbol id
@@ -1235,6 +1299,7 @@ node_create: (ntype: int) -> int = {
         new_data_str := alloc(int, new_cap);
         new_data_int := alloc(int, new_cap);
         new_data_bool := alloc(int, new_cap);
+        new_data_char := alloc(char, new_cap);
         new_data_op := alloc(int, new_cap);
         new_data_sym := alloc(int, new_cap);
         new_data_block_scope := alloc(int, new_cap);
@@ -1251,6 +1316,7 @@ node_create: (ntype: int) -> int = {
             new_data_str[i] = node_data_str[i];
             new_data_int[i] = node_data_int[i];
             new_data_bool[i] = node_data_bool[i];
+            new_data_char[i] = node_data_char[i];
             new_data_op[i] = node_data_op[i];
             new_data_sym[i] = node_data_sym[i];
             new_data_block_scope[i] = node_data_block_scope[i];
@@ -1268,6 +1334,7 @@ node_create: (ntype: int) -> int = {
             delete(node_data_str);
             delete(node_data_int);
             delete(node_data_bool);
+            delete(node_data_char);
             delete(node_data_op);
             delete(node_data_sym);
             delete(node_data_block_scope);
@@ -1283,6 +1350,7 @@ node_create: (ntype: int) -> int = {
         node_data_str = new_data_str;
         node_data_int = new_data_int;
         node_data_bool = new_data_bool;
+        node_data_char = new_data_char;
         node_data_op = new_data_op;
         node_data_sym = new_data_sym;
         node_data_block_scope = new_data_block_scope;
@@ -1381,6 +1449,48 @@ node_set_intdata: (node: int) -> void = {
     node_data_int[node] = stoi(ptr, strlen);
 }
 
+node_set_chardata: (node: int) -> void = {
+    len := cur_tok_end - cur_tok_beg - 2;
+    result: char;
+    if (len == 2) {
+        c1 := buf[cur_tok_beg + 2];
+        while (true) {
+            if (c1 == cast(int, 'n')) {
+                result = '\n';
+                break;
+            }
+            if (c1 == cast(int, 't')) {
+                result = '\t';
+                break;
+            }
+            if (c1 == cast(int, '\\')) {
+                result = '\\';
+                break;
+            }
+            if (c1 == cast(int, '\'')) {
+                result = '\'';
+                break;
+            }
+            if (c1 == cast(int, '\"')) {
+                result = '\"';
+                break;
+            }
+            if (c1 == cast(int, '0')) {
+                result = cast(char, 0);
+                break;
+            }
+
+            // TODO: if stable, it should just return c1
+            println("Unknown escaped char:", c1);
+            exit := 1 / 0;
+        }
+    } else {
+        result = cast(char, buf[cur_tok_beg + 1]);
+    }
+
+    node_data_char[node] = result;
+}
+
 decl_get_type_node: (decl_node: int) -> int = {
     children := node_children[decl_node];
     if (node_type[children[1]] == NODE_TYPE) {
@@ -1411,18 +1521,19 @@ parser_init: () -> void = {
     NODE_LIT_STR  = 7;
     NODE_LIT_INT  = 8;
     NODE_LIT_BOOL = 9;
-    NODE_UNOP     = 10;
-    NODE_BINOP    = 11;
-    NODE_IF       = 12;
-    NODE_WHILE    = 13;
-    NODE_RETURN   = 14;
-    NODE_INDEX    = 15;
-    NODE_BREAK    = 16;
-    NODE_CONTINUE = 17;
-    NODE_ADDROF   = 18;
-    NODE_DEREF    = 19;
-    NODE_ALLOC    = 20;
-    NODE_DELETE   = 21;
+    NODE_LIT_CHAR = 10;
+    NODE_UNOP     = 11;
+    NODE_BINOP    = 12;
+    NODE_IF       = 13;
+    NODE_WHILE    = 14;
+    NODE_RETURN   = 15;
+    NODE_INDEX    = 16;
+    NODE_BREAK    = 17;
+    NODE_CONTINUE = 18;
+    NODE_ADDROF   = 19;
+    NODE_DEREF    = 20;
+    NODE_ALLOC    = 21;
+    NODE_DELETE   = 22;
 
     TYPE_UNKNOWN = 0;
     TYPE_VOID    = 1;
@@ -1432,10 +1543,10 @@ parser_init: () -> void = {
     TYPE_STRLIT  = 5;
     TYPE_PTR     = 6;
 
-    // subtype variants
+    // basic variants
     TYPE_B_INT  = 0;
     TYPE_B_BOOL = 1;
-
+    TYPE_B_CHAR = 2;
 }
 
 parse_type: () -> int = {
@@ -1521,7 +1632,7 @@ parse_type: () -> int = {
         int_lit := peek_expect_advance(TOK_INT);
         int_node := node_create(NODE_LIT_INT);
         node_set_intdata(int_node);
-        node_add_child(type_node, int_node);
+        node_add_child(supertype_node, int_node);
 
         peek_expect_advance(cast(int, ']'));
         return supertype_node;
@@ -1783,6 +1894,13 @@ parse_primary_expr: () -> int = {
         node_set_intdata(int_node);
         lex_advance();
         return int_node;
+    }
+
+    if (token == TOK_CHAR) {
+        char_node := node_create(NODE_LIT_CHAR);
+        node_set_chardata(char_node);
+        lex_advance();
+        return char_node;
     }
 
     if (token == TOK_TRUE) {
@@ -2210,6 +2328,10 @@ type_sizeof: (typeid: int) -> int = {
             return 8;
         }
 
+        if (type_data_subtype[typeid] == TYPE_B_CHAR) {
+            return 1;
+        }
+
         println("Unhandled basic type in type_sizeof:", type_data_subtype[typeid]);
         exit := 1 / 0;
     }
@@ -2221,6 +2343,11 @@ type_sizeof: (typeid: int) -> int = {
 
     if (tc == TYPE_PTR) {
         // yes.
+        return 8;
+    }
+
+    if (tc == TYPE_STRLIT) {
+        // pointer basically
         return 8;
     }
 
@@ -2250,6 +2377,16 @@ type_is_bool: (typeid: int) -> bool = {
         return false;
     }
     if (type_data_subtype[typeid] != TYPE_B_BOOL) {
+        return false;
+    }
+    return true;
+}
+
+type_is_char: (typeid: int) -> bool = {
+    if (type_class[typeid] != TYPE_BASIC) {
+        return false;
+    }
+    if (type_data_subtype[typeid] != TYPE_B_CHAR) {
         return false;
     }
     return true;
@@ -2309,6 +2446,11 @@ type_get_type: (type_node: int) -> int = {
 
         if (streq(string_table[id_stridx], STRING_BOOL, 4)) {
             node_data_type[type_node] = type_create_basic(TYPE_B_BOOL);
+            return node_data_type[type_node];
+        }
+
+        if (streq(string_table[id_stridx], STRING_CHAR, 4)) {
+            node_data_type[type_node] = type_create_basic(TYPE_B_CHAR);
             return node_data_type[type_node];
         }
 
@@ -2811,6 +2953,11 @@ resolve_node: (node: int, scope: int) -> void = {
         return;
     }
 
+    if (node_type[node] == NODE_LIT_CHAR) {
+        node_data_type[node] = type_create_basic(TYPE_B_CHAR);
+        return;
+    }
+
     if (node_type[node] == NODE_LIT_STR) {
         node_data_type[node] = type_create(TYPE_STRLIT);
         return;
@@ -3184,16 +3331,54 @@ LABEL_COUNTER: int;
 curr_func_gen_sym: int;
 curr_while_label: int;
 
+RAX: int;
+RBX: int;
+RCX: int;
+RDX: int;
+RSP: int;
+RBP: int;
+RSI: int;
+RDI: int;
+R8: int;
+R9: int;
+R10: int;
+R11: int;
+R12: int;
+R13: int;
+R14: int;
+R15: int;
+RIP: int;
+
 generate_code: (root: int) -> void = {
 
     // setup
-    curr_while_label = -1;
+    {
+        curr_while_label = -1;
+        RAX = 0;
+        RBX = 1;
+        RCX = 2;
+        RDX = 3;
+        RSP = 4;
+        RBP = 5;
+        RSI = 6;
+        RDI = 7;
+        R8  = 8;
+        R9  = 9;
+        R10 = 10;
+        R11 = 11;
+        R12 = 12;
+        R13 = 13;
+        R14 = 14;
+        R15 = 15;
+        RIP = 16;
+    }
 
     { // string data. Consts?
         println(".section .rodata");
         println("strout: .asciz \"%s\"");
         println("intout: .asciz \"%ld\"");
         println("ptrout: .asciz \"%p\"");
+        println("charout: .asciz \"%c\"");
 
         i := 0;
         while (i < string_table_sz) {
@@ -3288,29 +3473,217 @@ generate_code: (root: int) -> void = {
     println(".global main");
 }
 
-emit_arg_reg: (arg_idx: int) -> void = {
+REGS: (reg: int, sz: int) -> void = {
+    if (reg == RAX) {
+        if (sz == 1) {
+            print("%al");
+            return;
+        }
+        if (sz == 2) {
+            print("%ax");
+            return;
+        }
+        if (sz == 4) {
+            print("%eax");
+            return;
+        }
+        if (sz == 8) {
+            print("%rax");
+            return;
+        }
+    }
+    if (reg == RCX) {
+        if (sz == 1) {
+            print("%cl");
+            return;
+        }
+        if (sz == 2) {
+            print("%cx");
+            return;
+        }
+        if (sz == 4) {
+            print("%ecx");
+            return;
+        }
+        if (sz == 8) {
+            print("%rcx");
+            return;
+        }
+    }
+    if (reg == RDX) {
+        if (sz == 1) {
+            print("%dl");
+            return;
+        }
+        if (sz == 2) {
+            print("%dx");
+            return;
+        }
+        if (sz == 4) {
+            print("%edx");
+            return;
+        }
+        if (sz == 8) {
+            print("%rdx");
+            return;
+        }
+    }
+    if (reg == RSI) {
+        if (sz == 1) {
+            print("%sil");
+            return;
+        }
+        if (sz == 2) {
+            print("%si");
+            return;
+        }
+        if (sz == 4) {
+            print("%esi");
+            return;
+        }
+        if (sz == 8) {
+            print("%rsi");
+            return;
+        }
+    }
+    if (reg == RDI) {
+        if (sz == 1) {
+            print("%dil");
+            return;
+        }
+        if (sz == 2) {
+            print("%di");
+            return;
+        }
+        if (sz == 4) {
+            print("%edi");
+            return;
+        }
+        if (sz == 8) {
+            print("%rdi");
+            return;
+        }
+    }
+    if (reg == RSP) {
+        if (sz == 1) {
+            print("%spl");
+            return;
+        }
+        if (sz == 2) {
+            print("%sp");
+            return;
+        }
+        if (sz == 4) {
+            print("%esp");
+            return;
+        }
+        if (sz == 8) {
+            print("%rsp");
+            return;
+        }
+    }
+    if (reg == RBP) {
+        if (sz == 1) {
+            print("%bpl");
+            return;
+        }
+        if (sz == 2) {
+            print("%bp");
+            return;
+        }
+        if (sz == 4) {
+            print("%ebp");
+            return;
+        }
+        if (sz == 8) {
+            print("%rbp");
+            return;
+        }
+    }
+    if (reg == R8) {
+        if (sz == 1) {
+            print("%r8b");
+            return;
+        }
+        if (sz == 2) {
+            print("%r8w");
+            return;
+        }
+        if (sz == 4) {
+            print("%r8d");
+            return;
+        }
+        if (sz == 8) {
+            print("%r8");
+            return;
+        }
+    }
+    if (reg == R9) {
+        if (sz == 1) {
+            print("%r9b");
+            return;
+        }
+        if (sz == 2) {
+            print("%r9w");
+            return;
+        }
+        if (sz == 4) {
+            print("%r9d");
+            return;
+        }
+        if (sz == 8) {
+            print("%r9");
+            return;
+        }
+    }
+
+    println("Unhandled register/size combo:", reg, sz);
+}
+
+MOVS: (sz: int) -> void = {
+    if (sz == 1) {
+        print("movb");
+        return;
+    }
+    if (sz == 2) {
+        print("movw");
+        return;
+    }
+    if (sz == 4) {
+        print("movl");
+        return;
+    }
+    if (sz == 8) {
+        print("movq");
+        return;
+    }
+    println("Unknown size", sz, "for mov");
+    exit := 1 / 0;
+}
+
+emit_arg_reg: (arg_idx: int, sz: int) -> void = {
     if (arg_idx == 0) {
-        print("%rdi");
+        REGS(RDI, sz);
         return;
     }
     if (arg_idx == 1) {
-        print("%rsi");
+        REGS(RSI, sz);
         return;
     }
     if (arg_idx == 2) {
-        print("%rdx");
+        REGS(RDX, sz);
         return;
     }
     if (arg_idx == 3) {
-        print("%rcx");
+        REGS(RCX, sz);
         return;
     }
     if (arg_idx == 4) {
-        print("%r8");
+        REGS(R8, sz);
         return;
     }
     if (arg_idx == 5) {
-        print("%r9");
+        REGS(R9, sz);
         return;
     }
 
@@ -3364,9 +3737,11 @@ generate_function_code: (func_scope: int, id_node: int, type_node: int, body_nod
             decl_children := node_children[decl];
             id_node := decl_children[0];
             sym := node_data_sym[id_node];
-            print("    movq ");
-
-            emit_arg_reg(i);
+            sz := type_sizeof(symbol_table_type[sym]);
+            print("    ");
+            MOVS(sz);
+            print(" ");
+            emit_arg_reg(i, sz);
             print(", ");
             emit_sym_access(sym);
             println();
@@ -3422,8 +3797,13 @@ generate_function_call: (node: int) -> void = {
     while (i < node_children_sz[call_arg_list_node]) {
         // TODO: caller saved eeee
         generate_expression(call_args[i]);
-        print("    movq %rax, ");
-        emit_arg_reg(i);
+        sz := type_sizeof(node_data_type[call_args[i]]);
+        print("    ");
+        MOVS(sz);
+        print(" ");
+        REGS(RAX, sz);
+        print(", ");
+        emit_arg_reg(i, sz);
         println();
         i += 1;
     }
@@ -3454,7 +3834,16 @@ generate_call_println: (args_node: int) -> void = {
         arg := args[i];
 
         generate_expression(arg);
-        println("    movq %rax, %rsi");
+        // TODO: maybe consider size here...
+        println("    xor %rsi, %rsi");
+        sz := type_sizeof(node_data_type[arg]);
+        print("    ");
+        MOVS(sz);
+        print(" ");
+        REGS(RAX, sz);
+        print(", "); 
+        REGS(RSI, sz);
+        println();
 
         while (true) {
             if (type_is_strlit(node_data_type[arg])) {
@@ -3471,6 +3860,11 @@ generate_call_println: (args_node: int) -> void = {
 
             if (type_is_ptr(node_data_type[arg])) {
                 println("    leaq ptrout(%rip), %rdi");
+                break;
+            }
+
+            if (type_is_char(node_data_type[arg])) {
+                println("    leaq charout(%rip), %rdi");
                 break;
             }
 
@@ -3520,7 +3914,16 @@ generate_call_print: (args_node: int) -> void = {
         arg := args[i];
 
         generate_expression(arg);
-        println("    movq %rax, %rsi");
+        // TODO: maybe consider size here...
+        println("    xor %rsi, %rsi");
+        sz := type_sizeof(node_data_type[arg]);
+        print("    ");
+        MOVS(sz);
+        print(" ");
+        REGS(RAX, sz);
+        print(", ");
+        REGS(RSI, sz);
+        println();
 
         while (true) {
             if (type_is_strlit(node_data_type[arg])) {
@@ -3536,6 +3939,11 @@ generate_call_print: (args_node: int) -> void = {
 
             if (type_is_ptr(node_data_type[arg])) {
                 println("    leaq ptrout(%rip), %rdi");
+                break;
+            }
+
+            if (type_is_char(node_data_type[arg])) {
+                println("    leaq charout(%rip), %rdi");
                 break;
             }
 
@@ -3733,6 +4141,13 @@ generate_expression: (node: int) -> void = {
         return;
     }
 
+    if (node_type[node] == NODE_LIT_CHAR) {
+        print("    movq $");
+        print(cast(int, node_data_char[node]));
+        println(", %rax");
+        return;
+    }
+
     if (node_type[node] == NODE_UNOP) {
         children := node_children[node];
         generate_expression(children[0]);
@@ -3810,9 +4225,16 @@ generate_expression: (node: int) -> void = {
     }
 
     if (node_type[node] == NODE_ID) {
-        print("    movq ");
+        sym := node_data_sym[node];
+        sz := type_sizeof(symbol_table_type[sym]);
+        println("    xor %rax, %rax");
+        print("    ");
+        MOVS(sz);
+        print(" ");
         emit_sym_access(node_data_sym[node]);
-        println(", %rax");
+        print(", ");
+        REGS(RAX, sz);
+        println();
         return;
     }
 
@@ -3822,19 +4244,21 @@ generate_expression: (node: int) -> void = {
         id_node := children[0];
         id_type := node_data_type[id_node];
         expr_node := children[1];
+        sym := node_data_sym[id_node];
 
         // get our index
         generate_expression(expr_node);
 
         if (type_is_arr(id_type)) {
             print("    leaq ");
-            emit_sym_access(node_data_sym[id_node]);
+            emit_sym_access(sym);
             println(", %rcx");
         }
 
         if (type_is_ptr(id_type)) {
+            // assume that the boi is 8 byte
             print("    movq ");
-            emit_sym_access(node_data_sym[id_node]);
+            emit_sym_access(sym);
             println(", %rcx");
         }
 
@@ -3846,8 +4270,14 @@ generate_expression: (node: int) -> void = {
         sz := type_sizeof(type_data_subtype[node_data_type[id_node]]);
         println("    leaq (%rcx, %rax,", sz, "), %rcx");
 
-        // end goal: memory address of indexed item in rcx
-        println("    movq (%rcx), %rax");
+        // now the memory address of indexed item in rcx
+
+        println("    xor %rax, %rax");
+        print("    ");
+        MOVS(sz);
+        print(" (%rcx), ");
+        REGS(RAX, sz);
+        println();
         return;
     }
 
@@ -3982,13 +4412,19 @@ generate_assign: (node: int) -> void = {
 
     if (node_type[lhs] == NODE_ID) {
         generate_expression(rhs);
-        print("    movq %rax, ");
+        sz := type_sizeof(symbol_table_type[node_data_sym[lhs]]);
+        print("    ");
+        MOVS(sz);
+        print(" ");
+        REGS(RAX, sz);
+        print(", ");
         emit_sym_access(node_data_sym[lhs]);
         println();
         return;
     }
     
     if (node_type[lhs] == NODE_INDEX) {
+        // foo[x] = rhs
         lhs_children := node_children[lhs];
         id_node := lhs_children[0];
         id_type := node_data_type[id_node];
@@ -4021,18 +4457,29 @@ generate_assign: (node: int) -> void = {
         generate_expression(rhs);
         println("    popq %rcx");
         // store it
-        println("    movq %rax, (%rcx)");
+        print("    ");
+        MOVS(sz);
+        print(" ");
+        REGS(RAX, sz);
+        println(", (%rcx)");
         // as a nice side effect, the value stored is also in %rax at this point ...
         return;
     }
 
     if (node_type[lhs] == NODE_DEREF) {
         lhs_children := node_children[lhs];
-        generate_expression(lhs_children[0]);
+        ch0 := lhs_children[0];
+        // type of dereffed ptr
+        sz := type_sizeof(type_data_subtype[node_data_type[ch0]]);
+        generate_expression(ch0);
         println("    pushq %rax");
         generate_expression(rhs);
         println("    popq %rcx");
-        println("    movq %rax, (%rcx)");
+        print("    ");
+        MOVS(sz);
+        print(" ");
+        REGS(RAX, sz);
+        println(", (%rcx)");
         return;
     }
 
@@ -4063,7 +4510,17 @@ generate_deref: (node: int) -> void = {
     children := node_children[node];
     generate_expression(children[0]);
     // now we have something looking like a pointer in %rax
-    println("    movq (%rax), %rax");
+    println("    xor %rcx, %rcx");
+
+    sz := type_sizeof(node_data_type[node]);
+    print("    ");
+    MOVS(sz);
+    print(" (%rax), ");
+    REGS(RCX, sz);
+    println();
+    // data is read into rcx
+
+    println("    movq %rcx, %rax");
 }
 
 generate_alloc: (node: int) -> void = {
@@ -4139,8 +4596,15 @@ generate_decl: (node: int) -> void = {
 
     generate_expression(rhs);
 
-    print("    movq %rax, ");
-    emit_sym_access(node_data_sym[children[0]]);
+    sym := node_data_sym[children[0]];
+    sz := type_sizeof(symbol_table_type[sym]);
+
+    print("    ");
+    MOVS(sz);
+    print(" ");
+    REGS(RAX, sz);
+    print(", ");
+    emit_sym_access(sym);
     println();
 }
 
@@ -4277,6 +4741,14 @@ node_print: (node: int) -> void = {
         print(")");
         return;
     }
+
+    if (typ == NODE_LIT_CHAR) {
+        print("LIT_CHAR (");
+        print(cast(int, node_data_char[node]));
+        print(")");
+        return;
+    }
+
     if (typ == NODE_UNOP) {
         print("UNOP ");
         tok_print(node_data_op[node]);

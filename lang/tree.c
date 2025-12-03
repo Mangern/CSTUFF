@@ -143,6 +143,8 @@ static void print_tree_impl(FILE *stream, node_t* node, int indent) {
         fprintf(stream, " (%s)", OPERATOR_TYPE_NAMES[node->data.operator]);
     } else if (node->type == INTEGER_LITERAL) {
         fprintf(stream, " (%ld)", node->data.int_literal_value);
+    } else if (node->type == CHAR_LITERAL) {
+        fprintf(stream, " (%c)", node->data.char_literal_value);
     } else if (node->type == STRING_LITERAL) {
         if (global_string_list == NULL) {
             fprintf(stream, " (%s)", node->data.string_literal_value);

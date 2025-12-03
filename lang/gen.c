@@ -317,7 +317,7 @@ static const char* generate_addr_access(size_t addr_idx) {
             break;
         case ADDR_CHAR_CONST:
             {
-                snprintf(result, sizeof result, "$'%c'", addr.data.char_const);
+                snprintf(result, sizeof result, "$%d", (int)addr.data.char_const);
             }
             break;
         case ADDR_REAL_CONST:
