@@ -77,6 +77,7 @@ STRING_INT: *int;
 STRING_VOID: *int;
 STRING_BOOL: *int;
 STRING_CHAR: *int;
+STRING_READCHAR: *int;
 
 ST_ID: int;
 ST_LIT: int;
@@ -147,6 +148,19 @@ string_table_init: () -> void = {
         STRING_CHAR[2] = cast(int, 'a');
         STRING_CHAR[3] = cast(int, 'r');
         STRING_CHAR[4] = 0;
+    }
+
+    {
+        STRING_READCHAR = alloc(int, 9);
+        STRING_READCHAR[0] = cast(int, 'r');
+        STRING_READCHAR[1] = cast(int, 'e');
+        STRING_READCHAR[2] = cast(int, 'a');
+        STRING_READCHAR[3] = cast(int, 'd');
+        STRING_READCHAR[4] = cast(int, 'c');
+        STRING_READCHAR[5] = cast(int, 'h');
+        STRING_READCHAR[6] = cast(int, 'a');
+        STRING_READCHAR[7] = cast(int, 'r');
+        STRING_READCHAR[8] = 0;
     }
 }
 
@@ -2819,6 +2833,10 @@ resolve_symbols: (root: int) -> void = {
         println_idx := string_table_add(STRING_PRINTLN, 7);
         symbol_table_insert(-1, println_idx, 0, type_create_func(type_create(TYPE_VOID), -1));
     }
+    {
+        readchar_idx := string_table_add(STRING_READCHAR, 8);
+        symbol_table_insert(-1, readchar_idx, 0, type_create_func(type_create_basic(TYPE_B_CHAR), 0));
+    }
 
 
     // register top level
@@ -3871,6 +3889,15 @@ generate_function_call: (node: int) -> void = {
         return;
     }
 
+    if (streq(
+        string_table[id_stridx],
+        STRING_READCHAR,
+        string_table_len[id_stridx])
+    ) {
+        generate_call_readchar();
+        return;
+    }
+
     call_arg_list_node := children[1];
     call_args := node_children[call_arg_list_node];
 
@@ -4045,6 +4072,25 @@ generate_call_print: (args_node: int) -> void = {
         println("    popq %rbp");
         i += 1;
     }
+}
+
+generate_call_readchar: () -> void = {
+    println("    pushq %rbp");
+    println("    movq %rsp, %rbp");
+    println("    andq $-16, %rsp");
+    println("    call getchar");
+    println("    movq %rbp, %rsp");
+    println("    popq %rbp");
+    println("    movq %rax, %rcx");
+    println("    xor %rax, %rax");
+    // adhering to the api we make sure the result is a char
+    print("    ");
+    MOVS(1);
+    print(" ");
+    REGS(RCX, 1);
+    print(", ");
+    REGS(RAX, 1);
+    println();
 }
 
 // expect subexpression in %rcx
