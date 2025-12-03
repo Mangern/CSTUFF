@@ -242,6 +242,7 @@ TOK_DEREF    : int; // .*
 TOK_ALLOC    : int;
 TOK_DELETE   : int;
 TOK_CHAR     : int;
+TOK_CAST     : int;
 
 operator_prec: *int;
 
@@ -280,6 +281,7 @@ lex_init: () -> void = {
     TOK_ALLOC    = 292;
     TOK_DELETE   = 293;
     TOK_CHAR     = 294;
+    TOK_CAST     = 295;
 
     operator_prec = alloc(int, 512);
     // 10 * (17 - original lang implementation in C precedence)
@@ -852,6 +854,30 @@ lex_matches_delete: () -> int = {
     return 6;
 }
 
+lex_matches_cast: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'c')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'a')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 's')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 't')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr < nbuf && lex_isidchar(buf[ptr])) {
+        return 0;
+    }
+    return 4;
+}
+
 lex_peek: () -> int = {
     match: int;
     if (cur_tok_beg == lex_ptr) {
@@ -968,6 +994,13 @@ lex_peek: () -> int = {
     match = lex_matches_delete();
     if (match > 0) {
         cur_tok = TOK_DELETE;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_cast();
+    if (match > 0) {
+        cur_tok = TOK_CAST;
         cur_tok_end = cur_tok_beg + match;
         return cur_tok;
     }
@@ -1198,6 +1231,11 @@ tok_print: (t: int) -> void = {
         return;
     }
 
+    if (t == TOK_CAST) {
+        print("cast");
+        return;
+    }
+
     println("???");
 }
 
@@ -1258,6 +1296,7 @@ NODE_ADDROF   : int; // [expr]
 NODE_DEREF    : int; // [expr]
 NODE_ALLOC    : int; // [type] | [type, expr]
 NODE_DELETE   : int; // [expr]
+NODE_CAST     : int; // [type, expr]
 
 node_da_cap: int;
 node_da_sz: int;
@@ -1535,6 +1574,7 @@ parser_init: () -> void = {
     NODE_DEREF    = 20;
     NODE_ALLOC    = 21;
     NODE_DELETE   = 22;
+    NODE_CAST     = 23;
 
     TYPE_UNKNOWN = 0;
     TYPE_VOID    = 1;
@@ -1774,6 +1814,18 @@ parse_delete_expr: () -> int = {
     return delete_node;
 }
 
+// cast ::= cast(type, expr)
+parse_cast_expr: () -> int = {
+    peek_expect_advance(TOK_CAST);
+    cast_node := node_create(NODE_CAST);
+    peek_expect_advance(cast(int, '('));
+    node_add_child(cast_node, parse_type());
+    peek_expect_advance(cast(int, ','));
+    node_add_child(cast_node, parse_expression());
+    peek_expect_advance(cast(int, ')'));
+    return cast_node;
+}
+
 parse_function_call: (id_node: int) -> int = {
     call_node := node_create(NODE_CALL);
     node_add_child(call_node, id_node);
@@ -1880,6 +1932,7 @@ parse_return_expr: () -> int = {
 //     ::= parenexpr
 //     ::= allocexpr
 //     ::= deleteexpr
+//     ::= castexpr
 parse_primary_expr: () -> int = {
     token := lex_peek();
 
@@ -1928,6 +1981,10 @@ parse_primary_expr: () -> int = {
 
     if (token == TOK_DELETE) {
         return parse_delete_expr();
+    }
+
+    if (token == TOK_CAST) {
+        return parse_cast_expr();
     }
 
     if (token == TOK_ID) {
@@ -3264,6 +3321,30 @@ resolve_node: (node: int, scope: int) -> void = {
         return;
     }
 
+    if (node_type[node] == NODE_CAST) {
+        ch0 := children[0];
+        ch1 := children[1];
+
+        resolve_node(ch0, new_scope);
+        resolve_node(ch1, new_scope);
+
+        type_dst := node_data_type[ch0];
+        type_src := node_data_type[ch1];
+
+        if (types_equivalent(type_src, type_dst)) {
+            // OK, nop
+            node_data_type[node] = type_dst;
+            return;
+        }
+
+        if (type_is_int(type_src) && type_is_char(type_dst)
+         || type_is_char(type_src) && type_is_int(type_dst)) {
+            // OK int -> char
+            node_data_type[node] = type_dst;
+            return;
+        }
+    }
+
     if (node_type[node] == NODE_TYPE) {
         node_data_type[node] = type_get_type(node);
         return;
@@ -4302,6 +4383,11 @@ generate_expression: (node: int) -> void = {
         return;
     }
 
+    if (node_type[node] == NODE_CAST) {
+        generate_cast(node);
+        return;
+    }
+
     print("generate_expression unhandled node type: ");
     node_print(node);
     println();
@@ -4566,6 +4652,37 @@ generate_delete: (node: int) -> void = {
     println("    popq %rbp");
 }
 
+generate_cast: (node: int) -> void = {
+    children := node_children[node];
+    src_expr := children[1];
+    type_src := node_data_type[src_expr];
+    type_dst := node_data_type[node];
+
+    sz_src := type_sizeof(type_src);
+    sz_dst := type_sizeof(type_dst);
+
+    generate_expression(src_expr);
+    // src is in %rax, presumably in good shape
+    // perform the cast from rcx to rax 
+    println("    movq %rax, %rcx");
+    // start in an empty state
+    println("    xor %rax, %rax");
+
+    // mov using the minimum of the two
+    sz_mov := sz_src;
+    if (sz_dst < sz_mov) {
+        sz_mov = sz_dst;
+    }
+
+    print("    ");
+    MOVS(sz_mov);
+    print(" ");
+    REGS(RCX, sz_mov);
+    print(", ");
+    REGS(RAX, sz_mov);
+    println();
+}
+
 emit_global_sym_access: (sym: int) -> void = {
     // global
     print(".");
@@ -4624,6 +4741,10 @@ type_print_basic: (basic_variant: int) -> void = {
     }
     if (basic_variant == TYPE_B_BOOL) {
         print("bool");
+        return;
+    }
+    if (basic_variant == TYPE_B_CHAR) {
+        print("char");
         return;
     }
 
@@ -4802,6 +4923,10 @@ node_print: (node: int) -> void = {
     }
     if (typ == NODE_DELETE) {
         print("DELETE");
+        return;
+    }
+    if (typ == NODE_CAST) {
+        print("CAST");
         return;
     }
     print("????");

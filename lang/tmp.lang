@@ -1,21 +1,11 @@
-x: int;
-foo: int[5];
-
 main: () -> void = {
-    i: int = 0;
+    c := 'x';
+    x := cast(int, c);
 
-    while (i < 5) {
-        foo[i] = i;
-        i = i + 1;
-    }
-
-    i = 0;
-    while (i < 5) {
-        print(foo[i]);
-        if (i < 4) {
-            print(" ");
-        }
-        i = i + 1;
-    }
-    println();
+    print("The numerical value of '");
+    print(c);
+    println("' is", x);
+    print("The charical  value of", x, "is '");
+    print(cast(char, x));
+    println("'");
 }
