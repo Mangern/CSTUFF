@@ -1,5 +1,5 @@
 *.o
-langc
+./langc
 *.S
 lexer-test
 parser-test

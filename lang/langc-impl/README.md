@@ -1,6 +1,6 @@
 # Selfhosting??
 
-The current state of this program is that it is able to compile more then this:
+The goal now is to only develop LANG in LANG.
 
 ```ts
 // Hello World
@@ -8,8 +8,6 @@ main: () -> void = {
     println("Hello", "world!");
 }
 ```
-
-through stdin and stdout.
 
 ```bash
 # "Bootstrapping"
