@@ -1,0 +1,5333 @@
+EOF: int;
+buf: *int;
+nbuf: int;
+
+// ==================== STD ====================
+isspace: (c: int) -> bool = {
+    // \n, ' ', \t
+    return c == 10 || c == 32 || c == 9;
+}
+
+isascii: (c: int) -> bool = {
+    return c <= 127;
+}
+
+isalpha: (c: int) -> bool = {
+    if (!isascii(c)) {
+        return false;
+    }
+    if (cast(int, 'A') <= c && c <= cast(int, 'Z')) {
+        return true;
+    }
+    if (cast(int, 'a') <= c && c <= cast(int, 'z')) {
+        return true;
+    }
+    return false;
+}
+
+isdigit: (c: int) -> bool = {
+    if (!isascii(c)) {
+        return false;
+    }
+    return cast(int, '0') <= c && c <= cast(int, '9');
+}
+
+streq: (str_a: *int, str_b: *int, len: int) -> bool = {
+    i := 0;
+    while (i < len) {
+        if (str_a[i] != str_b[i]) {
+            return false;
+        }
+        if (str_a[i] == 0 && str_b[i] == 0) {
+            return true;
+        }
+        i += 1;
+    }
+    return true;
+}
+
+stoi: (str: *int, len: int) -> int = {
+    res := 0;
+    i := 0;
+    while (i < len) {
+        res *= 10;
+        res += str[i] - cast(int, '0');
+        i += 1;
+    }
+    return res;
+}
+
+// ==================== UTILITY ====================
+read_content: () -> void = {
+    buf = alloc(int, 16777216);
+    nbuf = 0;
+    while (true) {
+        c := cast(int, readchar());
+        if (c == EOF) {
+            break;
+        }
+        buf[nbuf] = c;
+        nbuf += 1;
+    }
+};
+
+STRING_PRINTLN: *int;
+STRING_PRINT: *int;
+STRING_INT: *int;
+STRING_VOID: *int;
+STRING_BOOL: *int;
+STRING_CHAR: *int;
+STRING_READCHAR: *int;
+
+ST_ID: int;
+ST_LIT: int;
+
+string_table: **int;
+string_table_len: *int;
+string_table_type: *int;
+string_table_sz: int;
+string_table_cap: int;
+
+string_table_init: () -> void = {
+    ST_ID = 0;
+    ST_LIT = 1;
+
+    // bruhest moment
+    {
+        STRING_PRINT    = alloc(int, 6);
+        STRING_PRINT[0] = cast(int, 'p');
+        STRING_PRINT[1] = cast(int, 'r');
+        STRING_PRINT[2] = cast(int, 'i');
+        STRING_PRINT[3] = cast(int, 'n');
+        STRING_PRINT[4] = cast(int, 't');
+        STRING_PRINT[5] = 0;
+    }
+
+    {
+        STRING_PRINTLN    = alloc(int, 8);
+        STRING_PRINTLN[0] = cast(int, 'p');
+        STRING_PRINTLN[1] = cast(int, 'r');
+        STRING_PRINTLN[2] = cast(int, 'i');
+        STRING_PRINTLN[3] = cast(int, 'n');
+        STRING_PRINTLN[4] = cast(int, 't');
+        STRING_PRINTLN[5] = cast(int, 'l');
+        STRING_PRINTLN[6] = cast(int, 'n');
+        STRING_PRINTLN[7] = 0;
+    }
+
+    {
+        STRING_INT = alloc(int, 4);
+        STRING_INT[0] = cast(int, 'i');
+        STRING_INT[1] = cast(int, 'n');
+        STRING_INT[2] = cast(int, 't');
+        STRING_INT[3] = 0;
+    }
+
+    {
+        STRING_VOID = alloc(int, 5);
+        STRING_VOID[0] = cast(int, 'v');
+        STRING_VOID[1] = cast(int, 'o');
+        STRING_VOID[2] = cast(int, 'i');
+        STRING_VOID[3] = cast(int, 'd');
+        STRING_VOID[4] = 0;
+    }
+
+    {
+        STRING_BOOL = alloc(int, 5);
+        STRING_BOOL[0] = cast(int, 'b');
+        STRING_BOOL[1] = cast(int, 'o');
+        STRING_BOOL[2] = cast(int, 'o');
+        STRING_BOOL[3] = cast(int, 'l');
+        STRING_BOOL[4] = 0;
+    }
+
+    {
+        STRING_CHAR = alloc(int, 5);
+        STRING_CHAR[0] = cast(int, 'c');
+        STRING_CHAR[1] = cast(int, 'h');
+        STRING_CHAR[2] = cast(int, 'a');
+        STRING_CHAR[3] = cast(int, 'r');
+        STRING_CHAR[4] = 0;
+    }
+
+    {
+        STRING_READCHAR = alloc(int, 9);
+        STRING_READCHAR[0] = cast(int, 'r');
+        STRING_READCHAR[1] = cast(int, 'e');
+        STRING_READCHAR[2] = cast(int, 'a');
+        STRING_READCHAR[3] = cast(int, 'd');
+        STRING_READCHAR[4] = cast(int, 'c');
+        STRING_READCHAR[5] = cast(int, 'h');
+        STRING_READCHAR[6] = cast(int, 'a');
+        STRING_READCHAR[7] = cast(int, 'r');
+        STRING_READCHAR[8] = 0;
+    }
+}
+
+string_table_add: (str_buf: *int, len: int) -> int = {
+    if (string_table_sz == string_table_cap) {
+        new_cap := string_table_cap * 2;
+        if (new_cap == 0) {
+            new_cap = 1;
+        }
+
+        new_table := alloc(*int, new_cap);
+        new_table_len := alloc(int, new_cap);
+        new_table_type := alloc(int, new_cap);
+        i := 0;
+        while (i < string_table_cap) {
+            new_table[i] = string_table[i];
+            new_table_len[i] = string_table_len[i];
+            new_table_type[i] = string_table_type[i];
+            i += 1;
+        }
+
+        if (string_table_cap > 0) {
+            delete(string_table);
+            delete(string_table_len);
+            delete(string_table_type);
+        }
+
+        string_table = new_table;
+        string_table_len = new_table_len;
+        string_table_type = new_table_type;
+        string_table_cap = new_cap;
+    }
+    stridx := string_table_sz;
+    string_table_sz += 1;
+
+    string_table[stridx]     = alloc(int, len);
+    string_table_len[stridx] = len;
+
+    dst := string_table[stridx];
+
+    i := 0;
+    while (i < len) {
+        dst[i] = str_buf[i];
+        i += 1;
+    }
+
+    return stridx;
+}
+
+string_table_print: (stridx: int) -> void = {
+    len := string_table_len[stridx];
+    str := string_table[stridx];
+    i := 0;
+    while (i < len) {
+        print(cast(char, str[i]));
+        i += 1;
+    }
+}
+
+// ==================== LEX ====================
+lex_ptr: int;
+cur_tok: int;
+cur_tok_beg: int;
+cur_tok_end: int;
+
+TOK_EOF      : int;
+TOK_ID       : int;
+TOK_STR      : int;
+TOK_ARROW    : int;
+TOK_INT      : int;
+TOK_TRUE     : int;
+TOK_FALSE    : int;
+TOK_IF       : int;
+TOK_ELSE     : int;
+TOK_WHILE    : int;
+TOK_RETURN   : int;
+TOK_LEQ      : int;
+TOK_GEQ      : int;
+TOK_EQ       : int;
+TOK_NEQ      : int;
+TOK_AADD     : int;
+TOK_ASUB     : int;
+TOK_AMUL     : int;
+TOK_ADIV     : int;
+TOK_AMOD     : int;
+TOK_OR       : int;
+TOK_AND      : int;
+TOK_BREAK    : int;
+TOK_CONTINUE : int;
+TOK_NEG      : int; // really just -
+TOK_STAR     : int; // really just *
+TOK_DEREF    : int; // .*
+TOK_ALLOC    : int;
+TOK_DELETE   : int;
+TOK_CHAR     : int;
+TOK_CAST     : int;
+TOK_PLUSX2   : int;
+TOK_MINUSX2  : int;
+TOK_PREADD   : int; // for operators
+TOK_POSTADD  : int; // for operators
+TOK_PRESUB   : int; // for operators
+TOK_POSTSUB  : int; // for operators
+TOK_FOR      : int; 
+
+operator_prec: *int;
+
+
+lex_init: () -> void = {
+    lex_ptr = 0;
+    cur_tok_beg = -1;
+
+    TOK_EOF      = 255;
+    TOK_ID       = 256;
+    TOK_STR      = 257;
+    TOK_ARROW    = 258;
+    TOK_INT      = 259;
+    TOK_TRUE     = 260;
+    TOK_FALSE    = 261;
+    TOK_IF       = 262;
+    TOK_ELSE     = 263;
+    TOK_WHILE    = 264;
+    TOK_RETURN   = 265;
+    TOK_LEQ      = 266;
+    TOK_GEQ      = 267;
+    TOK_EQ       = 268;
+    TOK_NEQ      = 269;
+    TOK_AADD     = 270;
+    TOK_ASUB     = 271;
+    TOK_AMUL     = 272;
+    TOK_ADIV     = 273;
+    TOK_AMOD     = 274;
+    TOK_OR       = 275;
+    TOK_AND      = 276;
+    TOK_BREAK    = 277;
+    TOK_CONTINUE = 278;
+    TOK_NEG      = 289;
+    TOK_STAR     = 290;
+    TOK_DEREF    = 291;
+    TOK_ALLOC    = 292;
+    TOK_DELETE   = 293;
+    TOK_CHAR     = 294;
+    TOK_CAST     = 295;
+    TOK_PLUSX2   = 296;
+    TOK_MINUSX2  = 297;
+    TOK_PREADD   = 298;
+    TOK_POSTADD  = 299;
+    TOK_PRESUB   = 300;
+    TOK_POSTSUB  = 301;
+    TOK_FOR      = 302;
+
+    operator_prec = alloc(int, 512);
+    // 10 * (17 - original lang implementation in C precedence)
+    operator_prec[cast(int, '+')] = 110;
+    operator_prec[cast(int, '-')] = 110;
+    operator_prec[cast(int, '*')] = 120;
+    operator_prec[cast(int, '/')] = 120;
+    operator_prec[cast(int, '%')] = 120;
+    operator_prec[cast(int, '<')] = 80;
+    operator_prec[cast(int, '>')] = 80;
+    operator_prec[TOK_LEQ]        = 80;
+    operator_prec[TOK_GEQ]        = 80;
+    operator_prec[TOK_EQ]         = 70;
+    operator_prec[TOK_NEQ]        = 70;
+    operator_prec[cast(int, '=')] = 10;
+    operator_prec[TOK_AADD]       = 10;
+    operator_prec[TOK_ASUB]       = 10;
+    operator_prec[TOK_AMUL]       = 10;
+    operator_prec[TOK_ADIV]       = 10;
+    operator_prec[TOK_AMOD]       = 10;
+    operator_prec[TOK_OR]         = 20;
+    operator_prec[TOK_AND]        = 30;
+    operator_prec[cast(int, '!')] = 140;
+    operator_prec[TOK_NEG]        = 140;
+    operator_prec[TOK_STAR]       = 140;
+    operator_prec[TOK_DEREF]      = 150;
+    operator_prec[TOK_PREADD]     = 140;
+    operator_prec[TOK_POSTADD]     = 150;
+    operator_prec[TOK_PRESUB]     = 140;
+    operator_prec[TOK_POSTSUB]     = 150;
+}
+
+
+lex_skip_ws: () -> void = {
+    while (lex_ptr < nbuf && isspace(buf[lex_ptr])) {
+        lex_ptr += 1;
+    }
+}
+
+lex_skip_comments: () -> void = {
+    if (buf[lex_ptr] != cast(int, '/')) {
+        return;
+    }
+    if (lex_ptr + 1 < nbuf && buf[lex_ptr+1] == cast(int, '/')) {
+        while (lex_ptr < nbuf && buf[lex_ptr] != 10) {
+            lex_ptr += 1;
+        }
+    } else {
+        return;
+    }
+    // TODO: multiline comments
+    lex_skip_ws();
+    lex_skip_comments();
+}
+
+lex_matches_arrow: () -> bool = {
+    if (lex_ptr + 1 >= nbuf) {
+        return false;
+    }
+
+    return cast(char, buf[lex_ptr]) == '-' && cast(char, buf[lex_ptr + 1]) == '>';
+}
+
+lex_matches_deref: () -> bool = {
+    if (lex_ptr + 1 >= nbuf) {
+        return false;
+    }
+
+    return cast(char, buf[lex_ptr]) == '.' && cast(char, buf[lex_ptr + 1]) == '*';
+}
+
+lex_isidchar: (c: int) -> bool = {
+    // [_0-9A-Za-z]
+    return isalpha(c) || isdigit(c) || (c == cast(int, '_'));
+}
+
+lex_matches_id: () -> int = {
+    if (!isalpha(buf[lex_ptr])) {
+        return 0;
+    }
+    ptr := lex_ptr;
+
+    while (ptr < nbuf && lex_isidchar(buf[ptr])) {
+        ptr += 1;
+    }
+
+    return ptr - lex_ptr;
+}
+
+lex_matches_str: () -> int = {
+    if (cast(char, buf[lex_ptr]) != '"') {
+        return 0;
+    }
+    ptr := lex_ptr + 1;
+    while (ptr < nbuf && cast(char, buf[ptr]) != '"') {
+        // 92: '\'  Char literals not stable.
+        if (buf[ptr] == 92) {
+            ptr += 2;
+        } else {
+            ptr += 1;
+        }
+    }
+    if (ptr >= nbuf) {
+        println("Unexpected EOF when parsing string literal!");
+        // TODO: exit
+        x := 1 / 0;
+        return 0;
+    }
+    ptr += 1;
+    return ptr - lex_ptr;
+}
+
+lex_matches_int: () -> int = {
+    if (!isdigit(buf[lex_ptr])) {
+        return 0;
+    }
+    ptr := lex_ptr;
+    while (ptr < nbuf && isdigit(buf[ptr])) {
+        ptr += 1;
+    }
+
+    if (ptr < nbuf && buf[ptr] == cast(int, '.')) {
+        return 0;
+    }
+
+    return ptr - lex_ptr;
+}
+
+lex_matches_char: () -> int = {
+    ptr := lex_ptr;
+    if (buf[ptr] != cast(int, '\'')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf) {
+        println("Unexpected EOF when parsing char literal!");
+        exit := 1 / 0;
+        return 0;
+    }
+    if (buf[ptr] == cast(int, '\\')) {
+        ptr += 1;
+        if (ptr >= nbuf) {
+            println("Unexpected EOF when parsing char literal!");
+            exit := 1 / 0;
+            return 0;
+        }
+    }
+    ptr += 1;
+    if (ptr >= nbuf) {
+        println("Unexpected EOF when parsing char literal!");
+        exit := 1 / 0;
+        return 0;
+    }
+
+    if (buf[ptr] != cast(int, '\'')) {
+        println("Unclosed char literal!");
+        println(cast(char, buf[ptr]));
+        exit := 1 / 0;
+        return 0;
+    }
+    ptr += 1;
+    return ptr - lex_ptr;
+}
+
+lex_matches_true: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 't')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'r')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'u')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'e')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr < nbuf && lex_isidchar(buf[ptr])) {
+        return 0;
+    }
+    return 4;
+}
+
+lex_matches_false: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'f')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'a')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'l')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 's')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'e')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr < nbuf && lex_isidchar(buf[ptr])) {
+        return 0;
+    }
+    return 5;
+}
+
+lex_matches_if: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'i')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'f')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr < nbuf && lex_isidchar(buf[ptr])) {
+        return 0;
+    }
+    return 2;
+}
+
+lex_matches_else: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'e')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'l')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 's')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'e')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr < nbuf && lex_isidchar(buf[ptr])) {
+        return 0;
+    }
+    return 4;
+}
+
+lex_matches_while: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'w')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'h')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'i')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'l')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'e')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr < nbuf && lex_isidchar(buf[ptr])) {
+        return 0;
+    }
+    return 5;
+}
+
+lex_matches_for: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'f')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'o')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'r')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr < nbuf && lex_isidchar(buf[ptr])) {
+        return 0;
+    }
+    return 3;
+}
+
+lex_matches_return: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'r')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'e')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 't')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'u')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'r')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'n')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr < nbuf && lex_isidchar(buf[ptr])) {
+        return 0;
+    }
+    return 6;
+}
+
+lex_matches_leq: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '<')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '=')) {
+        return 0;
+    }
+    return 2;
+}
+
+lex_matches_geq: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '>')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '=')) {
+        return 0;
+    }
+    return 2;
+}
+
+lex_matches_eq: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '=')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '=')) {
+        return 0;
+    }
+    return 2;
+}
+
+lex_matches_neq: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '!')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '=')) {
+        return 0;
+    }
+    return 2;
+}
+
+lex_matches_aadd: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '+')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '=')) {
+        return 0;
+    }
+    return 2;
+}
+
+lex_matches_asub: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '-')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '=')) {
+        return 0;
+    }
+    return 2;
+}
+
+lex_matches_amul: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '*')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '=')) {
+        return 0;
+    }
+    return 2;
+}
+
+lex_matches_adiv: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '/')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '=')) {
+        return 0;
+    }
+    return 2;
+}
+
+lex_matches_amod: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '%')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '=')) {
+        return 0;
+    }
+    return 2;
+}
+
+lex_matches_plusx2: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '+')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '+')) {
+        return 0;
+    }
+    return 2;
+}
+
+lex_matches_minusx2: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '-')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '-')) {
+        return 0;
+    }
+    return 2;
+}
+
+lex_matches_or: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '|')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '|')) {
+        return 0;
+    }
+    return 2;
+}
+
+lex_matches_and: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '&')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '&')) {
+        return 0;
+    }
+    return 2;
+}
+
+lex_matches_break: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'b')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'r')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'e')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'a')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'k')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr < nbuf && lex_isidchar(buf[ptr])) {
+        return 0;
+    }
+    return 5;
+}
+
+lex_matches_continue: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'c')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'o')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'n')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 't')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'i')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'n')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'u')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'e')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr < nbuf && lex_isidchar(buf[ptr])) {
+        return 0;
+    }
+    return 8;
+}
+
+lex_matches_alloc: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'a')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'l')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'l')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'o')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'c')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr < nbuf && lex_isidchar(buf[ptr])) {
+        return 0;
+    }
+    return 5;
+}
+
+lex_matches_delete: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'd')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'e')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'l')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'e')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 't')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'e')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr < nbuf && lex_isidchar(buf[ptr])) {
+        return 0;
+    }
+    return 6;
+}
+
+lex_matches_cast: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'c')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 'a')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 's')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, 't')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr < nbuf && lex_isidchar(buf[ptr])) {
+        return 0;
+    }
+    return 4;
+}
+
+lex_peek: () -> int = {
+    match: int;
+    if (cur_tok_beg == lex_ptr) {
+        return cur_tok;
+    }
+
+    lex_skip_ws();
+    lex_skip_comments();
+
+    cur_tok_beg = lex_ptr;
+
+    if (lex_ptr >= nbuf) {
+        cur_tok = TOK_EOF;
+        cur_tok_end = nbuf;
+        return cur_tok;
+    }
+
+    if (lex_matches_arrow()) {
+        cur_tok = TOK_ARROW;
+        cur_tok_end = cur_tok_beg + 2;
+        return cur_tok;
+    }
+
+    if (lex_matches_deref()) {
+        cur_tok = TOK_DEREF;
+        cur_tok_end = cur_tok_beg + 2;
+        return cur_tok;
+    }
+
+    match = lex_matches_if();
+    if (match > 0) {
+        cur_tok = TOK_IF;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_else();
+    if (match > 0) {
+        cur_tok = TOK_ELSE;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_while();
+    if (match > 0) {
+        cur_tok = TOK_WHILE;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_for();
+    if (match > 0) {
+        cur_tok = TOK_FOR;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_return();
+    if (match > 0) {
+        cur_tok = TOK_RETURN;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_str();
+    if (match > 0) {
+        cur_tok = TOK_STR;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_int();
+    if (match > 0) {
+        cur_tok = TOK_INT;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_char();
+    if (match > 0) {
+        cur_tok = TOK_CHAR;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_true();
+    if (match > 0) {
+        cur_tok = TOK_TRUE;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_break();
+    if (match > 0) {
+        cur_tok = TOK_BREAK;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_continue();
+    if (match > 0) {
+        cur_tok = TOK_CONTINUE;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_false();
+    if (match > 0) {
+        cur_tok = TOK_FALSE;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_alloc();
+    if (match > 0) {
+        cur_tok = TOK_ALLOC;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_delete();
+    if (match > 0) {
+        cur_tok = TOK_DELETE;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_cast();
+    if (match > 0) {
+        cur_tok = TOK_CAST;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_leq();
+    if (match > 0) {
+        cur_tok = TOK_LEQ;
+        cur_tok_end = cur_tok_beg + 2;
+        return cur_tok;
+    }
+
+    match = lex_matches_geq();
+    if (match > 0) {
+        cur_tok = TOK_GEQ;
+        cur_tok_end = cur_tok_beg + 2;
+        return cur_tok;
+    }
+
+    match = lex_matches_eq();
+    if (match > 0) {
+        cur_tok = TOK_EQ;
+        cur_tok_end = cur_tok_beg + 2;
+        return cur_tok;
+    }
+
+    match = lex_matches_neq();
+    if (match > 0) {
+        cur_tok = TOK_NEQ;
+        cur_tok_end = cur_tok_beg + 2;
+        return cur_tok;
+    }
+
+    match = lex_matches_aadd();
+    if (match > 0) {
+        cur_tok = TOK_AADD;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_asub();
+    if (match > 0) {
+        cur_tok = TOK_ASUB;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_amul();
+    if (match > 0) {
+        cur_tok = TOK_AMUL;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_adiv();
+    if (match > 0) {
+        cur_tok = TOK_ADIV;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_amod();
+    if (match > 0) {
+        cur_tok = TOK_AMOD;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_plusx2();
+    if (match > 0) {
+        cur_tok = TOK_PLUSX2;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_minusx2();
+    if (match > 0) {
+        cur_tok = TOK_MINUSX2;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_or();
+    if (match > 0) {
+        cur_tok = TOK_OR;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_and();
+    if (match > 0) {
+        cur_tok = TOK_AND;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    // I think identifier should be checked last
+    match = lex_matches_id();
+    if (match > 0) {
+        cur_tok = TOK_ID;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    cur_tok = buf[lex_ptr];
+    cur_tok_end = cur_tok_beg + 1;
+    return cur_tok;
+}
+
+lex_advance: () -> void = {
+    lex_peek();
+    lex_ptr = cur_tok_end;
+}
+
+tok_print: (t: int) -> void = {
+    if (isascii(t)) {
+        print(cast(char, t));
+        return;
+    }
+    if (t == TOK_EOF) {
+        print("<EOF>");
+        return;
+    }
+    if (t == TOK_ID) {
+        print("<identifier>");
+        return;
+    }
+    if (t == TOK_STR) {
+        print("<string>");
+        return;
+    }
+    if (t == TOK_ARROW) {
+        print("->");
+        return;
+    }
+    if (t == TOK_INT) {
+        print("<integer>");
+        return;
+    }
+    if (t == TOK_IF) {
+        print("if");
+        return;
+    }
+    if (t == TOK_ELSE) {
+        print("else");
+        return;
+    }
+    if (t == TOK_WHILE) {
+        print("while");
+        return;
+    }
+    if (t == TOK_FOR) {
+        print("for");
+        return;
+    }
+    if (t == TOK_RETURN) {
+        print("return");
+        return;
+    }
+    if (t == TOK_LEQ) {
+        print("<=");
+        return;
+    }
+    if (t == TOK_GEQ) {
+        print(">=");
+        return;
+    }
+    if (t == TOK_EQ) {
+        print("==");
+        return;
+    }
+    if (t == TOK_NEQ) {
+        print("!=");
+        return;
+    }
+    if (t == TOK_AADD) {
+        print("+=");
+        return;
+    }
+    if (t == TOK_ASUB) {
+        print("-=");
+        return;
+    }
+    if (t == TOK_AMUL) {
+        print("*=");
+        return;
+    }
+    if (t == TOK_ADIV) {
+        print("/=");
+        return;
+    }
+    if (t == TOK_AMOD) {
+        print("%=");
+        return;
+    }
+    if (t == TOK_OR) {
+        print("||");
+        return;
+    }
+    if (t == TOK_AND) {
+        print("&&");
+        return;
+    }
+
+    if (t == TOK_TRUE) {
+        print("true");
+        return;
+    }
+
+    if (t == TOK_FALSE) {
+        print("false");
+        return;
+    }
+    
+    if (t == TOK_BREAK) {
+        print("break");
+        return;
+    }
+
+    if (t == TOK_CONTINUE) {
+        print("continue");
+        return;
+    }
+
+    if (t == TOK_NEG) {
+        print("-");
+        return;
+    }
+
+    if (t == TOK_DEREF) {
+        print(".*");
+        return;
+    }
+
+    if (t == TOK_ALLOC) {
+        print("alloc");
+        return;
+    }
+
+    if (t == TOK_DELETE) {
+        print("delete");
+        return;
+    }
+
+    if (t == TOK_CHAR) {
+        print("<char>");
+        return;
+    }
+
+    if (t == TOK_CAST) {
+        print("cast");
+        return;
+    }
+
+    if (t == TOK_PLUSX2
+     || t == TOK_PREADD
+     || t == TOK_POSTADD) {
+        print("++");
+        return;
+    }
+    if (t == TOK_MINUSX2
+     || t == TOK_PRESUB
+     || t == TOK_POSTSUB) {
+        print("--");
+        return;
+    }
+
+    println("???");
+}
+
+peek_expect_advance: (expected: int) -> int = {
+    token := lex_peek();
+    if (token != expected) {
+        print("Unexpected token: ");
+        tok_print(token);
+        println();
+        print("Expected: ");
+        tok_print(expected);
+        println();
+        exit := 1 / 0;
+    }
+    lex_advance();
+    return token;
+}
+
+// ==================== PARSE ====================
+
+// "Forward declare" here
+TYPEID_UNKNOWN: int;
+
+TYPE_UNKNOWN: int;
+TYPE_VOID: int;
+TYPE_BASIC: int; // subtype: basic variant
+TYPE_FUNC: int;  // subtype: return type, length: num args (-1: variadic), argtypes: argument types
+TYPE_ARR: int;   // subtype: subtype, length: length
+TYPE_STRLIT: int; // nothing
+TYPE_PTR: int; // subtype: subtype
+
+// basic variants
+TYPE_B_INT:  int;
+TYPE_B_BOOL: int;
+TYPE_B_CHAR: int;
+
+// Node types
+NODE_LIST     : int; // [any, ...]
+NODE_ID       : int; // leaf
+NODE_DECL     : int; // [identifier, type] | [identifier, type?, expr]
+NODE_ASSIGN   : int; // [something, expression]
+NODE_TYPE     : int; // [identifier] | [list[declaration], type] (func) | [identifier, int_literal] (array)
+NODE_BLOCK    : int; // list
+NODE_CALL     : int; // [identifier, list[expression]]
+NODE_LIT_STR  : int; // leaf
+NODE_LIT_INT  : int; // leaf
+NODE_LIT_BOOL : int; // leaf
+NODE_LIT_CHAR : int; // leaf
+NODE_UNOP     : int; // [expression]
+NODE_BINOP    : int; // [expression, expression]
+NODE_IF       : int; // [expr, expr] | [expr, expr, expr]
+NODE_WHILE    : int; // [expr, expr]
+NODE_FOR      : int; // [expr, expr, expr]
+NODE_RETURN   : int; // [] | [expr]
+NODE_INDEX    : int; // [identifier, expr] 
+NODE_BREAK    : int; // leaf
+NODE_CONTINUE : int; // leaf
+NODE_ADDROF   : int; // [expr]
+NODE_DEREF    : int; // [expr]
+NODE_ALLOC    : int; // [type] | [type, expr]
+NODE_DELETE   : int; // [expr]
+NODE_CAST     : int; // [type, expr]
+
+node_da_cap: int;
+node_da_sz: int;
+node_type: *int;
+// array of children lists
+node_children: **int;
+// array of children list capacities
+node_children_cap: *int;
+// array of children list sizes
+node_children_sz : *int;
+// optional string data: index in string table
+node_data_str : *int;
+// optional integer literal
+node_data_int : *int;
+// optional bool literal
+node_data_bool : *int;
+// optional char literal
+node_data_char: *char;
+// optional operator
+node_data_op  : *int;
+// optional symbol id
+node_data_sym : *int;
+// optional scope id for blocks
+node_data_block_scope: *int;
+// after a while it becomes mandatory: type
+node_data_type: *int;
+// type class hints from parsing stage
+node_parse_tc: *int;
+
+node_create: (ntype: int) -> int = {
+    if (node_da_sz == node_da_cap) {
+        new_cap := node_da_cap * 2;
+        if (new_cap == 0) {
+            new_cap = 1;
+        }
+        new_type := alloc(int, new_cap);
+        new_children := alloc(*int, new_cap);
+        new_children_cap := alloc(int, new_cap);
+        new_children_sz := alloc(int, new_cap);
+        new_data_str := alloc(int, new_cap);
+        new_data_int := alloc(int, new_cap);
+        new_data_bool := alloc(int, new_cap);
+        new_data_char := alloc(char, new_cap);
+        new_data_op := alloc(int, new_cap);
+        new_data_sym := alloc(int, new_cap);
+        new_data_block_scope := alloc(int, new_cap);
+        new_data_type := alloc(int, new_cap);
+        new_parse_tc := alloc(int, new_cap);
+
+        // copy data to new buffers
+        i := 0;
+        while (i < node_da_cap) {
+            new_type[i] = node_type[i];
+            new_children[i] = node_children[i];
+            new_children_cap[i] = node_children_cap[i];
+            new_children_sz[i] = node_children_sz[i];
+            new_data_str[i] = node_data_str[i];
+            new_data_int[i] = node_data_int[i];
+            new_data_bool[i] = node_data_bool[i];
+            new_data_char[i] = node_data_char[i];
+            new_data_op[i] = node_data_op[i];
+            new_data_sym[i] = node_data_sym[i];
+            new_data_block_scope[i] = node_data_block_scope[i];
+            new_data_type[i] = node_data_type[i];
+            new_parse_tc[i] = node_parse_tc[i];
+            i += 1;
+        }
+
+        // free old
+        if (node_da_cap != 0) {
+            delete(node_type);
+            delete(node_children);
+            delete(node_children_cap);
+            delete(node_children_sz);
+            delete(node_data_str);
+            delete(node_data_int);
+            delete(node_data_bool);
+            delete(node_data_char);
+            delete(node_data_op);
+            delete(node_data_sym);
+            delete(node_data_block_scope);
+            delete(node_data_type);
+            delete(node_parse_tc);
+        }
+
+        // update
+        node_type = new_type;
+        node_children = new_children;
+        node_children_cap = new_children_cap;
+        node_children_sz = new_children_sz;
+        node_data_str = new_data_str;
+        node_data_int = new_data_int;
+        node_data_bool = new_data_bool;
+        node_data_char = new_data_char;
+        node_data_op = new_data_op;
+        node_data_sym = new_data_sym;
+        node_data_block_scope = new_data_block_scope;
+        node_data_type = new_data_type;
+        node_parse_tc = new_parse_tc;
+
+        node_da_cap = new_cap;
+    }
+
+
+    // assert node_da_sz < node_da_cap
+    ret := node_da_sz;
+
+    node_type[ret] = ntype;
+    node_children_cap[ret] = 0;
+    node_children_sz[ret] = 0;
+    node_data_sym[ret] = 0;
+    node_data_type[ret] = 0;
+    node_parse_tc[ret] = TYPE_UNKNOWN;
+
+    node_da_sz += 1;
+    return ret;
+}
+
+node_add_child: (parent: int, child: int) -> void = {
+    cap := node_children_cap[parent];
+    sz  := node_children_sz[parent];
+
+    if (sz == cap) {
+        new_cap := cap * 2;
+
+        if (new_cap == 0) {
+            new_cap = 1;
+        }
+
+        new_children := alloc(int, new_cap);
+        old_children := node_children[parent];
+
+        i := 0;
+        while (i < cap) {
+            new_children[i] = old_children[i];
+            i += 1;
+        }
+
+        if (cap != 0) {
+            delete(old_children);
+        }
+
+        node_children[parent] = new_children;
+        node_children_cap[parent] = new_cap;
+    }
+
+    dst := node_children[parent];
+    dst[sz] = child;
+
+    node_children_sz[parent] += 1;
+}
+
+// deep copy 
+node_dup: (node: int) -> int = {
+    new_node := node_create(node_type[node]);
+    children := node_children[node];
+    i := 0;
+    while (i < node_children_sz[node]) {
+        node_add_child(new_node, node_dup(children[i]));
+        i += 1;
+    }
+    node_data_str[new_node] = node_data_str[node];
+    node_data_int[new_node] = node_data_int[node];
+    node_data_op[new_node]  = node_data_op[node];
+    node_data_sym[new_node] = node_data_op[node];
+    node_data_block_scope[new_node] = node_data_op[node];
+    node_data_type[new_node] = node_data_type[node];
+    return new_node;
+}
+
+node_set_idstr: (node: int) -> void = {
+    strlen := cur_tok_end - cur_tok_beg;
+    ptr := buf + cur_tok_beg;
+    stridx := string_table_add(ptr, strlen);
+    node_data_str[node] = stridx;
+    string_table_type[stridx] = ST_ID;
+}
+
+node_set_strdata: (node: int) -> void = {
+    strlen := cur_tok_end - cur_tok_beg - 2;
+    ptr := buf + (cur_tok_beg + 1);
+    stridx := string_table_add(ptr, strlen);
+    node_data_str[node] = stridx;
+    string_table_type[stridx] = ST_LIT;
+}
+
+node_set_intdata: (node: int) -> void = {
+    strlen := cur_tok_end - cur_tok_beg;
+    ptr := buf + cur_tok_beg;
+    node_data_int[node] = stoi(ptr, strlen);
+}
+
+node_set_chardata: (node: int) -> void = {
+    len := cur_tok_end - cur_tok_beg - 2;
+    result: char;
+    if (len == 2) {
+        c1 := buf[cur_tok_beg + 2];
+        while (true) {
+            if (c1 == cast(int, 'n')) {
+                result = '\n';
+                break;
+            }
+            if (c1 == cast(int, 't')) {
+                result = '\t';
+                break;
+            }
+            if (c1 == cast(int, '\\')) {
+                result = '\\';
+                break;
+            }
+            if (c1 == cast(int, '\'')) {
+                result = '\'';
+                break;
+            }
+            if (c1 == cast(int, '\"')) {
+                result = '\"';
+                break;
+            }
+            if (c1 == cast(int, '0')) {
+                result = cast(char, 0);
+                break;
+            }
+
+            // TODO: if stable, it should just return c1
+            println("Unknown escaped char:", c1);
+            exit := 1 / 0;
+        }
+    } else {
+        result = cast(char, buf[cur_tok_beg + 1]);
+    }
+
+    node_data_char[node] = result;
+}
+
+decl_get_type_node: (decl_node: int) -> int = {
+    children := node_children[decl_node];
+    if (node_type[children[1]] == NODE_TYPE) {
+        return children[1];
+    }
+    return -1;
+}
+
+decl_get_body: (decl_node: int) -> int = {
+    children := node_children[decl_node];
+    if (node_children_sz[decl_node] == 3) {
+        return children[2];
+    }
+    if (node_type[children[1]] != NODE_TYPE) {
+        return children[1];
+    }
+    return -1;
+}
+
+parser_init: () -> void = {
+    NODE_LIST     = 0;
+    NODE_ID       = 1;
+    NODE_DECL     = 2;
+    NODE_ASSIGN   = 3;
+    NODE_TYPE     = 4;
+    NODE_BLOCK    = 5;
+    NODE_CALL     = 6;
+    NODE_LIT_STR  = 7;
+    NODE_LIT_INT  = 8;
+    NODE_LIT_BOOL = 9;
+    NODE_LIT_CHAR = 10;
+    NODE_UNOP     = 11;
+    NODE_BINOP    = 12;
+    NODE_IF       = 13;
+    NODE_WHILE    = 14;
+    NODE_FOR      = 15;
+    NODE_RETURN   = 16;
+    NODE_INDEX    = 17;
+    NODE_BREAK    = 18;
+    NODE_CONTINUE = 19;
+    NODE_ADDROF   = 20;
+    NODE_DEREF    = 21;
+    NODE_ALLOC    = 22;
+    NODE_DELETE   = 23;
+    NODE_CAST     = 24;
+
+    TYPE_UNKNOWN = 0;
+    TYPE_VOID    = 1;
+    TYPE_BASIC   = 2;
+    TYPE_FUNC    = 3;
+    TYPE_ARR     = 4;
+    TYPE_STRLIT  = 5;
+    TYPE_PTR     = 6;
+
+    // basic variants
+    TYPE_B_INT  = 0;
+    TYPE_B_BOOL = 1;
+    TYPE_B_CHAR = 2;
+}
+
+parse_type: () -> int = {
+    type_node := node_create(NODE_TYPE);
+    node_parse_tc[type_node] = TYPE_BASIC;
+
+    token := lex_peek();
+    if (token == cast(int, '(')) {
+        // function type
+        lex_advance();
+
+        node_parse_tc[type_node] = TYPE_FUNC;
+
+        // TODO: argument list
+        decl_list_node := node_create(NODE_LIST);
+
+        token = lex_peek();
+        while (token == TOK_ID) {
+            id_node := node_create(NODE_ID);
+            node_set_idstr(id_node);
+
+            lex_advance();
+
+            decl_node := parse_declaration(id_node);
+            node_add_child(decl_list_node, decl_node);
+
+            token = lex_peek();
+
+            if (token == cast(int, ',')) {
+                lex_advance();
+                token = lex_peek();
+                continue;
+            }
+        }
+
+        node_add_child(type_node, decl_list_node);
+
+        peek_expect_advance(cast(int, ')'));
+        peek_expect_advance(TOK_ARROW);
+
+        return_type_node := parse_type();
+
+        node_add_child(type_node, return_type_node);
+
+        return type_node;
+    }
+
+    if (token == cast(int, '*')) {
+        // pointer_type
+        lex_advance();
+        node_parse_tc[type_node] = TYPE_PTR;
+
+        subtype_node := parse_type();
+        node_add_child(type_node, subtype_node);
+        return type_node;
+    }
+
+    if (token != TOK_ID) {
+        print("Unexpected token: ");
+        tok_print(token);
+        println();
+        exit := 1 / 0;
+    }
+
+    {
+        id_node := node_create(NODE_ID);
+        node_set_idstr(id_node);
+        node_add_child(type_node, id_node);
+    }
+    lex_advance();
+
+    token = lex_peek();
+
+    if (token == cast(int, '[')) {
+        // array type
+        lex_advance();
+
+        supertype_node := node_create(NODE_TYPE);
+        node_parse_tc[supertype_node] = TYPE_ARR;
+
+        node_add_child(supertype_node, type_node);
+
+        int_lit := peek_expect_advance(TOK_INT);
+        int_node := node_create(NODE_LIT_INT);
+        node_set_intdata(int_node);
+        node_add_child(supertype_node, int_node);
+
+        peek_expect_advance(cast(int, ']'));
+        return supertype_node;
+    }
+    return type_node;
+}
+
+parse_declaration: (id_node: int) -> int = {
+    decl_node := node_create(NODE_DECL);
+
+    node_add_child(decl_node, id_node);
+
+    peek_expect_advance(cast(int, ':'));
+
+    token := lex_peek();
+
+    if (token == cast(int, '=')) {
+        lex_advance();
+        node_add_child(decl_node, parse_whileif_body());
+        return decl_node;
+    }
+
+    // type
+    {
+        type_node := parse_type();
+        node_add_child(decl_node, type_node);
+    }
+
+    token = lex_peek();
+
+    // these are in our FOLLOW set
+    if (token == cast(int, ';') || token == cast(int, ')') || token == cast(int, ',')) {
+        return decl_node;
+    }
+
+    peek_expect_advance(cast(int, '='));
+
+    token = lex_peek();
+
+    node_add_child(decl_node, parse_whileif_body());
+
+    return decl_node;
+}
+
+parse_block: () -> int = {
+    block_node := node_create(NODE_BLOCK);
+
+    while (true) {
+        token := lex_peek();
+        if (token == cast(int, '}')) {
+            break;
+        }
+
+        if (token == cast(int, ';')) {
+            lex_advance();
+            continue;
+        }
+
+        expect_semicolon := !(
+             (token == TOK_IF)
+          || (token == TOK_WHILE)
+          || (token == TOK_FOR)
+          || (token == cast(int, '{'))
+        );
+
+        node_add_child(block_node, parse_statement());
+
+        if (expect_semicolon) {
+            peek_expect_advance(cast(int, ';'));
+        }
+
+        //print("Unexpected token: ");
+        //tok_print(token);
+        //exit := 1 / 0;
+    }
+
+    return block_node;
+}
+
+get_tok_precedence: (tok: int) -> int = {
+    prec := operator_prec[tok];
+    if (prec == 0) {
+        // not registered
+        return -1;
+    }
+    return prec;
+}
+
+// identifierexpr
+//     ::= identifier (TODO)
+//     ::= identifier ([ expression [ , expression ]*  ])
+//     ::= identifier : [type] [= expression]
+parse_identifier_expr: () -> int = {
+    token := lex_peek();
+
+    id_node := node_create(NODE_ID);
+    node_set_idstr(id_node);
+
+    lex_advance();
+
+    token = lex_peek();
+
+    if (token == cast(int, '(')) {
+        return parse_function_call(id_node);
+    }
+    if (token == cast(int, ':')) {
+        return parse_declaration(id_node);
+    }
+    return id_node;
+}
+
+// alloc ::= alloc(type [, expr])
+parse_alloc_expr: () -> int = {
+    peek_expect_advance(TOK_ALLOC);
+
+    alloc_node := node_create(NODE_ALLOC);
+    peek_expect_advance(cast(int, '('));
+    node_add_child(alloc_node, parse_type());
+    token := lex_peek();
+    if (token == cast(int, ',')) {
+        lex_advance();
+        node_add_child(alloc_node, parse_expression());
+    }
+    peek_expect_advance(cast(int, ')'));
+    return alloc_node;
+}
+
+// delete ::= delete(expr)
+// TODO: it would be cool if delete automatically set pointer to 0
+parse_delete_expr: () -> int = {
+    peek_expect_advance(TOK_DELETE);
+    delete_node := node_create(NODE_DELETE);
+    peek_expect_advance(cast(int, '('));
+    node_add_child(delete_node, parse_expression());
+    peek_expect_advance(cast(int, ')'));
+    return delete_node;
+}
+
+// cast ::= cast(type, expr)
+parse_cast_expr: () -> int = {
+    peek_expect_advance(TOK_CAST);
+    cast_node := node_create(NODE_CAST);
+    peek_expect_advance(cast(int, '('));
+    node_add_child(cast_node, parse_type());
+    peek_expect_advance(cast(int, ','));
+    node_add_child(cast_node, parse_expression());
+    peek_expect_advance(cast(int, ')'));
+    return cast_node;
+}
+
+parse_function_call: (id_node: int) -> int = {
+    call_node := node_create(NODE_CALL);
+    node_add_child(call_node, id_node);
+
+    list_node := node_create(NODE_LIST);
+    peek_expect_advance(cast(int, '('));
+
+    token := lex_peek();
+    while (token != cast(int, ')')) {
+        node_add_child(list_node, parse_expression());
+
+        token = lex_peek();
+        if (token == cast(int, ')')) {
+            break;
+        }
+        token = peek_expect_advance(cast(int, ','));
+    }
+    lex_advance();
+
+    node_add_child(call_node, list_node);
+
+    return call_node;
+}
+
+parse_indexing: (node: int) -> int = {
+    indexing_node := node_create(NODE_INDEX);
+    node_add_child(indexing_node, node);
+
+    peek_expect_advance(cast(int, '['));
+    node_add_child(indexing_node, parse_expression());
+    peek_expect_advance(cast(int, ']'));
+    return indexing_node;
+}
+
+// parenexpr
+//     ::= ( expr )
+parse_paren_expr: () -> int = {
+    peek_expect_advance(cast(int, '('));
+    expr := parse_expression();
+    peek_expect_advance(cast(int, ')'));
+    return expr;
+}
+
+
+parse_if_expr: () -> int = {
+    peek_expect_advance(TOK_IF);
+    cond := parse_paren_expr();
+    body := parse_whileif_body();
+    token := lex_peek();
+
+    if_node := node_create(NODE_IF);
+    node_add_child(if_node, cond);
+    node_add_child(if_node, body);
+
+    if (token == TOK_ELSE) {
+        lex_advance();
+        else_body := parse_whileif_body();
+        node_add_child(if_node, else_body);
+    }
+    return if_node;
+}
+
+parse_while_expr: () -> int = {
+    peek_expect_advance(TOK_WHILE);
+    cond := parse_paren_expr();
+    body := parse_whileif_body();
+
+    while_node := node_create(NODE_WHILE);
+    node_add_child(while_node, cond);
+    node_add_child(while_node, body);
+    return while_node;
+}
+
+parse_for_expr: () -> int = {
+    peek_expect_advance(TOK_FOR);
+    for_node := node_create(NODE_FOR);
+
+    peek_expect_advance(cast(int, '('));
+
+    token := lex_peek();
+    if (token == cast(int, ';')) {
+        node_add_child(for_node, node_create(NODE_BLOCK));
+    } else {
+        node_add_child(for_node, parse_statement());
+    }
+    peek_expect_advance(cast(int, ';'));
+    token = lex_peek();
+
+    if (token == cast(int, ';')) {
+        empty_cond := node_create(NODE_LIT_BOOL);
+        node_data_bool[empty_cond] = 1;
+        node_add_child(for_node, empty_cond);
+    } else {
+        node_add_child(for_node, parse_statement());
+    }
+    peek_expect_advance(cast(int, ';'));
+    token = lex_peek();
+
+    if (token == cast(int, ')')) {
+        node_add_child(for_node, node_create(NODE_BLOCK));
+    } else {
+        node_add_child(for_node, parse_statement());
+    }
+    peek_expect_advance(cast(int, ')'));
+
+    body := parse_whileif_body();
+    node_add_child(for_node, body);
+
+    return for_node;
+}
+
+// TODO: remove if conclusion is that statement is stable
+parse_whileif_body: () -> int = {
+    //token := lex_peek();
+    //if (token == cast(int, '{')) {
+    //    lex_advance();
+    //    block_node := parse_block();
+    //    peek_expect_advance(cast(int, '}'));
+    //    return block_node;
+    //}
+
+    return parse_statement();
+}
+
+parse_return_expr: () -> int = {
+    peek_expect_advance(TOK_RETURN);
+    token := lex_peek();
+
+    ret_node := node_create(NODE_RETURN);
+
+    if (token == cast(int, ';')) {
+        return ret_node;
+    }
+    node_add_child(ret_node, parse_expression());
+    return ret_node;
+}
+
+// primaryexpr
+//     ::= identifierexpr
+//     ::= lit_int
+//     ::= lit_str
+//     ::= parenexpr
+//     ::= allocexpr
+//     ::= deleteexpr
+//     ::= castexpr
+parse_primary_expr: () -> int = {
+    token := lex_peek();
+
+    if (token == TOK_STR) {
+        str_node := node_create(NODE_LIT_STR);
+        node_set_strdata(str_node);
+        lex_advance();
+        return str_node;
+    }
+
+    if (token == TOK_INT) {
+        int_node := node_create(NODE_LIT_INT);
+        node_set_intdata(int_node);
+        lex_advance();
+        return int_node;
+    }
+
+    if (token == TOK_CHAR) {
+        char_node := node_create(NODE_LIT_CHAR);
+        node_set_chardata(char_node);
+        lex_advance();
+        return char_node;
+    }
+
+    if (token == TOK_TRUE) {
+        bool_node := node_create(NODE_LIT_BOOL);
+        node_data_bool[bool_node] = 1;
+        lex_advance();
+        return bool_node;
+    }
+
+    if (token == TOK_FALSE) {
+        bool_node := node_create(NODE_LIT_BOOL);
+        node_data_bool[bool_node] = 0;
+        lex_advance();
+        return bool_node;
+    }
+
+    if (token == cast(int, '(')) {
+        return parse_paren_expr();
+    }
+
+    if (token == TOK_ALLOC) {
+        return parse_alloc_expr();
+    }
+
+    if (token == TOK_DELETE) {
+        return parse_delete_expr();
+    }
+
+    if (token == TOK_CAST) {
+        return parse_cast_expr();
+    }
+
+    if (token == TOK_ID) {
+        return parse_identifier_expr();
+    }
+
+    print("parse_primary_expr unhandled token: '");
+    tok_print(token);
+    println("'");
+    exit := 1 / 0;
+    return 0;
+}
+
+parse_expr_rhs: (expr_prec: int, lhs: int) -> int = {
+    while (true) {
+        token := lex_peek();
+        prec := get_tok_precedence(token);
+        if (prec < expr_prec) {
+            return lhs;
+        }
+        // token is guaranteed to be an operator
+        lex_advance();
+        rhs := parse_unary_expr();
+
+        next_prec := get_tok_precedence(lex_peek());
+        if (prec < next_prec) {
+            rhs = parse_expr_rhs(prec + 1, rhs);
+        }
+
+        // merge
+        op_node := node_create(NODE_BINOP);
+        node_data_op[op_node] = token;
+        node_add_child(op_node, lhs);
+        node_add_child(op_node, rhs);
+
+        lhs = op_node;
+    }
+    return lhs;
+}
+
+parse_statement: () -> int = {
+    token := lex_peek();
+
+    if (token == TOK_IF) {
+        return parse_if_expr();
+    }
+
+    if (token == TOK_WHILE) {
+        return parse_while_expr();
+    }
+
+    if (token == TOK_FOR) {
+        return parse_for_expr();
+    }
+
+    if (token == TOK_RETURN) {
+        return parse_return_expr();
+    }
+
+    if (token == TOK_BREAK) {
+        lex_advance();
+        return node_create(NODE_BREAK);
+    }
+
+    if (token == TOK_CONTINUE) {
+        lex_advance();
+        return node_create(NODE_CONTINUE);
+    }
+
+    if (token == cast(int, '{')) {
+        lex_advance();
+        block_node := parse_block();
+        peek_expect_advance(cast(int, '}'));
+        return block_node;
+    }
+
+    return parse_expression();
+}
+
+// unary ::= [unop]* postfix
+parse_unary_expr: () -> int = {
+    token := lex_peek();
+
+    if (token == cast(int, '!')) {
+        lex_advance();
+        subexpr := parse_unary_expr();
+        unary_node := node_create(NODE_UNOP);
+        node_data_op[unary_node] = token;
+        node_add_child(unary_node, subexpr);
+        return unary_node;
+    }
+
+    if (token == cast(int, '-')) {
+        lex_advance();
+        subexpr := parse_unary_expr();
+        unary_node := node_create(NODE_UNOP);
+        node_data_op[unary_node] = TOK_NEG;
+        node_add_child(unary_node, subexpr);
+        return unary_node;
+    }
+
+    if (token == cast(int, '*')) {
+        lex_advance();
+        subexpr := parse_unary_expr();
+        addrof_node := node_create(NODE_ADDROF);
+        node_add_child(addrof_node, subexpr);
+        return addrof_node;
+    }
+
+    if (token == TOK_PLUSX2) {
+        lex_advance();
+        subexpr := parse_unary_expr();
+        unary_node := node_create(NODE_UNOP);
+        node_data_op[unary_node] = TOK_PREADD;
+        node_add_child(unary_node, subexpr);
+        return unary_node;
+    }
+
+    if (token == TOK_MINUSX2) {
+        lex_advance();
+        subexpr := parse_unary_expr();
+        unary_node := node_create(NODE_UNOP);
+        node_data_op[unary_node] = TOK_PRESUB;
+        node_add_child(unary_node, subexpr);
+        return unary_node;
+    }
+
+    return parse_postfix_expr();
+}
+
+// postfix ::= primary [postfix_op]
+// TODO: what about multiple postfix ops
+parse_postfix_expr: () -> int = {
+    expr := parse_primary_expr();
+    while (true) {
+        token := lex_peek();
+        if (token == TOK_DEREF) {
+            lex_advance();
+            deref_node := node_create(NODE_DEREF);
+            node_add_child(deref_node, expr);
+            expr = deref_node;
+            continue;
+        }
+
+        if (token == cast(int, '[')) {
+            expr = parse_indexing(expr);
+            continue;
+        }
+
+        if (token == TOK_PLUSX2) {
+            lex_advance();
+            unary_node := node_create(NODE_UNOP);
+            node_data_op[unary_node] = TOK_POSTADD;
+            node_add_child(unary_node, expr);
+            expr = unary_node;
+            continue;
+        }
+
+        if (token == TOK_MINUSX2) {
+            lex_advance();
+            unary_node := node_create(NODE_UNOP);
+            node_data_op[unary_node] = TOK_POSTSUB;
+            node_add_child(unary_node, expr);
+            return unary_node;
+        }
+
+        break;
+    }
+
+    return expr;
+}
+
+// expression
+//     ::= unary [binop, unary]*
+parse_expression: () -> int = {
+    lhs := parse_unary_expr();
+    return parse_expr_rhs(0, lhs);
+}
+
+parse: () -> int = {
+    root := node_create(NODE_LIST);
+
+    while (true) {
+        tok := lex_peek();
+
+        if (tok == TOK_EOF) {
+            break;
+        }
+        if (tok == cast(int, ';')) {
+            lex_advance();
+            continue;
+        }
+        if (tok == TOK_ID) {
+            // eat identifier
+            id_node := node_create(NODE_ID);
+
+            // collect str
+            node_set_idstr(id_node);
+
+            lex_advance();
+
+            node := parse_declaration(id_node);
+
+            node_add_child(root, node);
+            continue;
+        }
+
+        print("Unexpected token: ");
+        tok_print(tok);
+        println();
+        exit := 1 / 0;
+        lex_advance();
+    }
+
+    parse_simplify(root);
+
+    return root;
+}
+
+// structural simplifications to le parse tree
+parse_simplify: (node: int) -> void = {
+    children := node_children[node];
+
+    i := 0;
+    while (i < node_children_sz[node]) {
+        parse_simplify(children[i]);
+        i += 1;
+    }
+
+    if (node_type[node] == NODE_BINOP) {
+        node_op := node_data_op[node];
+
+        if (node_op == cast(int, '=')) {
+            // assignment
+            node_type[node] = NODE_ASSIGN;
+        }
+        if (node_op == TOK_AADD
+         || node_op == TOK_ASUB
+         || node_op == TOK_AMUL
+         || node_op == TOK_ADIV
+         || node_op == TOK_AMOD) {
+            new_op: int;
+
+            if (node_op == TOK_AADD) {
+                new_op = cast(int, '+');
+            }
+            if (node_op == TOK_ASUB) {
+                new_op = cast(int, '-');
+            }
+            if (node_op == TOK_AMUL) {
+                new_op = cast(int, '*');
+            }
+            if (node_op == TOK_ADIV) {
+                new_op = cast(int, '/');
+            }
+            if (node_op == TOK_AMOD) {
+                new_op = cast(int, '%');
+            }
+
+            lhs := children[0];
+            rhs := children[1];
+            new_node := node_create(NODE_BINOP);
+            node_data_op[new_node] = new_op;
+            // x += foo
+            // -> x = (x + foo)
+            node_add_child(new_node, node_dup(lhs));
+            node_add_child(new_node, rhs);
+            children[1] = new_node;
+            node_type[node] = NODE_ASSIGN;
+        }
+        return;
+    }
+
+    if (node_type[node] == NODE_DECL) {
+        children := node_children[node];
+        if (node_children_sz[node] == 3) {
+            ch2 := children[2];
+            if (node_type[ch2] == NODE_BLOCK) {
+                block_children := node_children[ch2];
+                sz := node_children_sz[ch2];
+                has_return := true;
+                if (sz == 0) {
+                    has_return = false;
+                } else {
+                    last := block_children[sz - 1];
+                    if (node_type[last] != NODE_RETURN) {
+                        has_return = false;
+                    }
+                }
+
+                if (!has_return) {
+                    node_add_child(ch2, node_create(NODE_RETURN));
+                }
+            }
+        }
+        return;
+    }
+
+    if (node_type[node] == NODE_FOR) {
+        // turn this shit into a while loop
+        if (node_children_sz[node] != 4) {
+            println("Expected 'for' to have exactly 4 children");
+            exit := 1 / 0;
+        }
+        children := node_children[node];
+        prenode := children[0];
+        condnode := children[1];
+        postnode := children[2];
+        bodynode := children[3];
+
+        // make a new body including the post stuff
+        new_bodynode := node_create(NODE_BLOCK);
+        node_add_child(new_bodynode, bodynode);
+        node_add_child(new_bodynode, postnode);
+
+        while_node := node_create(NODE_WHILE);
+        node_add_child(while_node, condnode);
+        node_add_child(while_node, new_bodynode);
+
+        // to ensure a new scope is created
+        node_type[node] = NODE_BLOCK;
+        // prenode stays the same
+        children[1] = while_node;
+        children[2] = 0;
+        children[3] = 0;
+        node_children_sz[node] = 2;
+
+        return;
+    }
+}
+
+// ==================== SYMBOL ====================
+// type table
+type_table_sz: int;
+type_table_cap: int;
+type_class: *int;
+// for stuff with a subtype
+type_data_subtype: *int;
+// for stuff with a length
+type_data_length: *int;
+// for stuff with a list of params
+type_data_argtypes: **int;
+
+
+// first index: by scope. 
+// array at location: list of indices in string table
+scope_parent: *int; // scope_parent[s] = parent scope of s
+
+scope_syms: **int;
+scope_szs: *int;
+scope_caps: *int;
+
+scope_sz: int;
+scope_cap: int;
+
+// given the symbol, get its name (index in string table)
+symbol_table_str: *int;
+symbol_table_type: *int;
+symbol_table_scope: *int;
+symbol_table_decl_node: *int;
+// sequence number in function
+symbol_table_seq: *int;
+// offset from rbp (local vars ONLY)
+symbol_table_offs: *int;
+symbol_table_sz: int;
+symbol_table_cap: int;
+
+symbol_table_seq_counter: int;
+
+symbol_table_init: () -> void = {
+    scope_parent = alloc(int, 1);
+    scope_syms = alloc(*int, 1);
+    scope_szs = alloc(int, 1);
+    scope_caps = alloc(int, 1);
+    scope_sz = 1;
+    scope_cap = 1;
+
+    scope_szs[0] = 0;
+    scope_caps[0] = 0;
+
+    TYPEID_UNKNOWN = 0;
+    TYPEID_UNKNOWN = type_create(TYPE_UNKNOWN);
+}
+
+type_create: (tc: int) -> int = {
+    if (type_table_sz == type_table_cap) {
+        new_cap := type_table_cap * 2;
+        if (new_cap == 0) {
+            new_cap = 1;
+        }
+
+        new_class := alloc(int, new_cap);
+        new_data_subtype := alloc(int, new_cap);
+        new_data_length := alloc(int, new_cap);
+        new_data_argtypes := alloc(*int, new_cap);
+
+        i := 0;
+
+        while (i < type_table_cap) {
+            new_class[i] = type_class[i];
+            new_data_subtype[i] = type_data_subtype[i];
+            new_data_length[i] = type_data_length[i];
+            new_data_argtypes[i] = type_data_argtypes[i];
+            i += 1;
+        }
+
+        if (type_table_cap != 0) {
+            delete(type_class);
+            delete(type_data_subtype);
+            delete(type_data_length);
+            delete(type_data_argtypes);
+        }
+
+        type_class         = new_class;
+        type_data_subtype  = new_data_subtype;
+        type_data_length   = new_data_length;
+        type_data_argtypes = new_data_argtypes;
+
+        type_table_cap = new_cap;
+    }
+
+    ret := type_table_sz;
+    type_table_sz += 1;
+
+    type_class[ret] = tc;
+    type_data_subtype[ret] = 0;
+    type_data_length[ret] = 0;
+
+    return ret;
+}
+
+type_create_basic: (basic_var: int) -> int = {
+    typeid := type_create(TYPE_BASIC);
+    type_data_subtype[typeid] = basic_var;
+    return typeid;
+}
+
+type_create_array: (subtype_id: int, length: int) -> int = {
+    typeid := type_create(TYPE_ARR);
+    type_data_subtype[typeid] = subtype_id;
+    type_data_length[typeid] = length;
+    return typeid;
+}
+
+type_create_ptr: (subtype_id: int) -> int = {
+    typeid := type_create(TYPE_PTR);
+    type_data_subtype[typeid] = subtype_id;
+    return typeid;
+}
+
+type_create_func: (ret_type: int, num_args: int) -> int = {
+    typeid := type_create(TYPE_FUNC);
+    type_data_subtype[typeid] = ret_type;
+    type_data_length[typeid] = num_args;
+    argtypes: *int;
+    if (num_args > 0) {
+        argtypes = alloc(int, num_args);
+    }
+    i := 0;
+    while (i < num_args) {
+        argtypes[i] = TYPEID_UNKNOWN;
+        i += 1;
+    }
+    type_data_argtypes[typeid] = argtypes;
+    return typeid;
+}
+
+// Return size of a type in bytes
+type_sizeof: (typeid: int) -> int = {
+    tc := type_class[typeid];
+
+    if (tc == TYPE_VOID) {
+        // Hmm
+        return 0;
+    }
+
+    if (tc == TYPE_BASIC) {
+        if (type_data_subtype[typeid] == TYPE_B_INT
+         || type_data_subtype[typeid] == TYPE_B_BOOL) {
+            // don't know
+            return 8;
+        }
+
+        if (type_data_subtype[typeid] == TYPE_B_CHAR) {
+            return 1;
+        }
+
+        println("Unhandled basic type in type_sizeof:", type_data_subtype[typeid]);
+        exit := 1 / 0;
+    }
+
+    if (tc == TYPE_ARR) {
+        subsize := type_sizeof(type_data_subtype[typeid]);
+        return subsize * type_data_length[typeid];
+    }
+
+    if (tc == TYPE_PTR) {
+        // yes.
+        return 8;
+    }
+
+    if (tc == TYPE_STRLIT) {
+        // pointer basically
+        return 8;
+    }
+
+    println("Unhandled type class in type_sizeof:", tc);
+    type_print(typeid);
+    println();
+    exit := 1 / 0;
+    return 0;
+}
+
+type_is_unknown: (typeid: int) -> bool = {
+    return type_class[typeid] == TYPE_UNKNOWN;
+}
+
+type_is_int: (typeid: int) -> bool = {
+    if (type_class[typeid] != TYPE_BASIC) {
+        return false;
+    }
+    if (type_data_subtype[typeid] != TYPE_B_INT) {
+        return false;
+    }
+    return true;
+}
+
+type_is_bool: (typeid: int) -> bool = {
+    if (type_class[typeid] != TYPE_BASIC) {
+        return false;
+    }
+    if (type_data_subtype[typeid] != TYPE_B_BOOL) {
+        return false;
+    }
+    return true;
+}
+
+type_is_char: (typeid: int) -> bool = {
+    if (type_class[typeid] != TYPE_BASIC) {
+        return false;
+    }
+    if (type_data_subtype[typeid] != TYPE_B_CHAR) {
+        return false;
+    }
+    return true;
+}
+
+type_is_strlit: (typeid: int) -> bool = {
+    return type_class[typeid] == TYPE_STRLIT;
+}
+
+type_is_func: (typeid: int) -> bool = {
+    return type_class[typeid] == TYPE_FUNC;
+}
+
+type_is_arr: (typeid: int) -> bool = {
+    return type_class[typeid] == TYPE_ARR;
+}
+
+type_is_ptr: (typeid: int) -> bool = {
+    return type_class[typeid] == TYPE_PTR;
+}
+
+type_get_type: (type_node: int) -> int = {
+    if (node_data_type[type_node] != TYPEID_UNKNOWN) {
+        return node_data_type[type_node];
+    }
+
+    children := node_children[type_node];
+
+    if (node_parse_tc[type_node] == TYPE_PTR) {
+        subtype := type_get_type(children[0]);
+        node_data_type[type_node] = type_create_ptr(subtype);
+        return node_data_type[type_node];
+    }
+
+    if (node_children_sz[type_node] == 1) {
+        id_node := children[0];
+
+        if (node_type[id_node] != NODE_ID) {
+            print("Unexpected only-child of TYPE: ");
+            node_print(id_node);
+            println();
+            exit := 1 / 0;
+        }
+
+        id_stridx := node_data_str[id_node];
+
+        // streq: (str_a: *int, str_b: *int, len: int) -> bool
+        if (streq(string_table[id_stridx], STRING_INT, 3)) {
+            node_data_type[type_node] = type_create_basic(TYPE_B_INT);
+            return node_data_type[type_node];
+        }
+
+        if (streq(string_table[id_stridx], STRING_VOID, 4)) {
+            node_data_type[type_node] = type_create(TYPE_VOID);
+            return node_data_type[type_node];
+        }
+
+        if (streq(string_table[id_stridx], STRING_BOOL, 4)) {
+            node_data_type[type_node] = type_create_basic(TYPE_B_BOOL);
+            return node_data_type[type_node];
+        }
+
+        if (streq(string_table[id_stridx], STRING_CHAR, 4)) {
+            node_data_type[type_node] = type_create_basic(TYPE_B_CHAR);
+            return node_data_type[type_node];
+        }
+
+        print("Unknown type: ");
+        string_table_print(id_stridx);
+        println();
+        exit := 1 / 0;
+    }
+
+    ch0 := children[0];
+    ch1 := children[1];
+
+    if (node_type[ch1] == NODE_LIT_INT) {
+        // array type
+        subtype := type_get_type(ch0);
+
+        node_data_type[type_node] = type_create_array(subtype, node_data_int[ch1]);
+        return node_data_type[type_node];
+    }
+
+    if (node_type[ch0] == NODE_LIST && node_type[ch1] == NODE_TYPE) {
+        // function
+        ret_type := type_get_type(ch1);
+        num_args := node_children_sz[ch0];
+        typeid := type_create_func(ret_type, num_args);
+        argtypes := type_data_argtypes[typeid];
+
+        decls := node_children[ch0];
+        i := 0;
+        while (i < num_args) {
+            decl := decls[i];
+            decl_children := node_children[decl];
+            decl_type_node := decl_children[1];
+            if (node_type[decl] != NODE_DECL) {
+                print("Unexpected node in function type: ");
+                node_print(decl);
+                println();
+                exit := 1 / 0;
+            }
+
+            if (node_type[decl_type_node] != NODE_TYPE) {
+                println("Function arguments require a type!");
+                node_print(decl_type_node);
+                println();
+                exit := 1 / 0;
+            }
+
+            decl_type := type_get_type(decl_type_node);
+            argtypes[i] = decl_type;
+
+            i += 1;
+        }
+
+        node_data_type[type_node] = typeid;
+        return typeid;
+    }
+
+    println("Unhandled type: ");
+    print_tree(type_node, 0);
+    println();
+    exit := 1 / 0;
+
+    return 0;
+}
+
+types_equivalent: (type_a: int, type_b: int) -> bool = {
+    if (type_class[type_a] != type_class[type_b]) {
+        return false;
+    }
+    tc := type_class[type_a];
+    if (tc == TYPE_VOID) {
+        return true;
+    }
+    if (tc == TYPE_BASIC) {
+        return type_data_subtype[type_a] == type_data_subtype[type_b];
+    }
+    if (tc == TYPE_FUNC) {
+        println("Not handled type equivalence: FUNC");
+        exit := 1 / 0;
+        return false;
+    }
+    if (tc == TYPE_ARR) {
+        if (!types_equivalent(type_data_subtype[type_a], type_data_subtype[type_b])) {
+            return false;
+        }
+        if (type_data_length[type_a] != type_data_length[type_b]) {
+            return false;
+        }
+        return true;
+    }
+
+    if (tc == TYPE_PTR) {
+        if (!types_equivalent(type_data_subtype[type_a], type_data_subtype[type_b])) {
+            return false;
+        }
+        return true;
+    }
+
+    print("Unhandled type equivalence: ");
+    type_print(type_a);
+    print(" vs. ");
+    type_print(type_b);
+    println();
+    exit := 1 / 0;
+    return false;
+}
+
+decl_get_symbol_type: (node: int) -> int = {
+    if (node_data_type[node] != TYPEID_UNKNOWN) {
+        return node_data_type[node];
+    }
+    children := node_children[node];
+    ch1 := children[1];
+    if (node_type[ch1] == NODE_TYPE) {
+        typeid := type_get_type(ch1);
+        node_data_type[node] = typeid;
+        return typeid;
+    }
+    return TYPEID_UNKNOWN;
+}
+
+scope_is_parent: (par: int, scope: int) -> bool = {
+    while (scope >= par && scope > 0) {
+        if (scope == par) {
+            return true;
+        }
+
+        scope = scope_parent[scope];
+    }
+    return false;
+}
+
+// lookup a name from a scope
+// return symbol id or -1 if not found
+symbol_table_lookup: (stridx: int, scope: int) -> int = {
+    len := string_table_len[stridx];
+    while (true) {
+        syms := scope_syms[scope];
+
+        i := 0;
+
+        while (i < scope_szs[scope]) {
+            sym := syms[i];
+
+            intable_stridx := symbol_table_str[sym];
+            intable_len := string_table_len[intable_stridx];
+            if (len == intable_len) {
+                if (streq(string_table[stridx], string_table[intable_stridx], len)) {
+                    return sym;
+                }
+            }
+
+            i += 1;
+        }
+
+        if (scope == 0) {
+            break;
+        }
+        scope = scope_parent[scope];
+    }
+
+    return -1;
+}
+
+// append a symbol to the symbol list of a scope
+symbol_table_scope_append: (scope: int, symidx: int) -> void = {
+    sz := scope_szs[scope];
+    cap := scope_caps[scope];
+
+    if (sz == cap) {
+        new_cap := cap * 2;
+        if (new_cap == 0) {
+            new_cap = 1;
+        }
+
+        new_data_syms := alloc(int, new_cap);
+        old_data_syms := scope_syms[scope];
+
+        i := 0;
+
+        while (i < cap) {
+            new_data_syms[i] = old_data_syms[i];
+            i += 1;
+        }
+
+        if (cap > 0) {
+            delete(old_data_syms);
+        }
+
+        scope_syms[scope] = new_data_syms;
+        scope_caps[scope] = new_cap;
+    }
+    arr := scope_syms[scope];
+    arr[sz] = symidx;
+    scope_szs[scope] = sz + 1;
+}
+
+// assumes the scope exists
+symbol_table_insert: (decl_node: int, stridx: int, scope: int, symtype: int) -> int = {
+    if (symbol_table_sz == symbol_table_cap) {
+        new_cap := symbol_table_cap * 2;
+        if (new_cap == 0) {
+            new_cap = 1;
+        }
+
+        new_table_str       := alloc(int, new_cap);
+        new_table_type      := alloc(int, new_cap);
+        new_table_scope     := alloc(int, new_cap);
+        new_table_seq       := alloc(int, new_cap);
+        new_table_decl_node := alloc(int, new_cap);
+        new_table_offs      := alloc(int, new_cap);
+
+        i := 0;
+        while (i < symbol_table_cap) {
+            new_table_str[i]       = symbol_table_str[i];
+            new_table_type[i]      = symbol_table_type[i];
+            new_table_scope[i]     = symbol_table_scope[i];
+            new_table_seq[i]       = symbol_table_seq[i];
+            new_table_decl_node[i] = symbol_table_decl_node[i];
+            new_table_offs[i]      = symbol_table_offs[i];
+            i += 1;
+        }
+
+        if (symbol_table_cap > 0) {
+            delete(symbol_table_str);
+            delete(symbol_table_type);
+            delete(symbol_table_scope);
+            delete(symbol_table_seq);
+            delete(symbol_table_decl_node);
+            delete(symbol_table_offs);
+        }
+
+        symbol_table_str       = new_table_str;
+        symbol_table_type      = new_table_type;
+        symbol_table_scope     = new_table_scope;
+        symbol_table_seq       = new_table_seq;
+        symbol_table_decl_node = new_table_decl_node;
+        symbol_table_offs      = new_table_offs;
+        symbol_table_cap       = new_cap;
+    }
+
+    symidx := symbol_table_sz;
+    symbol_table_sz += 1;
+
+    symbol_table_str[symidx]       = stridx;
+    symbol_table_type[symidx]      = symtype;
+    symbol_table_scope[symidx]     = scope;
+    symbol_table_decl_node[symidx] = decl_node;
+    symbol_table_scope_append(scope, symidx);
+
+    return symidx;
+}
+
+// Create a new scope with the given parent
+symbol_table_scope_add: (par: int) -> int = {
+    if (scope_sz == scope_cap) {
+        new_cap := scope_cap * 2;
+        if (new_cap == 0) {
+            new_cap = 1;
+        }
+
+        new_data_parent := alloc(int, new_cap);
+        new_data_syms := alloc(*int, new_cap);
+        new_data_szs := alloc(int, new_cap);
+        new_data_caps := alloc(int, new_cap);
+
+        i := 0;
+
+        while (i < scope_cap) {
+            new_data_parent[i] = scope_parent[i];
+            new_data_syms[i] = scope_syms[i];
+            new_data_szs[i] = scope_szs[i];
+            new_data_caps[i] = scope_caps[i];
+            i += 1;
+        }
+
+        if (scope_cap > 0) {
+            delete(scope_parent);
+            delete(scope_syms);
+            delete(scope_szs);
+            delete(scope_caps);
+        }
+
+        scope_parent = new_data_parent;
+        scope_syms = new_data_syms;
+        scope_szs = new_data_szs;
+        scope_caps = new_data_caps;
+        scope_cap = new_cap;
+    }
+
+    scope := scope_sz;
+    scope_sz += 1;
+
+    scope_parent[scope] = par;
+    scope_szs[scope] = 0;
+    scope_caps[scope] = 0;
+    return scope;
+}
+
+CURRENT_FUNC_BLOCK: int;
+resolve_symbols: (root: int) -> void = {
+    // builtin functions
+    {
+        print_idx := string_table_add(STRING_PRINT, 5);
+        symbol_table_insert(-1, print_idx, 0, type_create_func(type_create(TYPE_VOID), -1));
+    }
+    {
+        println_idx := string_table_add(STRING_PRINTLN, 7);
+        symbol_table_insert(-1, println_idx, 0, type_create_func(type_create(TYPE_VOID), -1));
+    }
+    {
+        readchar_idx := string_table_add(STRING_READCHAR, 8);
+        symbol_table_insert(-1, readchar_idx, 0, type_create_func(type_create_basic(TYPE_B_CHAR), 0));
+    }
+
+
+    // register top level
+
+    i := 0;
+    children := node_children[root];
+
+    while (i < node_children_sz[root]) {
+        child := children[i];
+        if (node_type[child] != NODE_DECL) {
+            print("Unhandled root node type in resolve_symbols: ");
+            node_print(child);
+            println();
+            exit := 1 / 0;
+        }
+
+        subchildren := node_children[child];
+
+        id_node := subchildren[0];
+
+        id_str := node_data_str[id_node];
+        decl_type := decl_get_symbol_type(child);
+        idx := symbol_table_insert(child, id_str, 0, decl_type);
+        node_data_sym[id_node] = idx;
+        node_data_type[id_node] = decl_type;
+
+        i += 1;
+    }
+
+    // register all blocks
+    i = 0;
+
+    while (i < node_children_sz[root]) {
+        child := children[i];
+        decl_children := node_children[child];
+        id_node := decl_children[0];
+        body := decl_get_body(child);
+        if (body >= 0) {
+            symbol_table_seq_counter = 0;
+
+            decl_type := decl_get_symbol_type(child);
+            type_node := decl_get_type_node(child);
+
+            if (type_is_func(decl_type)) {
+                func_scope := symbol_table_scope_add(0);
+                type_children := node_children[type_node];
+                node_data_block_scope[child] = func_scope;
+                // arg declarations
+                resolve_node(type_children[0], func_scope);
+                CURRENT_FUNC_BLOCK = body;
+                node_data_type[body] = type_data_subtype[decl_type];
+                resolve_node(body, func_scope);
+
+                func_ret_type := type_data_subtype[decl_type];
+
+                if (node_data_type[body] == TYPEID_UNKNOWN) {
+                    if (func_ret_type == TYPEID_UNKNOWN) {
+                        println("Unspecified return type encountered??");
+                        exit := 1 / 0;
+                    }
+                    node_data_type[body] = func_ret_type;
+                } else {
+                    if (!types_equivalent(func_ret_type, node_data_type[body])) {
+                        println("Function does not return expected type");
+                        print("Expected: ");
+                        type_print(func_ret_type);
+                        print(", got: ");
+                        type_print(node_data_type[body]);
+                        println();
+                        exit := 1 / 0;
+                    }
+                }
+            } else {
+                resolve_node(body, 0);
+                inferred_type := node_data_type[body];
+
+                if (type_is_unknown(decl_type) && type_is_unknown(inferred_type)) {
+                    print("Unable to infer type for variable: ");
+                    string_table_print(node_data_str[id_node]);
+                    println();
+                    exit := 1 / 0;
+                }
+                if (type_is_unknown(decl_type)) {
+                    decl_type = inferred_type;
+                    node_data_type[id_node] = decl_type;
+                    sym := node_data_sym[id_node];
+                    symbol_table_type[sym] = decl_type;
+                    node_data_type[child] = decl_type;
+                }
+                else { if (type_is_unknown(inferred_type)) {
+                    node_data_type[body] = decl_type;
+                    inferred_type = decl_type;
+                } else {
+                    if (!types_equivalent(decl_type, node_data_type[body])) {
+                        println("Mismatching types in declaration: ");
+                        print_tree(child, 2);
+                        println();
+                        print("Decl type: ");
+                        type_print(decl_type);
+                        print(" (");
+                        print(decl_type);
+                        println(")");
+                        print("Body type: ");
+                        type_print(node_data_type[body]);
+                        println();
+                        exit := 1 / 0;
+                    }
+                }}
+            }
+        }
+        i += 1;
+    }
+}
+
+// Resolve symbols and register types!
+resolve_node: (node: int, scope: int) -> void = {
+    children := node_children[node];
+    if (node_type[node] == NODE_DECL) {
+        // references in body first
+        body := decl_get_body(node);
+        if (body >= 0) {
+            resolve_node(body, scope);
+        }
+        // register new symbol
+        id_node := children[0];
+        id_str := node_data_str[id_node];
+
+        exists := symbol_table_lookup(id_str, scope);
+        if (exists >= 0 && symbol_table_scope[exists] == scope) {
+            print("Error: redeclaration of ");
+            string_table_print(id_str);
+            println();
+            exit := 1 / 0;
+        }
+
+        decl_type := decl_get_symbol_type(node);
+        if (body >= 0) {
+            inferred_type := node_data_type[body];
+
+            if (type_is_unknown(decl_type) && type_is_unknown(inferred_type)) {
+                print("Unable to infer type for variable: ");
+                string_table_print(node_data_str[id_node]);
+                println();
+                exit := 1 / 0;
+            }
+            if (type_is_unknown(decl_type)) {
+                decl_type = inferred_type;
+                node_data_type[node] = decl_type;
+            }
+            else { if (type_is_unknown(inferred_type)) {
+                node_data_type[body] = decl_type;
+                inferred_type = decl_type;
+            } else {
+                if (!types_equivalent(decl_type, inferred_type)) {
+                    print("Variable: '");
+                    string_table_print(node_data_str[id_node]);
+                    print("' was declared with type: ");
+                    type_print(decl_type);
+                    print(" but assigned to expression of type: ");
+                    type_print(inferred_type);
+                    println();
+                    exit := 1 / 0;
+                }
+            }}
+        }
+
+        idx := symbol_table_insert(node, id_str, scope, decl_type);
+
+        symbol_table_seq[idx] = symbol_table_seq_counter;
+        symbol_table_seq_counter += 1;
+
+        node_data_sym[id_node] = idx;
+        node_data_type[id_node] = decl_type;
+        return;
+    }
+
+    new_scope := scope;
+    if (node_type[node] == NODE_BLOCK) {
+        new_scope = symbol_table_scope_add(scope);
+        node_data_block_scope[node] = new_scope;
+    }
+
+    if (node_type[node] == NODE_LIT_INT) {
+        node_data_type[node] = type_create_basic(TYPE_B_INT);
+        return;
+    }
+
+    if (node_type[node] == NODE_LIT_BOOL) {
+        node_data_type[node] = type_create_basic(TYPE_B_BOOL);
+        return;
+    }
+
+    if (node_type[node] == NODE_LIT_CHAR) {
+        node_data_type[node] = type_create_basic(TYPE_B_CHAR);
+        return;
+    }
+
+    if (node_type[node] == NODE_LIT_STR) {
+        node_data_type[node] = type_create(TYPE_STRLIT);
+        return;
+    }
+
+    if (node_type[node] == NODE_ID) {
+        id_str := node_data_str[node];
+        idx := symbol_table_lookup(
+            id_str,
+            scope
+        );
+
+        if (idx < 0) {
+            print("Unresolved reference: ");
+            string_table_print(id_str);
+            println();
+            exit := 1 / 0;
+        }
+        node_data_sym[node] = idx;
+        node_data_type[node] = symbol_table_type[idx];
+        return;
+    }
+
+    if (node_type[node] == NODE_CALL) {
+        i := 0;
+        while (i < node_children_sz[node]) {
+            resolve_node(children[i], new_scope);
+            i += 1;
+        }
+
+        func_id_node := children[0];
+        func_type := node_data_type[func_id_node];
+        call_list := children[1];
+        arg_nodes := node_children[call_list];
+        num_arg_nodes := node_children_sz[call_list];
+        req_argtypes := type_data_argtypes[func_type];
+
+        if (type_data_length[func_type] >= 0) {
+            // if not variadic, do type checks
+            if (type_data_length[func_type] != num_arg_nodes) {
+                print("Function '");
+                string_table_print(node_data_str[func_id_node]);
+                println("' requires", type_data_length[func_type], "args but was called with", num_arg_nodes);
+                exit := 1 / 0;
+            }
+            i := 0;
+            while (i < num_arg_nodes) {
+                arg_node := arg_nodes[i];
+                arg_type := node_data_type[arg_node];
+                req_type := req_argtypes[i];
+                // assert none of the types are unknown ... or infer?
+                if (!types_equivalent(req_type, arg_type)) {
+                    print("Mismatch in type of argument", i+1, "when calling ");
+                    string_table_print(node_data_str[func_id_node]);
+                    print(": Expected ");
+                    type_print(req_type);
+                    print(", got ");
+                    type_print(arg_type);
+                    println();
+                    exit := 1 / 0;
+                }
+                i += 1;
+            }
+        }
+        // call expression gets type == return type of func
+        node_data_type[node] = type_data_subtype[func_type];
+        return;
+    }
+
+    if (node_type[node] == NODE_BINOP) {
+        lhs := children[0];
+        rhs := children[1];
+        resolve_node(lhs, new_scope);
+        resolve_node(rhs, new_scope);
+        lhs_type := node_data_type[lhs];
+        rhs_type := node_data_type[rhs];
+
+        if (type_is_ptr(lhs_type) && type_is_int(rhs_type) && node_data_op[node] == cast(int, '+')) {
+            // OK, pointer + int, but we have to multiply integer with inner type size
+            // create int literal with value sizeof(*ptr)
+            subt_size := type_sizeof(type_data_subtype[lhs_type]);
+            literal_node := node_create(NODE_LIT_INT);
+            node_data_int[literal_node] = subt_size;
+            node_data_type[literal_node] = rhs_type;
+
+            // create mul node multiplying original rhs with the literal
+            mul_node := node_create(NODE_BINOP);
+            node_data_op[mul_node] = cast(int, '*');
+            node_data_type[mul_node] = rhs_type;
+            node_add_child(mul_node, rhs);
+            node_add_child(mul_node, literal_node);
+
+            // make mul node the new rhs
+            children[1] = mul_node;
+
+            node_data_type[node] = lhs_type;
+            return;
+        }
+
+        // TODO: infer if unknown?
+        if (!types_equivalent(lhs_type, rhs_type)) {
+            print("Cannot apply operator ");
+            print(cast(char, node_data_op[node]));
+            print(" to LHS of type ");
+            type_print(lhs_type);
+            print(" and RHS of type ");
+            type_print(rhs_type);
+            println();
+            exit := 1 / 0;
+        }
+
+        set_operator_type(node, lhs_type, rhs_type);
+        return;
+    }
+
+    if (node_type[node] == NODE_UNOP) {
+        sub := children[0];
+        resolve_node(sub, new_scope);
+
+        if (node_data_op[node] == cast(int, '!')) {
+            if (!type_is_bool(node_data_type[sub])) {
+                print("Operator ! can only be applied to boolean expressions, not: ");
+                type_print(node_data_type[sub]);
+                println();
+                exit := 1 / 0;
+            }
+            node_data_type[node] = node_data_type[sub];
+            return;
+        }
+
+        if (node_data_op[node] == TOK_NEG) {
+            if (!type_is_int(node_data_type[sub])) {
+                print("Operator - can only be applied to numerical expressions, not: ");
+                type_print(node_data_type[sub]);
+                println();
+                exit := 1 / 0;
+            }
+            node_data_type[node] = node_data_type[sub];
+            return;
+        }
+
+        if (node_data_op[node] == TOK_PREADD
+         || node_data_op[node] == TOK_POSTADD
+         || node_data_op[node] == TOK_PRESUB
+         || node_data_op[node] == TOK_POSTSUB) {
+            tok_print(node_data_op[node]);
+            println(" is not supported yet");
+            exit := 1 / 0;
+        }
+
+        print("Unhandled unary operator: ");
+        tok_print(node_data_op[node]);
+        println();
+        exit := 1 / 0;
+    }
+
+    if (node_type[node] == NODE_RETURN) {
+        ret_type: int;
+        if (node_children_sz[node] == 0) {
+            ret_type = type_create(TYPE_VOID);
+        } else {
+            ch0 := children[0];
+            resolve_node(ch0, new_scope);
+            ret_type = node_data_type[ch0];
+        }
+        if (!types_equivalent(node_data_type[CURRENT_FUNC_BLOCK], ret_type)) {
+            print("Cannot return type ");
+            type_print(ret_type);
+            print(" in function returning ");
+            type_print(node_data_type[CURRENT_FUNC_BLOCK]);
+            println();
+            exit := 1 / 0;
+        }
+        node_data_type[node] = ret_type;
+        return;
+    }
+
+    if (node_type[node] == NODE_BREAK) {
+        node_data_type[node] = type_create(TYPE_VOID);
+        return;
+    }
+
+    if (node_type[node] == NODE_CONTINUE) {
+        node_data_type[node] = type_create(TYPE_VOID);
+        return;
+    }
+
+    if (node_type[node] == NODE_ASSIGN) {
+        lhs := children[0];
+        rhs := children[1];
+        resolve_node(lhs, new_scope);
+        resolve_node(rhs, new_scope);
+
+        if (!types_equivalent(node_data_type[lhs], node_data_type[rhs])) {
+            print("Cannot assign ");
+            type_print(node_data_type[rhs]);
+            print(" to type ");
+            type_print(node_data_type[lhs]);
+            println();
+            exit := 1 / 0;
+        }
+        // should it inherit type?
+        node_data_type[node] = node_data_type[lhs];
+        return;
+    }
+
+    if (node_type[node] == NODE_INDEX) {
+        id_node := children[0];
+        expr_node := children[1];
+        resolve_node(id_node, new_scope);
+        resolve_node(expr_node, new_scope);
+
+        id_type := node_data_type[id_node];
+        expr_type := node_data_type[expr_node];
+
+        if (!type_is_arr(id_type) && !type_is_ptr(id_type)) {
+            print("Cannot index non-array/pointer '");
+            string_table_print(node_data_str[id_node]);
+            println("'");
+            exit := 1 / 0;
+        }
+
+        if (!type_is_int(expr_type)) {
+            print("Cannot index array '");
+            string_table_print(node_data_str[id_node]);
+            print("' using non-integral data type ");
+            type_print(expr_type);
+            println();
+            exit := 1 / 0;
+        }
+
+        // an indexed element gets type == subtype of arr
+        node_data_type[node] = type_data_subtype[id_type];
+        return;
+    }
+
+    if (node_type[node] == NODE_IF) {
+        i := 0;
+        while (i < node_children_sz[node]) {
+            resolve_node(children[i], new_scope);
+            i += 1;
+        }
+
+        cond_node := children[0];
+
+        if (!type_is_bool(node_data_type[cond_node])) {
+            print("if-condition must be bool, not ");
+            type_print(node_data_type[cond_node]);
+            println();
+            exit := 1 / 0;
+        }
+        node_data_type[node] = type_create(TYPE_VOID);
+
+        return;
+    }
+    if (node_type[node] == NODE_WHILE) {
+        i := 0;
+        while (i < node_children_sz[node]) {
+            resolve_node(children[i], new_scope);
+            i += 1;
+        }
+
+        cond_node := children[0];
+
+        if (!type_is_bool(node_data_type[cond_node])) {
+            print("while-condition must be bool, not ");
+            type_print(node_data_type[cond_node]);
+            println();
+            exit := 1 / 0;
+        }
+        node_data_type[node] = type_create(TYPE_VOID);
+        return;
+    }
+
+    if (node_type[node] == NODE_ADDROF) {
+        // TODO: subexpr should be lvalue or something
+        ch0 := children[0];
+        resolve_node(ch0, new_scope);
+        subtype := node_data_type[ch0];
+        if (type_is_unknown(subtype)) {
+            println("Taking address of unknown type!");
+            node_print(node);
+            println();
+            exit := 1 / 0;
+        }
+
+        node_data_type[node] = type_create_ptr(subtype);
+        return;
+    }
+
+    if (node_type[node] == NODE_DEREF) {
+        ch0 := children[0];
+        resolve_node(ch0, new_scope);
+        subtype := node_data_type[ch0];
+        if (!type_is_ptr(subtype)) {
+            print("Cannot dereference non-pointer type: ");
+            type_print(subtype);
+            println();
+            exit := 1 / 0;
+        }
+        node_data_type[node] = type_data_subtype[subtype];
+        return;
+    }
+
+    if (node_type[node] == NODE_ALLOC) {
+        ch0 := children[0];
+        resolve_node(ch0, new_scope);
+        
+        if (node_children_sz[node] > 1) {
+            ch1 := children[1];
+            resolve_node(ch1, new_scope);
+
+            if (!type_is_int(node_data_type[ch1])) {
+                print("Second argument to alloc must be int, not: ");
+                type_print(node_data_type[ch1]);
+                println();
+                exit := 1 / 0;
+            }
+        }
+
+        subtype := node_data_type[ch0];
+        node_data_type[node] = type_create_ptr(subtype);
+        return;
+    }
+
+    if (node_type[node] == NODE_DELETE) {
+        ch0 := children[0];
+        resolve_node(ch0, new_scope);
+
+        if (!type_is_ptr(node_data_type[ch0])) {
+            print("Attempt to delete non-pointer type: ");
+            type_print(node_data_type[ch0]);
+            println();
+            exit := 1 / 0;
+        }
+
+        node_data_type[node] = type_create(TYPE_VOID);
+        return;
+    }
+
+    if (node_type[node] == NODE_CAST) {
+        ch0 := children[0];
+        ch1 := children[1];
+
+        resolve_node(ch0, new_scope);
+        resolve_node(ch1, new_scope);
+
+        type_dst := node_data_type[ch0];
+        type_src := node_data_type[ch1];
+
+        if (types_equivalent(type_src, type_dst)) {
+            // OK, nop
+            node_data_type[node] = type_dst;
+            return;
+        }
+
+        if (type_is_int(type_src) && type_is_char(type_dst)
+         || type_is_char(type_src) && type_is_int(type_dst)
+         || type_is_ptr(type_src) && type_is_int(type_dst)) {
+            // OK int -> char
+            node_data_type[node] = type_dst;
+            return;
+        }
+
+        print("Unable to cast from: ");
+        type_print(type_src);
+        print(" to ");
+        type_print(type_dst);
+        println();
+        exit := 1 / 0;
+    }
+
+    if (node_type[node] == NODE_TYPE) {
+        node_data_type[node] = type_get_type(node);
+        return;
+    }
+
+
+    if ( (node_type[node] == NODE_BLOCK)
+      || (node_type[node] == NODE_LIST)
+    ) {
+
+        i := 0;
+        while (i < node_children_sz[node]) {
+            resolve_node(children[i], new_scope);
+            i += 1;
+        }
+        if (node_type[node] != NODE_BLOCK) {
+            node_data_type[node] = type_create(TYPE_VOID);
+        }
+        return;
+    }
+    if (node_type[node] == NODE_ASSIGN) {
+        // TODO: lvalue-rvalue stuff
+    }
+
+    print("resolve_node unhandled: ");
+    node_print(node);
+    println();
+    exit := 1/ 0;
+}
+
+// kinda assumes validity is checked
+set_operator_type: (operator_node: int, lhs_type: int, rhs_type: int) -> void = {
+    op := node_data_op[operator_node];
+
+    if ( op == cast(int, '=')
+      || op == cast(int, '+')
+      || op == cast(int, '-')
+      || op == cast(int, '*')
+      || op == cast(int, '/')
+      || op == cast(int, '%')) {
+        node_data_type[operator_node] = lhs_type;
+        return;
+    }
+
+    if ( op == cast(int, '<')
+      || op == cast(int, '>')
+      || op == TOK_EQ
+      || op == TOK_NEQ
+      || op == TOK_LEQ
+      || op == TOK_GEQ
+      || op == TOK_OR 
+      || op == TOK_AND) {
+        node_data_type[operator_node] = type_create_basic(TYPE_B_BOOL);
+        return;
+    }
+
+    print("set_operator_type unhandled operator:");
+    tok_print(op);
+    println();
+    exit := 1 / 0;
+}
+
+// ==================== GEN ====================
+LABEL_COUNTER: int;
+
+curr_func_gen_sym: int;
+curr_while_label: int;
+
+RAX: int;
+RBX: int;
+RCX: int;
+RDX: int;
+RSP: int;
+RBP: int;
+RSI: int;
+RDI: int;
+R8: int;
+R9: int;
+R10: int;
+R11: int;
+R12: int;
+R13: int;
+R14: int;
+R15: int;
+RIP: int;
+
+generate_code: (root: int) -> void = {
+
+    // setup
+    {
+        curr_while_label = -1;
+        RAX = 0;
+        RBX = 1;
+        RCX = 2;
+        RDX = 3;
+        RSP = 4;
+        RBP = 5;
+        RSI = 6;
+        RDI = 7;
+        R8  = 8;
+        R9  = 9;
+        R10 = 10;
+        R11 = 11;
+        R12 = 12;
+        R13 = 13;
+        R14 = 14;
+        R15 = 15;
+        RIP = 16;
+    }
+
+    { // string data. Consts?
+        println(".section .rodata");
+        println("strout: .asciz \"%s\"");
+        println("intout: .asciz \"%ld\"");
+        println("ptrout: .asciz \"%p\"");
+        println("charout: .asciz \"%c\"");
+
+        i := 0;
+        while (i < string_table_sz) {
+            if (string_table_type[i] != ST_LIT) {
+                i += 1;
+                continue;
+            }
+            print("string");
+            print(i);
+            print(":  .asciz \"");
+
+            j := 0;
+
+            str := string_table[i];
+            while (j < string_table_len[i]) {
+                print(cast(char, str[j]));
+                j += 1;
+            }
+            println("\"");
+
+            i += 1;
+        }
+    }
+
+    { // global vars
+        println(".section .bss");
+        println(".align 8");
+
+        i := 0;
+
+        global_syms := scope_syms[0];
+        while (i < scope_szs[0]) {
+            sym := global_syms[i];
+            sym_type := symbol_table_type[sym];
+
+            if (type_is_func(sym_type)
+             || type_is_strlit(sym_type)) {
+                i += 1;
+                continue;
+            }
+            print(".");
+            string_table_print(symbol_table_str[sym]);
+            println(": .zero", type_sizeof(sym_type));
+
+            i += 1;
+        }
+    }
+
+    println(".text");
+
+    i := 0;
+
+    root_children := node_children[root];
+    while (i < node_children_sz[root]) {
+        child := root_children[i];
+        child_children := node_children[child];
+
+        if (node_type[child] == NODE_DECL) {
+            id_node := child_children[0];
+            sym := node_data_sym[id_node];
+
+            if (type_is_func(symbol_table_type[sym])) {
+                curr_func_gen_sym = sym;
+                generate_function_code(
+                    node_data_block_scope[child],
+                    child_children[0],
+                    child_children[1],
+                    child_children[2]
+                );
+            }
+        } else {
+            println("Not implemented: root decl node type");
+            exit := 1 / 0;
+        }
+
+        i += 1;
+    }
+
+    // entrypoint
+    println("main:");
+    println("    pushq %rbp");
+    println("    movq %rsp, %rbp");
+    println("    andq $-16, %rsp");
+    println("    call .main");
+    println("    movq %rbp, %rsp");
+    println("    popq %rbp");
+    println("    movq $0, %rdi");
+    println("    pushq %rbp");
+    println("    movq %rsp, %rbp");
+    println("    andq $-16, %rsp");
+    println("    call exit");
+    println(".global main");
+}
+
+REGS: (reg: int, sz: int) -> void = {
+    if (reg == RAX) {
+        if (sz == 1) {
+            print("%al");
+            return;
+        }
+        if (sz == 2) {
+            print("%ax");
+            return;
+        }
+        if (sz == 4) {
+            print("%eax");
+            return;
+        }
+        if (sz == 8) {
+            print("%rax");
+            return;
+        }
+    }
+    if (reg == RCX) {
+        if (sz == 1) {
+            print("%cl");
+            return;
+        }
+        if (sz == 2) {
+            print("%cx");
+            return;
+        }
+        if (sz == 4) {
+            print("%ecx");
+            return;
+        }
+        if (sz == 8) {
+            print("%rcx");
+            return;
+        }
+    }
+    if (reg == RDX) {
+        if (sz == 1) {
+            print("%dl");
+            return;
+        }
+        if (sz == 2) {
+            print("%dx");
+            return;
+        }
+        if (sz == 4) {
+            print("%edx");
+            return;
+        }
+        if (sz == 8) {
+            print("%rdx");
+            return;
+        }
+    }
+    if (reg == RSI) {
+        if (sz == 1) {
+            print("%sil");
+            return;
+        }
+        if (sz == 2) {
+            print("%si");
+            return;
+        }
+        if (sz == 4) {
+            print("%esi");
+            return;
+        }
+        if (sz == 8) {
+            print("%rsi");
+            return;
+        }
+    }
+    if (reg == RDI) {
+        if (sz == 1) {
+            print("%dil");
+            return;
+        }
+        if (sz == 2) {
+            print("%di");
+            return;
+        }
+        if (sz == 4) {
+            print("%edi");
+            return;
+        }
+        if (sz == 8) {
+            print("%rdi");
+            return;
+        }
+    }
+    if (reg == RSP) {
+        if (sz == 1) {
+            print("%spl");
+            return;
+        }
+        if (sz == 2) {
+            print("%sp");
+            return;
+        }
+        if (sz == 4) {
+            print("%esp");
+            return;
+        }
+        if (sz == 8) {
+            print("%rsp");
+            return;
+        }
+    }
+    if (reg == RBP) {
+        if (sz == 1) {
+            print("%bpl");
+            return;
+        }
+        if (sz == 2) {
+            print("%bp");
+            return;
+        }
+        if (sz == 4) {
+            print("%ebp");
+            return;
+        }
+        if (sz == 8) {
+            print("%rbp");
+            return;
+        }
+    }
+    if (reg == R8) {
+        if (sz == 1) {
+            print("%r8b");
+            return;
+        }
+        if (sz == 2) {
+            print("%r8w");
+            return;
+        }
+        if (sz == 4) {
+            print("%r8d");
+            return;
+        }
+        if (sz == 8) {
+            print("%r8");
+            return;
+        }
+    }
+    if (reg == R9) {
+        if (sz == 1) {
+            print("%r9b");
+            return;
+        }
+        if (sz == 2) {
+            print("%r9w");
+            return;
+        }
+        if (sz == 4) {
+            print("%r9d");
+            return;
+        }
+        if (sz == 8) {
+            print("%r9");
+            return;
+        }
+    }
+
+    println("Unhandled register/size combo:", reg, sz);
+}
+
+MOVS: (sz: int) -> void = {
+    if (sz == 1) {
+        print("movb");
+        return;
+    }
+    if (sz == 2) {
+        print("movw");
+        return;
+    }
+    if (sz == 4) {
+        print("movl");
+        return;
+    }
+    if (sz == 8) {
+        print("movq");
+        return;
+    }
+    println("Unknown size", sz, "for mov");
+    exit := 1 / 0;
+}
+
+emit_arg_reg: (arg_idx: int, sz: int) -> void = {
+    if (arg_idx == 0) {
+        REGS(RDI, sz);
+        return;
+    }
+    if (arg_idx == 1) {
+        REGS(RSI, sz);
+        return;
+    }
+    if (arg_idx == 2) {
+        REGS(RDX, sz);
+        return;
+    }
+    if (arg_idx == 3) {
+        REGS(RCX, sz);
+        return;
+    }
+    if (arg_idx == 4) {
+        REGS(R8, sz);
+        return;
+    }
+    if (arg_idx == 5) {
+        REGS(R9, sz);
+        return;
+    }
+
+    // TODO: read from stack
+    println("Too many arguments!");
+    exit := 1 / 0;
+}
+
+generate_function_code: (func_scope: int, id_node: int, type_node: int, body_node: int) -> void = {
+    print(".");
+    string_table_print(node_data_str[id_node]);
+    println(":");
+
+    println("    pushq %rbp");
+    println("    movq %rsp, %rbp");
+
+    local_space := 0;
+    {
+        // make some stack space
+        sym := 0;
+        if (func_scope == 0) {
+            println("Something went wrong");
+            exit := 1 / 0;
+        }
+
+
+        while (sym < symbol_table_sz) {
+            sc := symbol_table_scope[sym];
+            if (scope_is_parent(func_scope, sc)) {
+                local_space += type_sizeof(symbol_table_type[sym]);
+                symbol_table_offs[sym] = -local_space;
+            }
+            sym += 1;
+        }
+
+        // align
+        local_space = ((local_space + 15) / 16) *16;
+
+        print("    subq $");
+        print(local_space);
+        println(", %rsp");
+    }
+
+    {
+        // args
+        type_children := node_children[type_node];
+        args_list := node_children[type_children[0]];
+        i := 0;
+        while (i < node_children_sz[type_children[0]]) {
+            decl := args_list[i];
+            decl_children := node_children[decl];
+            id_node := decl_children[0];
+            sym := node_data_sym[id_node];
+            sz := type_sizeof(symbol_table_type[sym]);
+            print("    ");
+            MOVS(sz);
+            print(" ");
+            emit_arg_reg(i, sz);
+            print(", ");
+            emit_sym_access(sym);
+            println();
+
+            i += 1;
+        }
+    }
+
+    body_children := node_children[body_node];
+
+    i := 0;
+    while (i < node_children_sz[body_node]) {
+        generate_expression(body_children[i]);
+        i += 1;
+    }
+
+    print(".");
+    string_table_print(node_data_str[id_node]);
+    println(".epilogue:");
+    println("    movq %rbp, %rsp");
+    println("    popq %rbp");
+    println("    ret");
+}
+
+generate_function_call: (node: int) -> void = {
+    children := node_children[node];
+    id_node := children[0];
+
+    id_stridx := node_data_str[id_node];
+
+    if (streq(string_table[id_stridx],
+        STRING_PRINT,
+        string_table_len[id_stridx])
+    ) {
+        generate_call_print(children[1]);
+        return;
+    }
+
+    if (streq(
+        string_table[id_stridx], 
+        STRING_PRINTLN, 
+        string_table_len[id_stridx])
+    ) {
+        generate_call_println(children[1]);
+        return;
+    }
+
+    if (streq(
+        string_table[id_stridx],
+        STRING_READCHAR,
+        string_table_len[id_stridx])
+    ) {
+        generate_call_readchar();
+        return;
+    }
+
+    call_arg_list_node := children[1];
+    call_args := node_children[call_arg_list_node];
+
+    i := 0;
+
+    while (i < node_children_sz[call_arg_list_node]) {
+        // TODO: caller saved eeee
+        generate_expression(call_args[i]);
+        sz := type_sizeof(node_data_type[call_args[i]]);
+        println("    pushq %rax");
+        i += 1;
+    }
+
+    while (i > 0) {
+        i -= 1;
+
+        print("    popq ");
+        emit_arg_reg(i, 8);
+        println();
+    }
+
+    println("    pushq %rcx");
+    print("    call .");
+    string_table_print(id_stridx);
+    println();
+    println("    popq %rcx");
+}
+
+generate_call_println: (args_node: int) -> void = {
+    args := node_children[args_node];
+
+    i := 0;
+    while (i < node_children_sz[args_node]) {
+        if (i > 0) {
+            println("    movq $' ', %rdi");
+            // align stuff
+            println("    pushq %rbp");
+            println("    movq %rsp, %rbp");
+            println("    andq $-16, %rsp");
+            println("    call putchar");
+            println("    movq %rbp, %rsp");
+            println("    popq %rbp");
+        }
+
+        arg := args[i];
+
+        generate_expression(arg);
+        // TODO: maybe consider size here...
+        println("    xor %rsi, %rsi");
+        sz := type_sizeof(node_data_type[arg]);
+        print("    ");
+        MOVS(sz);
+        print(" ");
+        REGS(RAX, sz);
+        print(", "); 
+        REGS(RSI, sz);
+        println();
+
+        while (true) {
+            if (type_is_strlit(node_data_type[arg])) {
+                println("    leaq strout(%rip), %rdi");
+                break;
+            }
+
+            // TODO: bool could have a pretty string printed
+            if (type_is_int(node_data_type[arg])
+              || type_is_bool(node_data_type[arg])) {
+                println("    leaq intout(%rip), %rdi");
+                break;
+            }
+
+            if (type_is_ptr(node_data_type[arg])) {
+                println("    leaq ptrout(%rip), %rdi");
+                break;
+            }
+
+            if (type_is_char(node_data_type[arg])) {
+                println("    leaq charout(%rip), %rdi");
+                break;
+            }
+
+            println("Unhandled node type println");
+            print("Violating: ");
+            node_print(arg);
+            println();
+            exit := 1 / 0;
+        }
+        println("    movq $1, %rax");
+        // align stuff
+        println("    pushq %rbp");
+        println("    movq %rsp, %rbp");
+        println("    andq $-16, %rsp");
+        println("    call printf");
+        println("    movq %rbp, %rsp");
+        println("    popq %rbp");
+        i += 1;
+    }
+
+    println("    movq $'\\n', %rdi");
+    println("    pushq %rbp");
+    println("    movq %rsp, %rbp");
+    println("    andq $-16, %rsp");
+    println("    call putchar");
+    println("    movq %rbp, %rsp");
+    println("    popq %rbp");
+ 
+}
+
+generate_call_print: (args_node: int) -> void = {
+    args := node_children[args_node];
+
+    i := 0;
+    while (i < node_children_sz[args_node]) {
+        if (i > 0) {
+            println("    movq $' ', %rdi");
+            // align stuff
+            println("    pushq %rbp");
+            println("    movq %rsp, %rbp");
+            println("    andq $-16, %rsp");
+            println("    call putchar");
+            println("    movq %rbp, %rsp");
+            println("    popq %rbp");
+        }
+
+        arg := args[i];
+
+        generate_expression(arg);
+        // TODO: maybe consider size here...
+        println("    xor %rsi, %rsi");
+        sz := type_sizeof(node_data_type[arg]);
+        print("    ");
+        MOVS(sz);
+        print(" ");
+        REGS(RAX, sz);
+        print(", ");
+        REGS(RSI, sz);
+        println();
+
+        while (true) {
+            if (type_is_strlit(node_data_type[arg])) {
+                println("    leaq strout(%rip), %rdi");
+                break;
+            }
+
+            if (type_is_int(node_data_type[arg])
+              || type_is_bool(node_data_type[arg])) {
+                println("    leaq intout(%rip), %rdi");
+                break;
+            }
+
+            if (type_is_ptr(node_data_type[arg])) {
+                println("    leaq ptrout(%rip), %rdi");
+                break;
+            }
+
+            if (type_is_char(node_data_type[arg])) {
+                println("    leaq charout(%rip), %rdi");
+                break;
+            }
+
+            println("Unhandled node type println");
+            print("Violating: ");
+            node_print(arg);
+            println();
+            exit := 1 / 0;
+        }
+        println("    movq $1, %rax");
+        // align stuff
+        println("    pushq %rbp");
+        println("    movq %rsp, %rbp");
+        println("    andq $-16, %rsp");
+        println("    call printf");
+        println("    movq %rbp, %rsp");
+        println("    popq %rbp");
+        i += 1;
+    }
+}
+
+generate_call_readchar: () -> void = {
+    println("    pushq %rbp");
+    println("    movq %rsp, %rbp");
+    println("    andq $-16, %rsp");
+    println("    call getchar");
+    println("    movq %rbp, %rsp");
+    println("    popq %rbp");
+    println("    movq %rax, %rcx");
+    println("    xor %rax, %rax");
+    // adhering to the api we make sure the result is a char
+    print("    ");
+    MOVS(1);
+    print(" ");
+    REGS(RCX, 1);
+    print(", ");
+    REGS(RAX, 1);
+    println();
+}
+
+// expect subexpression in %rcx
+generate_unop: (op: int) -> void = {
+    if (op == cast(int, '!')) {
+        println("    xor %rax, %rax");
+        println("    test %rcx, %rcx");
+        println("    sete %al");
+        return;
+    }
+
+    if (op == TOK_NEG) {
+        println("    neg %rcx");
+        println("    movq %rcx, %rax");
+        return;
+    }
+
+    print("generate_unop unhandled operator: ");
+    tok_print(op);
+    println();
+    exit := 1 / 0;
+}
+
+// expects: lhs in %rcx, rhs in %rax
+// result in %rax
+generate_binop: (op: int) -> void = {
+    if (op == cast(int, '+')) {
+        println("    addq %rcx, %rax");
+        return;
+    }
+    if (op == cast(int, '-')) {
+        println("    subq %rax, %rcx");
+        println("    movq %rcx, %rax");
+        return;
+    }
+    if (op == cast(int, '*')) {
+        println("    imulq %rcx, %rax");
+        return;
+    }
+    if (op == cast(int, '/')) {
+        // swap
+        println("    xchg %rax, %rcx");
+        // sign extend rax
+        println("    cqo");
+        // div by rcx
+        println("    idivq %rcx");
+        return;
+    }
+    if (op == cast(int, '%')) {
+        // swap
+        println("    xchg %rax, %rcx");
+        // sign extend rax
+        println("    cqo");
+        // div by rcx
+        println("    idivq %rcx");
+        // get remainder
+        println("    movq %rdx, %rax");
+        return;
+    }
+
+    if (op == cast(int, '<')) {
+        println("    cmpq %rax, %rcx");
+        println("    setl %al");
+        println("    movzbq %al, %rax");
+        return;
+    }
+
+    if (op == cast(int, '>')) {
+        println("    cmpq %rax, %rcx");
+        println("    setg %al");
+        println("    movzbq %al, %rax");
+        return;
+    }
+
+    if (op == TOK_LEQ) {
+        println("    cmpq %rax, %rcx");
+        println("    setle %al");
+        println("    movzbq %al, %rax");
+        return;
+    }
+
+    if (op == TOK_GEQ) {
+        println("    cmpq %rax, %rcx");
+        println("    setge %al");
+        println("    movzbq %al, %rax");
+        return;
+    }
+    if (op == TOK_EQ) {
+        println("    cmpq %rax, %rcx");
+        println("    sete %al");
+        println("    movzbq %al, %rax");
+        return;
+    }
+    if (op == TOK_NEQ) {
+        println("    cmpq %rax, %rcx");
+        println("    setne %al");
+        println("    movzbq %al, %rax");
+        return;
+    }
+
+    println("Unhandled binop gen");
+    exit := 1 / 0;
+}
+
+generate_or_or_and: (node: int) -> void = {
+    children := node_children[node];
+    lhs := children[0];
+    rhs := children[1];
+    if (node_data_op[node] == TOK_OR) {
+        shortcut_lab := gen_next_label();
+
+        // A
+        generate_expression(lhs);
+        println("    cmpq $0, %rax");
+        print(  "    jne .ORSHORTCUT");
+        println(shortcut_lab);
+
+        // if A is false, evaluate B
+        generate_expression(rhs);
+
+        // at this point %rax should contain the correct stuff
+        print(".ORSHORTCUT");
+        print(shortcut_lab);
+        println(":");
+        return;
+    }
+
+    if (node_data_op[node] == TOK_AND) {
+        shortcut_lab := gen_next_label();
+
+        // A
+        generate_expression(lhs);
+        println("    cmpq $0, %rax");
+        print(  "    je .ANDSHORTCUT");
+        println(shortcut_lab);
+
+        // if A is true, evaluate B
+        generate_expression(rhs);
+
+        // at this point %rax should contain the correct stuff
+        print(".ANDSHORTCUT");
+        print(shortcut_lab);
+        println(":");
+        return;
+    }
+
+    println("Unexpected token in generate_or_or_and");
+    tok_print(node_data_op[node]);
+    println();
+    exit := 1 / 0;
+}
+
+// Place result of computation in rax
+generate_expression: (node: int) -> void = {
+    if (node_type[node] == NODE_LIT_STR) {
+        print("    leaq string");
+        print(node_data_str[node]);
+        print("(%rip)");
+        println(", %rax");
+        return;
+    }
+
+    if (node_type[node] == NODE_LIT_INT) {
+        print("    movq $");
+        print(node_data_int[node]);
+        println(", %rax");
+        return;
+    }
+
+    if (node_type[node] == NODE_LIT_BOOL) {
+        print("    movq $");
+        if (node_data_bool[node]!=0) {
+            print("1");
+        } else {
+            print("0");
+        }
+        println(", %rax");
+        return;
+    }
+
+    if (node_type[node] == NODE_LIT_CHAR) {
+        print("    movq $");
+        print(cast(int, node_data_char[node]));
+        println(", %rax");
+        return;
+    }
+
+    if (node_type[node] == NODE_UNOP) {
+        children := node_children[node];
+        generate_expression(children[0]);
+        println("    movq %rax, %rcx");
+        generate_unop(node_data_op[node]);
+        return;
+    }
+
+    if (node_type[node] == NODE_BINOP) {
+        if (node_data_op[node] == TOK_OR
+         || node_data_op[node] == TOK_AND) {
+            // special handling for short-circuiting
+            generate_or_or_and(node);
+            return;
+        }
+        children := node_children[node];
+        generate_expression(children[0]);
+        println("    pushq %rax");
+        generate_expression(children[1]);
+        println("    popq %rcx");
+        generate_binop(node_data_op[node]);
+        return;
+    }
+
+    if (node_type[node] == NODE_CALL) {
+        generate_function_call(node);
+        return;
+    }
+
+    if (node_type[node] == NODE_DECL) {
+        generate_decl(node);
+        return;
+    }
+
+    if (node_type[node] == NODE_BLOCK) {
+        children := node_children[node];
+
+        i := 0;
+        while (i < node_children_sz[node]) {
+            generate_expression(children[i]);
+            i += 1;
+        }
+        return;
+    }
+
+    if (node_type[node] == NODE_IF) {
+        generate_if(node);
+        return;
+    }
+
+    if (node_type[node] == NODE_WHILE) {
+        generate_while(node);
+        return;
+    }
+
+
+    if (node_type[node] == NODE_RETURN) {
+        generate_return(node);
+        return;
+    }
+
+    if (node_type[node] == NODE_BREAK) {
+        generate_break(node);
+        return;
+    }
+
+    if (node_type[node] == NODE_CONTINUE) {
+        generate_continue(node);
+        return;
+    }
+
+    if (node_type[node] == NODE_ASSIGN) {
+        generate_assign(node);
+        return;
+    }
+
+    if (node_type[node] == NODE_ID) {
+        sym := node_data_sym[node];
+        sz := type_sizeof(symbol_table_type[sym]);
+        println("    xor %rax, %rax");
+        print("    ");
+        MOVS(sz);
+        print(" ");
+        emit_sym_access(node_data_sym[node]);
+        print(", ");
+        REGS(RAX, sz);
+        println();
+        return;
+    }
+
+    if (node_type[node] == NODE_INDEX) {
+        // load the boi in %rax
+        children := node_children[node];
+        id_node := children[0];
+        id_type := node_data_type[id_node];
+        expr_node := children[1];
+        sym := node_data_sym[id_node];
+
+        if (type_is_arr(id_type)) {
+            print("    leaq ");
+            emit_sym_access(sym);
+            println(", %rcx");
+        }
+
+        if (type_is_ptr(id_type)) {
+            // assume that the boi is 8 byte
+            generate_expression(id_node);
+            println("    movq %rax, %rcx");
+        }
+
+        if (!type_is_arr(id_type) && !type_is_ptr(id_type)) {
+            println("Fix this: index can only handle pointer and array");
+            exit := 1 / 0;
+        }
+
+        println("    pushq %rcx");
+        // get our index
+        generate_expression(expr_node);
+        println("    popq %rcx");
+
+        sz := type_sizeof(type_data_subtype[node_data_type[id_node]]);
+        println("    leaq (%rcx, %rax,", sz, "), %rcx");
+
+        // now the memory address of indexed item in rcx
+
+        println("    xor %rax, %rax");
+        print("    ");
+        MOVS(sz);
+        print(" (%rcx), ");
+        REGS(RAX, sz);
+        println();
+        return;
+    }
+
+    if (node_type[node] == NODE_ADDROF) {
+        generate_addrof(node);
+        return;
+    }
+
+    if (node_type[node] == NODE_DEREF) {
+        generate_deref(node);
+        return;
+    }
+
+    if (node_type[node] == NODE_ALLOC) {
+        generate_alloc(node);
+        return;
+    }
+
+    if (node_type[node] == NODE_DELETE) {
+        generate_delete(node);
+        return;
+    }
+
+    if (node_type[node] == NODE_CAST) {
+        generate_cast(node);
+        return;
+    }
+
+    print("generate_expression unhandled node type: ");
+    node_print(node);
+    println();
+    exit := 1 / 0;
+}
+
+generate_if: (node: int) -> void = {
+    children := node_children[node];
+
+    cur_if := gen_next_label();
+    has_else := (node_children_sz[node] > 2);
+
+    generate_expression(children[0]);
+
+    println("    cmpq $0, %rax");
+
+    if (has_else) {
+        print("    je .ELSE");
+        println(cur_if);
+    } else {
+        print("    je .ENDIF");
+        println(cur_if);
+    }
+
+    generate_expression(children[1]);
+
+    if (has_else) {
+        print("    jmp .ENDIF");
+        println(cur_if);
+
+        print(".ELSE");
+        print(cur_if);
+        println(":");
+
+        generate_expression(children[2]);
+    }
+
+    // generate condition
+    // generate body
+    // generate else body
+    // generate endif
+    print(".ENDIF");
+    print(cur_if);
+    println(":");
+}
+
+generate_while: (node: int) -> void = {
+    children := node_children[node];
+
+    old_while_label := curr_while_label;
+
+    curr_while_label   = gen_next_label();
+    print(".WHILE");
+    print(curr_while_label);
+    println(":");
+    generate_expression(children[0]);
+
+    println("    cmpq $0, %rax");
+    print("    je .ENDWHILE");
+    println(curr_while_label);
+
+    generate_expression(children[1]);
+
+    print("    jmp .WHILE");
+    println(curr_while_label);
+
+    print(".ENDWHILE");
+    print(curr_while_label);
+    println(":");
+
+    // using the builtin stack machine like a boss
+    curr_while_label = old_while_label;
+}
+
+generate_return: (node: int) -> void = {
+    children := node_children[node];
+    if (node_children_sz[node] > 0) {
+        generate_expression(children[0]);
+        // now it is in %rax as it should
+    }
+    print("    jmp .");
+    string_table_print(symbol_table_str[curr_func_gen_sym]);
+    println(".epilogue");
+}
+
+generate_break: (node: int) -> void = {
+    if (curr_while_label == -1) {
+        println("Unexpected break outside loop");
+        exit := 1 / 0;
+    }
+    print("    jmp .ENDWHILE");
+    println(curr_while_label);
+}
+
+generate_continue: (node: int) -> void = {
+    if (curr_while_label == -1) {
+        println("Unexpected break outside loop");
+        exit := 1 / 0;
+    }
+    print("    jmp .WHILE");
+    println(curr_while_label);
+}
+
+// TODO: we could benefit from some lvalue-rvalue stuff here
+generate_assign: (node: int) -> void = {
+    children := node_children[node];
+    lhs := children[0];
+    rhs := children[1];
+
+    if (node_type[lhs] == NODE_ID) {
+        generate_expression(rhs);
+        sz := type_sizeof(symbol_table_type[node_data_sym[lhs]]);
+        print("    ");
+        MOVS(sz);
+        print(" ");
+        REGS(RAX, sz);
+        print(", ");
+        emit_sym_access(node_data_sym[lhs]);
+        println();
+        return;
+    }
+    
+    if (node_type[lhs] == NODE_INDEX) {
+        // foo[x] = rhs
+        lhs_children := node_children[lhs];
+        id_node := lhs_children[0];
+        id_type := node_data_type[id_node];
+        expr_node := lhs_children[1];
+
+        if (type_is_arr(id_type)) {
+            print("    leaq ");
+            emit_sym_access(node_data_sym[id_node]);
+            println(", %rcx");
+        }
+
+        if (type_is_ptr(id_type)) {
+            generate_expression(id_node);
+            println("    movq %rax, %rcx");
+        }
+
+        if (!type_is_arr(id_type) && !type_is_ptr(id_type)) {
+            println("Fix this: index can only handle pointer and array");
+            exit := 1 / 0;
+        }
+
+        println("    pushq %rcx");
+
+        // get our index
+        generate_expression(expr_node);
+
+        println("    popq %rcx");
+
+        sz := type_sizeof(type_data_subtype[node_data_type[id_node]]);
+        println("    leaq (%rcx, %rax,", sz, "), %rcx");
+        // address where we want to store is in %rcx
+        println("    pushq %rcx");
+        generate_expression(rhs);
+        println("    popq %rcx");
+        // store it
+        print("    ");
+        MOVS(sz);
+        print(" ");
+        REGS(RAX, sz);
+        println(", (%rcx)");
+        // as a nice side effect, the value stored is also in %rax at this point ...
+        return;
+    }
+
+    if (node_type[lhs] == NODE_DEREF) {
+        lhs_children := node_children[lhs];
+        ch0 := lhs_children[0];
+        // type of dereffed ptr
+        sz := type_sizeof(type_data_subtype[node_data_type[ch0]]);
+        generate_expression(ch0);
+        println("    pushq %rax");
+        generate_expression(rhs);
+        println("    popq %rcx");
+        print("    ");
+        MOVS(sz);
+        print(" ");
+        REGS(RAX, sz);
+        println(", (%rcx)");
+        return;
+    }
+
+    print("Unhandled lhs type in generate_assign: ");
+    node_print(lhs);
+    println();
+    exit := 1 / 0;
+}
+
+// put an address in %rax
+generate_addrof: (node: int) -> void = {
+    children := node_children[node];
+    child := children[0];
+
+    if (node_type[child] != NODE_ID) {
+        println("Not something we can take the address of!");
+        node_print(child);
+        println();
+        exit := 1 / 0;
+    }
+
+    print("    leaq ");
+    emit_sym_access(node_data_sym[child]);
+    println(", %rax");
+}
+
+generate_deref: (node: int) -> void = {
+    children := node_children[node];
+    generate_expression(children[0]);
+    // now we have something looking like a pointer in %rax
+    println("    xor %rcx, %rcx");
+
+    sz := type_sizeof(node_data_type[node]);
+    print("    ");
+    MOVS(sz);
+    print(" (%rax), ");
+    REGS(RCX, sz);
+    println();
+    // data is read into rcx
+
+    println("    movq %rcx, %rax");
+}
+
+generate_alloc: (node: int) -> void = {
+    children := node_children[node];
+    ptr_type := node_data_type[node];
+    subtype  := type_data_subtype[ptr_type];
+    base_sz  := type_sizeof(subtype);
+    print("    movq $");
+    print(base_sz);
+    println(", %rsi"); // size arg of calloc
+    if (node_children_sz[node] > 1) {
+        // hmm don't know if it will corrupt rsi
+        println("    pushq %rsi");
+        generate_expression(children[1]);
+        println("    popq %rsi");
+        println("    movq %rax, %rdi");
+    } else {
+        println("    movq $1, %rdi");
+    }
+    // %rdi: nmemb, %rsi: size
+    // align stuff
+    println("    pushq %rbp");
+    println("    movq %rsp, %rbp");
+    println("    andq $-16, %rsp");
+    println("    call calloc");
+    println("    movq %rbp, %rsp");
+    println("    popq %rbp");
+
+    // pointer to allocated data successfully in %rax
+}
+
+generate_delete: (node: int) -> void = {
+    children := node_children[node];
+    generate_expression(children[0]);
+    println("    movq %rax, %rdi");
+    // align stuff
+    println("    pushq %rbp");
+    println("    movq %rsp, %rbp");
+    println("    andq $-16, %rsp");
+    println("    call free");
+    println("    movq %rbp, %rsp");
+    println("    popq %rbp");
+}
+
+generate_cast: (node: int) -> void = {
+    children := node_children[node];
+    src_expr := children[1];
+    type_src := node_data_type[src_expr];
+    type_dst := node_data_type[node];
+
+    sz_src := type_sizeof(type_src);
+    sz_dst := type_sizeof(type_dst);
+
+    generate_expression(src_expr);
+    // src is in %rax, presumably in good shape
+    // perform the cast from rcx to rax 
+    println("    movq %rax, %rcx");
+    // start in an empty state
+    println("    xor %rax, %rax");
+
+    // mov using the minimum of the two
+    sz_mov := sz_src;
+    if (sz_dst < sz_mov) {
+        sz_mov = sz_dst;
+    }
+
+    print("    ");
+    MOVS(sz_mov);
+    print(" ");
+    REGS(RCX, sz_mov);
+    print(", ");
+    REGS(RAX, sz_mov);
+    println();
+}
+
+emit_global_sym_access: (sym: int) -> void = {
+    // global
+    print(".");
+    string_table_print(symbol_table_str[sym]);
+    print("(%rip)");
+    return;
+}
+
+emit_sym_access: (sym: int) -> void = {
+    if (symbol_table_scope[sym] == 0) {
+        emit_global_sym_access(sym);
+        return;
+    }
+    print(symbol_table_offs[sym]);
+    print("(%rbp)");
+}
+
+generate_decl: (node: int) -> void = {
+    children := node_children[node];
+    rhs: int;
+    if (node_type[children[1]] == NODE_TYPE) {
+        if (node_children_sz[node] == 2) {
+            return;
+        }
+        rhs = children[2];
+    } else {
+        rhs = children[1];
+    }
+
+    generate_expression(rhs);
+
+    sym := node_data_sym[children[0]];
+    sz := type_sizeof(symbol_table_type[sym]);
+
+    print("    ");
+    MOVS(sz);
+    print(" ");
+    REGS(RAX, sz);
+    print(", ");
+    emit_sym_access(sym);
+    println();
+}
+
+gen_next_label: () -> int = {
+    lab := LABEL_COUNTER;
+    LABEL_COUNTER += 1;
+    return lab;
+}
+
+// ==================== DEBUG ====================
+
+type_print_basic: (basic_variant: int) -> void = {
+    if (basic_variant == TYPE_B_INT) {
+        print("int");
+        return;
+    }
+    if (basic_variant == TYPE_B_BOOL) {
+        print("bool");
+        return;
+    }
+    if (basic_variant == TYPE_B_CHAR) {
+        print("char");
+        return;
+    }
+
+    println("Unhandled basic variant in type_print_basic:", basic_variant);
+    exit := 1 / 0;
+}
+
+type_print: (typeid: int) -> void = {
+    tc := type_class[typeid];
+
+    if (tc == TYPE_VOID) {
+        print("void");
+        return;
+    }
+    if (tc == TYPE_BASIC) {
+        print("basic<");
+        type_print_basic(type_data_subtype[typeid]);
+        print(">");
+        return;
+    }
+    if (tc == TYPE_FUNC) {
+        print("(");
+        argt := type_data_argtypes[typeid];
+        i := 0;
+        while (i < type_data_length[typeid]) {
+            if (i > 0) {
+                print(",");
+            }
+            type_print(argt[i]);
+            i += 1;
+        }
+        print(")");
+        print("->");
+        type_print(type_data_subtype[typeid]);
+        return;
+    }
+    if (tc == TYPE_ARR) {
+        type_print(type_data_subtype[typeid]);
+        print("[");
+        print(type_data_length[typeid]);
+        print("]");
+        return;
+    }
+
+    if (tc == TYPE_STRLIT) {
+        print("strlit");
+        return;
+    }
+
+    if (tc == TYPE_PTR) {
+        print("*");
+        type_print(type_data_subtype[typeid]);
+        return;
+    }
+
+    if (tc == TYPE_UNKNOWN) {
+        print("?");
+        return;
+    }
+
+    println("Unhandled type class in type_print:", tc);
+}
+
+node_print: (node: int) -> void = {
+    typ := node_type[node];
+    if (typ == NODE_LIST) {
+        print("LIST");
+        return;
+    }
+    if (typ == NODE_ID) {
+        print("ID (");
+        string_table_print(node_data_str[node]);
+        print(")");
+
+        if (node_data_sym[node] > 0) {
+            print(" -> ");
+            print(node_data_sym[node]);
+        }
+        return;
+    }
+    if (typ == NODE_DECL) {
+        print("DECL");
+        return;
+    }
+    if (typ == NODE_TYPE) {
+        print("TYPE");
+        return;
+    }
+    if (typ == NODE_BLOCK) {
+        print("BLOCK");
+        return;
+    }
+    if (typ == NODE_CALL) {
+        print("CALL");
+        return;
+    }
+    if (typ == NODE_LIT_STR) {
+        print("LIT_STR \"");
+        string_table_print(node_data_str[node]);
+        print("\"");
+        return;
+    }
+    if (typ == NODE_LIT_INT) {
+        print("LIT_INT (");
+        print(node_data_int[node]);
+        print(")");
+        return;
+    }
+    if (typ == NODE_LIT_BOOL) {
+        print("LIT_BOOL (");
+        if (node_data_bool[node]!=0) {
+            print("true");
+        } else {
+            print("false");
+        }
+        print(")");
+        return;
+    }
+
+    if (typ == NODE_LIT_CHAR) {
+        print("LIT_CHAR (");
+        print(cast(int, node_data_char[node]));
+        print(")");
+        return;
+    }
+
+    if (typ == NODE_UNOP) {
+        print("UNOP ");
+        tok_print(node_data_op[node]);
+        return;
+    }
+    if (typ == NODE_BINOP) {
+        print("BINOP ");
+        tok_print(node_data_op[node]);
+        return;
+    }
+    if (typ == NODE_ASSIGN) {
+        print("ASSIGN");
+        return;
+    }
+    if (typ == NODE_IF) {
+        print("IF ");
+        return;
+    }
+    if (typ == NODE_WHILE) {
+        print("WHILE ");
+        return;
+    }
+    if (typ == NODE_FOR) {
+        print("FOR ");
+        return;
+    }
+    if (typ == NODE_RETURN) {
+        print("RETURN");
+        return;
+    }
+    if (typ == NODE_INDEX) {
+        print("INDEX");
+        return;
+    }
+    if (typ == NODE_BREAK) {
+        print("BREAK");
+        return;
+    }
+    if (typ == NODE_CONTINUE) {
+        print("CONTINUE");
+        return;
+    }
+    if (typ == NODE_ADDROF) {
+        print("ADDROF");
+        return;
+    }
+    if (typ == NODE_DEREF) {
+        print("DEREF");
+        return;
+    }
+    if (typ == NODE_ALLOC) {
+        print("ALLOC");
+        return;
+    }
+    if (typ == NODE_DELETE) {
+        print("DELETE");
+        return;
+    }
+    if (typ == NODE_CAST) {
+        print("CAST");
+        return;
+    }
+    print("????");
+}
+
+print_tree: (node: int, indent: int) -> void = {
+    {
+        i := 0;
+        while (i < indent) {
+            print(" ");
+            i += 1;
+        }
+    }
+    node_print(node);
+    print(" :: ");
+    type_print(node_data_type[node]);
+    println();
+
+    i := 0;
+    children := node_children[node];
+    while (i < node_children_sz[node]) {
+        print_tree(children[i], indent + 2);
+        i += 1;
+    }
+}
+
+print_symbol: (sym: int) -> void = {
+    print(sym);
+    print(" ");
+    string_table_print(symbol_table_str[sym]);
+    print(" (");
+    type_print(symbol_table_type[sym]);
+    print(")");
+}
+
+print_symbols: () -> void = {
+    scope := 0;
+
+    while (scope < scope_sz) {
+        syms := scope_syms[scope];
+        println("Scope", scope, ":");
+
+        i := 0;
+        while (i < scope_szs[scope]) {
+            sym := syms[i];
+            print("  ");
+            print_symbol(sym);
+            println();
+
+            i += 1;
+        }
+
+        scope += 1;
+    }
+}
+
+main: () -> void = {
+    EOF = 255;
+
+    read_content();
+
+    lex_init();
+    parser_init();
+    string_table_init();
+
+    root := parse();
+
+    symbol_table_init();
+
+    //print_tree(root, 0);
+
+    resolve_symbols(root);
+
+    //print_tree(root, 0);
+
+    //print_symbols();
+
+    //print_tree(root, 0);
+
+    generate_code(root);
+
+    delete(buf);
+}
