@@ -2343,7 +2343,6 @@ type_create: (tc: int) -> int = {
     type_class[ret] = tc;
     type_data_subtype[ret] = 0;
     type_data_length[ret] = 0;
-    type_data_argtypes[ret] = cast(*int, 0); // ?
 
     return ret;
 }
@@ -3108,19 +3107,44 @@ resolve_node: (node: int, scope: int) -> void = {
         rhs := children[1];
         resolve_node(lhs, new_scope);
         resolve_node(rhs, new_scope);
+        lhs_type := node_data_type[lhs];
+        rhs_type := node_data_type[rhs];
+
+        if (type_is_ptr(lhs_type) && type_is_int(rhs_type) && node_data_op[node] == cast(int, '+')) {
+            // OK, pointer + int, but we have to multiply integer with inner type size
+            // create int literal with value sizeof(*ptr)
+            subt_size := type_sizeof(type_data_subtype[lhs_type]);
+            literal_node := node_create(NODE_LIT_INT);
+            node_data_int[literal_node] = subt_size;
+            node_data_type[literal_node] = rhs_type;
+
+            // create mul node multiplying original rhs with the literal
+            mul_node := node_create(NODE_BINOP);
+            node_data_op[mul_node] = cast(int, '*');
+            node_data_type[mul_node] = rhs_type;
+            node_add_child(mul_node, rhs);
+            node_add_child(mul_node, literal_node);
+
+            // make mul node the new rhs
+            children[1] = mul_node;
+
+            node_data_type[node] = lhs_type;
+            return;
+        }
 
         // TODO: infer if unknown?
-        if (!types_equivalent(node_data_type[lhs], node_data_type[rhs])) {
+        if (!types_equivalent(lhs_type, rhs_type)) {
             print("Cannot apply operator ");
             print(cast(char, node_data_op[node]));
             print(" to LHS of type ");
-            type_print(node_data_type[lhs]);
+            type_print(lhs_type);
             print(" and RHS of type ");
-            type_print(node_data_type[rhs]);
+            type_print(rhs_type);
             println();
             exit := 1 / 0;
         }
-        set_operator_type(node, node_data_type[lhs], node_data_type[rhs]);
+
+        set_operator_type(node, lhs_type, rhs_type);
         return;
     }
 
@@ -3356,11 +3380,19 @@ resolve_node: (node: int, scope: int) -> void = {
         }
 
         if (type_is_int(type_src) && type_is_char(type_dst)
-         || type_is_char(type_src) && type_is_int(type_dst)) {
+         || type_is_char(type_src) && type_is_int(type_dst)
+         || type_is_ptr(type_src) && type_is_int(type_dst)) {
             // OK int -> char
             node_data_type[node] = type_dst;
             return;
         }
+
+        print("Unable to cast from: ");
+        type_print(type_src);
+        print(" to ");
+        type_print(type_dst);
+        println();
+        exit := 1 / 0;
     }
 
     if (node_type[node] == NODE_TYPE) {
@@ -3907,14 +3939,16 @@ generate_function_call: (node: int) -> void = {
         // TODO: caller saved eeee
         generate_expression(call_args[i]);
         sz := type_sizeof(node_data_type[call_args[i]]);
-        print("    ");
-        MOVS(sz);
-        print(" ");
-        REGS(RAX, sz);
-        print(", ");
-        emit_arg_reg(i, sz);
-        println();
+        println("    pushq %rax");
         i += 1;
+    }
+
+    while (i > 0) {
+        i -= 1;
+
+        print("    popq ");
+        emit_arg_reg(i, 8);
+        println();
     }
 
     println("    pushq %rcx");
