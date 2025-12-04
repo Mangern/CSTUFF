@@ -75,6 +75,7 @@ STRING_BOOL: *int;
 STRING_CHAR: *int;
 STRING_READCHAR: *int;
 STRING_MAIN: *int;
+STRING_FILE_OPEN: *int;
 
 ST_ID: int;
 ST_LIT: int;
@@ -167,6 +168,20 @@ string_table_init: () -> void = {
         STRING_MAIN[2] = cast(int, 'i');
         STRING_MAIN[3] = cast(int, 'n');
         STRING_MAIN[4] = 0;
+    }
+
+    {
+        STRING_FILE_OPEN   = alloc(int, 10);
+        STRING_FILE_OPEN[0] = cast(int, 'f');
+        STRING_FILE_OPEN[1] = cast(int, 'i');
+        STRING_FILE_OPEN[2] = cast(int, 'l');
+        STRING_FILE_OPEN[3] = cast(int, 'e');
+        STRING_FILE_OPEN[4] = cast(int, '_');
+        STRING_FILE_OPEN[5] = cast(int, 'o');
+        STRING_FILE_OPEN[6] = cast(int, 'p');
+        STRING_FILE_OPEN[7] = cast(int, 'e');
+        STRING_FILE_OPEN[8] = cast(int, 'n');
+        STRING_FILE_OPEN[9] = 0;
     }
 }
 
@@ -1381,6 +1396,7 @@ TYPE_FUNC: int;  // subtype: return type, length: num args (-1: variadic), argty
 TYPE_ARR: int;   // subtype: subtype, length: length
 TYPE_STRLIT: int; // nothing
 TYPE_PTR: int; // subtype: subtype
+TYPE_FILE: int; // opaque type wrapping a C FILE*. TODO: represent attrs "rwa+" in the type!
 
 // basic variants
 TYPE_B_INT:  int;
@@ -1694,6 +1710,7 @@ parser_init: () -> void = {
     TYPE_ARR     = 4;
     TYPE_STRLIT  = 5;
     TYPE_PTR     = 6;
+    TYPE_FILE    = 7;
 
     // basic variants
     TYPE_B_INT  = 0;
@@ -2577,6 +2594,14 @@ type_create_ptr: (subtype_id: int) -> int = {
     return typeid;
 }
 
+type_create_strlit: () -> int = {
+    return type_create(TYPE_STRLIT);
+}
+
+type_create_file: () -> int = {
+    return type_create(TYPE_FILE);
+}
+
 type_create_func: (ret_type: int, num_args: int) -> int = {
     typeid := type_create(TYPE_FUNC);
     type_data_subtype[typeid] = ret_type;
@@ -2631,7 +2656,12 @@ type_sizeof: (typeid: int) -> int = {
         return 8;
     }
 
-    println("Unhandled type class in type_sizeof:", tc);
+    if (tc == TYPE_FILE) {
+        // pointer basically
+        return 8;
+    }
+
+    print("Unhandled type class in type_sizeof: ");
     type_print(typeid);
     println();
     exit := 1 / 0;
@@ -2690,6 +2720,10 @@ type_is_arr: (typeid: int) -> bool = {
 
 type_is_ptr: (typeid: int) -> bool = {
     return type_class[typeid] == TYPE_PTR;
+}
+
+type_is_file: (typeid: int) -> bool = {
+    return type_class[typeid] == TYPE_FILE;
 }
 
 type_get_type: (type_node: int) -> int = {
@@ -2803,6 +2837,9 @@ types_equivalent: (type_a: int, type_b: int) -> bool = {
     }
     tc := type_class[type_a];
     if (tc == TYPE_VOID) {
+        return true;
+    }
+    if (tc == TYPE_STRLIT) {
         return true;
     }
     if (tc == TYPE_BASIC) {
@@ -3033,6 +3070,13 @@ resolve_symbols: (root: int) -> void = {
     {
         readchar_idx := string_table_add(STRING_READCHAR, 8);
         symbol_table_insert(-1, readchar_idx, 0, type_create_func(type_create_basic(TYPE_B_CHAR), 0));
+    }
+    {
+        file_open_idx := string_table_add(STRING_FILE_OPEN, 9);
+        file_open_t := type_create_func(type_create_file(), 2);
+        type_data_argtypes[file_open_t][0] = type_create_ptr(type_create_basic(TYPE_B_CHAR));
+        type_data_argtypes[file_open_t][1] = type_create_strlit();
+        symbol_table_insert(-1, file_open_idx, 0, file_open_t);
     }
 
 
@@ -3589,7 +3633,15 @@ resolve_node: (node: int, scope: int) -> void = {
         if (type_is_int(type_src) && type_is_char(type_dst)
          || type_is_char(type_src) && type_is_int(type_dst)
          || type_is_ptr(type_src) && type_is_int(type_dst)) {
-            // OK int -> char
+            // OK int <-> char
+            node_data_type[node] = type_dst;
+            return;
+        }
+
+        if (type_is_strlit(type_src) 
+         && type_is_ptr(type_dst) 
+         && type_is_char(type_data_subtype[type_dst])) {
+            // OK strlit -> *char
             node_data_type[node] = type_dst;
             return;
         }
@@ -4170,6 +4222,14 @@ generate_function_call: (node: int) -> void = {
         return;
     }
 
+    if (streq(
+        string_table[id_stridx],
+        STRING_FILE_OPEN,
+        string_table_len[id_stridx])) {
+        generate_call_file_open(children[1]);
+        return;
+    }
+
     call_arg_list_node := children[1];
     call_args := node_children[call_arg_list_node];
 
@@ -4238,7 +4298,8 @@ generate_call_println: (args_node: int) -> void = {
                 break;
             }
 
-            if (type_is_ptr(node_data_type[arg])) {
+            if (type_is_ptr(node_data_type[arg])
+             || type_is_file(node_data_type[arg])) {
                 println("    leaq ptrout(%rip), %rdi");
                 break;
             }
@@ -4349,6 +4410,31 @@ generate_call_readchar: () -> void = {
     print(", ");
     REGS(RAX, 1);
     println();
+}
+
+generate_call_file_open: (args_node: int) -> void = {
+    args := node_children[args_node];
+
+    generate_expression(args[0]);
+    println("    pushq %rax");
+    generate_expression(args[1]);
+    println("    pushq %rax");
+
+    print("    popq ");
+    emit_arg_reg(1, 8);
+    println();
+    print("    popq ");
+    emit_arg_reg(0, 8);
+    println();
+
+    println("    pushq %rbp");
+    println("    movq %rsp, %rbp");
+    println("    andq $-16, %rsp");
+    println("    call fopen");
+    println("    movq %rbp, %rsp");
+    println("    popq %rbp");
+
+    // %rax holds our file pointer
 }
 
 // expect subexpression in %rcx
@@ -5119,6 +5205,11 @@ type_print: (typeid: int) -> void = {
     if (tc == TYPE_PTR) {
         print("*");
         type_print(type_data_subtype[typeid]);
+        return;
+    }
+
+    if (tc == TYPE_FILE) {
+        print("File");
         return;
     }
 
