@@ -111,6 +111,7 @@ STRING_MAIN: *int;
 STRING_FILE_OPEN: *int;
 STRING_FILE_CLOSE: *int;
 STRING_FILE_READ: *int;
+STRING_EXIT: *int;
 
 ST_ID: int;
 ST_LIT: int;
@@ -246,6 +247,15 @@ string_table_init: () -> void = {
         STRING_FILE_READ[7] = cast(int, 'a');
         STRING_FILE_READ[8] = cast(int, 'd');
         STRING_FILE_READ[9] = 0;
+    }
+
+    {
+        STRING_EXIT = alloc(int, 5);
+        STRING_EXIT[0] = cast(int, 'e');
+        STRING_EXIT[1] = cast(int, 'x');
+        STRING_EXIT[2] = cast(int, 'i');
+        STRING_EXIT[3] = cast(int, 't');
+        STRING_EXIT[4] = 0;
     }
 }
 
@@ -3127,19 +3137,22 @@ CURRENT_FUNC_BLOCK: int;
 resolve_symbols: (root: int) -> void = {
     // builtin functions
     {
+        // print: (...) -> void; print to stdout
         print_idx := string_table_add(STRING_PRINT, 5);
         symbol_table_insert(-1, print_idx, 0, type_create_func(type_create(TYPE_VOID), -1));
     }
     {
+        // println: (...) -> void; print to stdout with an appended newline
         println_idx := string_table_add(STRING_PRINTLN, 7);
         symbol_table_insert(-1, println_idx, 0, type_create_func(type_create(TYPE_VOID), -1));
     }
     {
+        // readchar: () -> char; read one byte from stdin
         readchar_idx := string_table_add(STRING_READCHAR, 8);
         symbol_table_insert(-1, readchar_idx, 0, type_create_func(type_create_basic(TYPE_B_CHAR), 0));
     }
     {
-        // file_open: (path: *char, mode: strlit) -> File
+        // file_open: (path: *char, mode: strlit) -> File; open a file (fopen wrapper)
         file_open_idx := string_table_add(STRING_FILE_OPEN, 9);
         file_open_t := type_create_func(type_create_file(), 2);
         type_data_argtypes[file_open_t][0] = type_create_ptr(type_create_basic(TYPE_B_CHAR));
@@ -3148,7 +3161,7 @@ resolve_symbols: (root: int) -> void = {
     }
 
     {
-        // file_close: (f: File) -> bool
+        // file_close: (f: File) -> bool; close a file (fclose wrapper)
         file_close_idx := string_table_add(STRING_FILE_CLOSE, 10);
         file_close_t := type_create_func(type_create_basic(TYPE_B_BOOL), 1);
         type_data_argtypes[file_close_t][0] = type_create_file();
@@ -3156,13 +3169,21 @@ resolve_symbols: (root: int) -> void = {
     }
 
     {
-        // file_read: (f: File, buf: *char, count: int) -> int
+        // file_read: (f: File, buf: *char, count: int) -> int; read from a file (fread wrapper)
         file_read_idx := string_table_add(STRING_FILE_READ, 9);
         file_read_t := type_create_func(type_create_basic(TYPE_B_INT), 3);
         type_data_argtypes[file_read_t][0] = type_create_file();
         type_data_argtypes[file_read_t][1] = type_create_ptr(type_create_basic(TYPE_B_CHAR));
         type_data_argtypes[file_read_t][2] = type_create_basic(TYPE_B_INT);
         symbol_table_insert(-1, file_read_idx, 0, file_read_t);
+    }
+
+    {
+        // exit: (status: int) -> void; exit program with status code (exit wrapper)
+        exit_idx := string_table_add(STRING_EXIT, 4);
+        exit_t := type_create_func(type_create(TYPE_VOID), 1);
+        type_data_argtypes[exit_t][0] = type_create_basic(TYPE_B_INT);
+        symbol_table_insert(-1, exit_idx, 0, exit_t);
     }
 
     // register top level
@@ -4343,6 +4364,14 @@ generate_function_call: (node: int) -> void = {
         return;
     }
 
+    if (streq(
+        string_table[id_stridx],
+        STRING_EXIT,
+        string_table_len[id_stridx])) {
+        generate_call_exit(children[1]);
+        return;
+    }
+
     call_arg_list_node := children[1];
     call_args := node_children[call_arg_list_node];
 
@@ -4597,6 +4626,21 @@ generate_call_file_read: (args_node: int) -> void = {
     println("    movq %rsp, %rbp");
     println("    andq $-16, %rsp");
     println("    call fread");
+    println("    movq %rbp, %rsp");
+    println("    popq %rbp");
+}
+
+generate_call_exit: (args_node: int) -> void = {
+    // TODO: may want our own cleanup at some point
+    args := node_children[args_node];
+    generate_expression(args[0]);
+    print("    movq %rax, ");
+    emit_arg_reg(0, 8);
+    println();
+    println("    pushq %rbp");
+    println("    movq %rsp, %rbp");
+    println("    andq $-16, %rsp");
+    println("    call exit");
     println("    movq %rbp, %rsp");
     println("    popq %rbp");
 }
