@@ -407,9 +407,7 @@ lex_matches_str: () -> int = {
     }
     if (ptr >= nbuf) {
         println("Unexpected EOF when parsing string literal!");
-        // TODO: exit
-        x := 1 / 0;
-        return 0;
+        exit(1);
     }
     ptr += 1;
     return ptr - lex_ptr;
@@ -439,29 +437,24 @@ lex_matches_char: () -> int = {
     ptr += 1;
     if (ptr >= nbuf) {
         println("Unexpected EOF when parsing char literal!");
-        exit := 1 / 0;
-        return 0;
+        exit(1);
     }
     if (buf[ptr] == cast(int, '\\')) {
         ptr += 1;
         if (ptr >= nbuf) {
             println("Unexpected EOF when parsing char literal!");
-            exit := 1 / 0;
-            return 0;
+            exit(1);
         }
     }
     ptr += 1;
     if (ptr >= nbuf) {
         println("Unexpected EOF when parsing char literal!");
-        exit := 1 / 0;
-        return 0;
+        exit(1);
     }
 
     if (buf[ptr] != cast(int, '\'')) {
         println("Unclosed char literal!");
-        println(cast(char, buf[ptr]));
-        exit := 1 / 0;
-        return 0;
+        exit(1);
     }
     ptr += 1;
     return ptr - lex_ptr;
@@ -1053,7 +1046,7 @@ peek_expect_advance: (expected: int) -> int = {
         print("Expected: ");
         tok_print(expected);
         println();
-        exit := 1 / 0;
+        exit(1);
     }
     lex_advance();
     return token;
@@ -1323,7 +1316,7 @@ node_set_chardata: (node: int) -> void = {
 
             // TODO: if stable, it should just return c1
             println("Unknown escaped char:", c1);
-            exit := 1 / 0;
+            exit(1);
         }
     } else {
         result = cast(char, buf[cur_tok_beg + 1]);
@@ -1452,7 +1445,7 @@ parse_type: () -> int = {
         print("Unexpected token: ");
         tok_print(token);
         println();
-        exit := 1 / 0;
+        exit(1);
     }
 
     {
@@ -1558,10 +1551,6 @@ parse_block: () -> int = {
         if (expect_semicolon) {
             peek_expect_advance(cast(int, ';'));
         }
-
-        //print("Unexpected token: ");
-        //tok_print(token);
-        //exit := 1 / 0;
     }
 
     return block_node;
@@ -1850,7 +1839,7 @@ parse_primary_expr: () -> int = {
     print("parse_primary_expr unhandled token: '");
     tok_print(token);
     println("'");
-    exit := 1 / 0;
+    exit(1);
     return 0;
 }
 
@@ -2051,7 +2040,7 @@ parse: () -> int = {
         print("Unexpected token: ");
         tok_print(tok);
         println();
-        exit := 1 / 0;
+        exit(1);
         lex_advance();
     }
 
@@ -2140,7 +2129,7 @@ parse_simplify: (node: int) -> void = {
         // turn this shit into a while loop
         if (node_children_sz[node] != 4) {
             println("Expected 'for' to have exactly 4 children");
-            exit := 1 / 0;
+            exit(1);
         }
         children := node_children[node];
         prenode := children[0];
@@ -2330,7 +2319,7 @@ type_sizeof: (typeid: int) -> int = {
         }
 
         println("Unhandled basic type in type_sizeof:", type_data_subtype[typeid]);
-        exit := 1 / 0;
+        exit(1);
     }
 
     if (tc == TYPE_ARR) {
@@ -2359,7 +2348,7 @@ type_sizeof: (typeid: int) -> int = {
     print("Unhandled type class in type_sizeof: ");
     type_print(typeid);
     println();
-    exit := 1 / 0;
+    exit(1);
     return 0;
 }
 
@@ -2441,7 +2430,7 @@ type_get_type: (type_node: int) -> int = {
             print("Unexpected only-child of TYPE: ");
             node_print(id_node);
             println();
-            exit := 1 / 0;
+            exit(1);
         }
 
         id_stridx := node_data_str[id_node];
@@ -2470,7 +2459,7 @@ type_get_type: (type_node: int) -> int = {
         print("Unknown type: ");
         string_table_print(id_stridx);
         println();
-        exit := 1 / 0;
+        exit(1);
     }
 
     ch0 := children[0];
@@ -2504,14 +2493,14 @@ type_get_type: (type_node: int) -> int = {
                 print("Unexpected node in function type: ");
                 node_print(decl);
                 println();
-                exit := 1 / 0;
+                exit(1);
             }
 
             if (node_type[decl_type_node] != NODE_TYPE) {
                 println("Function arguments require a type!");
                 node_print(decl_type_node);
                 println();
-                exit := 1 / 0;
+                exit(1);
             }
 
             decl_type := type_get_type(decl_type_node);
@@ -2525,7 +2514,7 @@ type_get_type: (type_node: int) -> int = {
     println("Unhandled type: ");
     print_tree(type_node, 0);
     println();
-    exit := 1 / 0;
+    exit(1);
 
     return 0;
 }
@@ -2549,7 +2538,7 @@ types_equivalent: (type_a: int, type_b: int) -> bool = {
     }
     if (tc == TYPE_FUNC) {
         println("Not handled type equivalence: FUNC");
-        exit := 1 / 0;
+        exit(1);
         return false;
     }
     if (tc == TYPE_ARR) {
@@ -2579,7 +2568,7 @@ types_equivalent: (type_a: int, type_b: int) -> bool = {
     print(" vs. ");
     type_print(type_b);
     println();
-    exit := 1 / 0;
+    exit(1);
     return false;
 }
 
@@ -2826,7 +2815,7 @@ resolve_symbols: (root: int) -> void = {
             print("Unhandled root node type in resolve_symbols: ");
             node_print(child);
             println();
-            exit := 1 / 0;
+            exit(1);
         }
 
         subchildren := node_children[child];
@@ -2841,7 +2830,7 @@ resolve_symbols: (root: int) -> void = {
             print("Error: redeclaration of ");
             string_table_print(id_str);
             println();
-            exit := 1 / 0;
+            exit(1);
         }
 
         decl_type := decl_get_symbol_type(child);
@@ -2877,7 +2866,7 @@ resolve_symbols: (root: int) -> void = {
                 if (node_data_type[body] == TYPEID_UNKNOWN) {
                     if (func_ret_type == TYPEID_UNKNOWN) {
                         println("Unspecified return type encountered??");
-                        exit := 1 / 0;
+                        exit(1);
                     }
                     node_data_type[body] = func_ret_type;
                 } else {
@@ -2888,7 +2877,7 @@ resolve_symbols: (root: int) -> void = {
                         print(", got: ");
                         type_print(node_data_type[body]);
                         println();
-                        exit := 1 / 0;
+                        exit(1);
                     }
                 }
 
@@ -2906,7 +2895,7 @@ resolve_symbols: (root: int) -> void = {
                     print("Unable to infer type for variable: ");
                     string_table_print(node_data_str[id_node]);
                     println();
-                    exit := 1 / 0;
+                    exit(1);
                 }
 
                 if (type_is_unknown(decl_type)) {
@@ -2927,7 +2916,7 @@ resolve_symbols: (root: int) -> void = {
                         print(" but assigned to expression of type: ");
                         type_print(inferred_type);
                         println();
-                        exit := 1 / 0;
+                        exit(1);
                     }
                 }
             }
@@ -2953,7 +2942,7 @@ resolve_node: (node: int, scope: int) -> void = {
             print("Error: redeclaration of ");
             string_table_print(id_str);
             println();
-            exit := 1 / 0;
+            exit(1);
         }
 
         decl_type := decl_get_symbol_type(node);
@@ -2964,7 +2953,7 @@ resolve_node: (node: int, scope: int) -> void = {
                 print("Unable to infer type for variable: ");
                 string_table_print(node_data_str[id_node]);
                 println();
-                exit := 1 / 0;
+                exit(1);
             }
             if (type_is_unknown(decl_type)) {
                 decl_type = inferred_type;
@@ -2982,7 +2971,7 @@ resolve_node: (node: int, scope: int) -> void = {
                     print(" but assigned to expression of type: ");
                     type_print(inferred_type);
                     println();
-                    exit := 1 / 0;
+                    exit(1);
                 }
             }
         }
@@ -3034,7 +3023,7 @@ resolve_node: (node: int, scope: int) -> void = {
             print("Unresolved reference: ");
             string_table_print(id_str);
             println();
-            exit := 1 / 0;
+            exit(1);
         }
         node_data_sym[node] = idx;
         node_data_type[node] = symbol_table_type[idx];
@@ -3059,7 +3048,7 @@ resolve_node: (node: int, scope: int) -> void = {
                 print("Function '");
                 string_table_print(node_data_str[func_id_node]);
                 println("' requires", type_data_length[func_type], "args but was called with", num_arg_nodes);
-                exit := 1 / 0;
+                exit(1);
             }
             for (i := 0; i < num_arg_nodes; i += 1) {
                 arg_node := arg_nodes[i];
@@ -3074,7 +3063,7 @@ resolve_node: (node: int, scope: int) -> void = {
                     print(", got ");
                     type_print(arg_type);
                     println();
-                    exit := 1 / 0;
+                    exit(1);
                 }
             }
         }
@@ -3122,7 +3111,7 @@ resolve_node: (node: int, scope: int) -> void = {
             print(" and RHS of type ");
             type_print(rhs_type);
             println();
-            exit := 1 / 0;
+            exit(1);
         }
 
         set_operator_type(node, lhs_type, rhs_type);
@@ -3138,7 +3127,7 @@ resolve_node: (node: int, scope: int) -> void = {
                 print("Operator ! can only be applied to boolean expressions, not: ");
                 type_print(node_data_type[sub]);
                 println();
-                exit := 1 / 0;
+                exit(1);
             }
             node_data_type[node] = node_data_type[sub];
             return;
@@ -3149,7 +3138,7 @@ resolve_node: (node: int, scope: int) -> void = {
                 print("Operator - can only be applied to numerical expressions, not: ");
                 type_print(node_data_type[sub]);
                 println();
-                exit := 1 / 0;
+                exit(1);
             }
             node_data_type[node] = node_data_type[sub];
             return;
@@ -3161,13 +3150,13 @@ resolve_node: (node: int, scope: int) -> void = {
          || node_data_op[node] == TOK_POSTSUB) {
             tok_print(node_data_op[node]);
             println(" is not supported yet");
-            exit := 1 / 0;
+            exit(1);
         }
 
         print("Unhandled unary operator: ");
         tok_print(node_data_op[node]);
         println();
-        exit := 1 / 0;
+        exit(1);
     }
 
     if (node_type[node] == NODE_RETURN) {
@@ -3185,7 +3174,7 @@ resolve_node: (node: int, scope: int) -> void = {
             print(" in function returning ");
             type_print(node_data_type[CURRENT_FUNC_BLOCK]);
             println();
-            exit := 1 / 0;
+            exit(1);
         }
         node_data_type[node] = ret_type;
         return;
@@ -3213,7 +3202,7 @@ resolve_node: (node: int, scope: int) -> void = {
             print(" to type ");
             type_print(node_data_type[lhs]);
             println();
-            exit := 1 / 0;
+            exit(1);
         }
         // should it inherit type?
         node_data_type[node] = node_data_type[lhs];
@@ -3233,12 +3222,12 @@ resolve_node: (node: int, scope: int) -> void = {
             print("Cannot index non-array/pointer '");
             string_table_print(node_data_str[id_node]);
             println("'");
-            exit := 1 / 0;
+            exit(1);
         }
 
         if (type_is_ptr(id_type) && num_children > 2) {
             println("Indexing a pointer using multiple indices is not yet supported. Use [][] syntax");
-            exit := 1 / 0;
+            exit(1);
         }
 
         if (type_is_arr(id_type) && num_children - 1 != type_data_length[id_type]) {
@@ -3246,7 +3235,7 @@ resolve_node: (node: int, scope: int) -> void = {
             string_table_print(node_data_str[id_node]);
             print("' has", type_data_length[id_type], "dimensions but was indexed using", num_children-1);
             println();
-            exit := 1 / 0;
+            exit(1);
         }
 
         for (i := 1; i < num_children; i += 1) {
@@ -3259,7 +3248,7 @@ resolve_node: (node: int, scope: int) -> void = {
                 type_print(expr_type);
                 print(" at index", i - 1);
                 println();
-                exit := 1 / 0;
+                exit(1);
             }
         }
 
@@ -3279,7 +3268,7 @@ resolve_node: (node: int, scope: int) -> void = {
             print("if-condition must be bool, not ");
             type_print(node_data_type[cond_node]);
             println();
-            exit := 1 / 0;
+            exit(1);
         }
         node_data_type[node] = type_create(TYPE_VOID);
 
@@ -3296,7 +3285,7 @@ resolve_node: (node: int, scope: int) -> void = {
             print("while-condition must be bool, not ");
             type_print(node_data_type[cond_node]);
             println();
-            exit := 1 / 0;
+            exit(1);
         }
         node_data_type[node] = type_create(TYPE_VOID);
         return;
@@ -3311,7 +3300,7 @@ resolve_node: (node: int, scope: int) -> void = {
             println("Taking address of unknown type!");
             node_print(node);
             println();
-            exit := 1 / 0;
+            exit(1);
         }
 
         node_data_type[node] = type_create_ptr(subtype);
@@ -3326,7 +3315,7 @@ resolve_node: (node: int, scope: int) -> void = {
             print("Cannot dereference non-pointer type: ");
             type_print(subtype);
             println();
-            exit := 1 / 0;
+            exit(1);
         }
         node_data_type[node] = type_data_subtype[subtype];
         return;
@@ -3344,7 +3333,7 @@ resolve_node: (node: int, scope: int) -> void = {
                 print("Second argument to alloc must be int, not: ");
                 type_print(node_data_type[ch1]);
                 println();
-                exit := 1 / 0;
+                exit(1);
             }
         }
 
@@ -3361,7 +3350,7 @@ resolve_node: (node: int, scope: int) -> void = {
             print("Attempt to delete non-pointer type: ");
             type_print(node_data_type[ch0]);
             println();
-            exit := 1 / 0;
+            exit(1);
         }
 
         node_data_type[node] = type_create(TYPE_VOID);
@@ -3400,7 +3389,7 @@ resolve_node: (node: int, scope: int) -> void = {
     print("resolve_node unhandled: ");
     node_print(node);
     println();
-    exit := 1/ 0;
+    exit(1);
 }
 
 // kinda assumes validity is checked
@@ -3432,7 +3421,7 @@ set_operator_type: (operator_node: int, lhs_type: int, rhs_type: int) -> void = 
     print("set_operator_type unhandled operator:");
     tok_print(op);
     println();
-    exit := 1 / 0;
+    exit(1);
 }
 
 resolve_cast: (node: int) -> void = {
@@ -3477,14 +3466,14 @@ resolve_cast: (node: int) -> void = {
     print(" to ");
     type_print(type_dst);
     println();
-    exit := 1 / 0;
+    exit(1);
 }
 
 check_main_signature: (main_decl: int) -> void = {
     type_node := decl_get_type_node(main_decl);
     if (type_node < 0) {
         println("Expected main to have a signature but it doesn't!");
-        exit := 1 / 0;
+        exit(1);
     }
 
     main_type := node_data_type[type_node];
@@ -3493,12 +3482,12 @@ check_main_signature: (main_decl: int) -> void = {
 
     if (nargs != 0 && nargs != 2) {
         println("Function main must take exactly 0 or exactly 2 arguments!");
-        exit := 1 / 0;
+        exit(1);
     }
 
     if (!type_is_int(ret_type) && !type_is_void(ret_type)) {
         println("Function main must return either 'int' or 'void'");
-        exit := 1 / 0;
+        exit(1);
     }
 
     if (nargs == 2) {
@@ -3509,7 +3498,7 @@ check_main_signature: (main_decl: int) -> void = {
             print("First argument of main must be int, not ");
             type_print(first_argt);
             println();
-            exit := 1 / 0;
+            exit(1);
         }
         // here it could be nice with type_parse("**char") or something
         if (!types_equivalent(
@@ -3519,7 +3508,7 @@ check_main_signature: (main_decl: int) -> void = {
             print("Second argument of main must be **char, not ");
             type_print(second_argt);
             println();
-            exit := 1 / 0;
+            exit(1);
         }
     }
     // alles gut
@@ -3542,7 +3531,7 @@ post_resolve_simplify: (node: int) -> void = {
         id_type := node_data_type[id_node];
         if (!type_is_arr(id_type)) {
             println("Expected type to be array when indexed with more than one index!");
-            exit := 1 / 0;
+            exit(1);
         }
         num_dims := type_data_length[id_type];
         dims     := type_data_argtypes[id_type];
@@ -3688,7 +3677,7 @@ generate_code: (root: int) -> void = {
             }
         } else {
             println("Not implemented: root decl node type");
-            exit := 1 / 0;
+            exit(1);
         }
     }
 
@@ -3893,7 +3882,7 @@ MOVS: (sz: int) -> void = {
         return;
     }
     println("Unknown size", sz, "for mov");
-    exit := 1 / 0;
+    exit(1);
 }
 
 emit_arg_reg: (arg_idx: int, sz: int) -> void = {
@@ -3924,7 +3913,7 @@ emit_arg_reg: (arg_idx: int, sz: int) -> void = {
 
     // TODO: read from stack
     println("Too many arguments!");
-    exit := 1 / 0;
+    exit(1);
 }
 
 generate_function_code: (func_scope: int, id_node: int, type_node: int, body_node: int) -> void = {
@@ -3940,7 +3929,7 @@ generate_function_code: (func_scope: int, id_node: int, type_node: int, body_nod
         // make some stack space
         if (func_scope == 0) {
             println("Something went wrong");
-            exit := 1 / 0;
+            exit(1);
         }
 
 
@@ -4151,7 +4140,7 @@ generate_call_println: (args_node: int) -> void = {
             print("Violating: ");
             node_print(arg);
             println();
-            exit := 1 / 0;
+            exit(1);
         }
         println("    movq $1, %rax");
         // align stuff
@@ -4218,7 +4207,7 @@ generate_call_print: (args_node: int) -> void = {
             print("Violating: ");
             node_print(arg);
             println();
-            exit := 1 / 0;
+            exit(1);
         }
         println("    movq $1, %rax");
         // align stuff
@@ -4359,7 +4348,7 @@ generate_unop: (op: int) -> void = {
     print("generate_unop unhandled operator: ");
     tok_print(op);
     println();
-    exit := 1 / 0;
+    exit(1);
 }
 
 // expects: lhs in %rcx, rhs in %rax
@@ -4440,7 +4429,7 @@ generate_binop: (op: int) -> void = {
     }
 
     println("Unhandled binop gen");
-    exit := 1 / 0;
+    exit(1);
 }
 
 generate_or_or_and: (node: int) -> void = {
@@ -4488,7 +4477,7 @@ generate_or_or_and: (node: int) -> void = {
     println("Unexpected token in generate_or_or_and");
     tok_print(node_data_op[node]);
     println();
-    exit := 1 / 0;
+    exit(1);
 }
 
 // Place result of computation in rax
@@ -4636,7 +4625,7 @@ generate_expression: (node: int) -> void = {
 
         if (!type_is_arr(id_type) && !type_is_ptr(id_type)) {
             println("Fix this: index can only handle pointer and array");
-            exit := 1 / 0;
+            exit(1);
         }
 
         println("    pushq %rcx");
@@ -4686,7 +4675,7 @@ generate_expression: (node: int) -> void = {
     print("generate_expression unhandled node type: ");
     node_print(node);
     println();
-    exit := 1 / 0;
+    exit(1);
 }
 
 generate_if: (node: int) -> void = {
@@ -4782,7 +4771,7 @@ generate_return: (node: int) -> void = {
 generate_break: (node: int) -> void = {
     if (curr_while_label == -1) {
         println("Unexpected break outside loop");
-        exit := 1 / 0;
+        exit(1);
     }
     print("    jmp .ENDWHILE");
     println(curr_while_label);
@@ -4791,7 +4780,7 @@ generate_break: (node: int) -> void = {
 generate_continue: (node: int) -> void = {
     if (curr_while_label == -1) {
         println("Unexpected break outside loop");
-        exit := 1 / 0;
+        exit(1);
     }
     if (curr_while_has_post) {
         print("    jmp .POSTWHILE");
@@ -4841,7 +4830,7 @@ generate_assign: (node: int) -> void = {
 
         if (!type_is_arr(id_type) && !type_is_ptr(id_type)) {
             println("Fix this: index can only handle pointer and array");
-            exit := 1 / 0;
+            exit(1);
         }
 
         println("    pushq %rcx");
@@ -4887,7 +4876,7 @@ generate_assign: (node: int) -> void = {
     print("Unhandled lhs type in generate_assign: ");
     node_print(lhs);
     println();
-    exit := 1 / 0;
+    exit(1);
 }
 
 // put an address in %rax
@@ -4899,7 +4888,7 @@ generate_addrof: (node: int) -> void = {
         println("Not something we can take the address of!");
         node_print(child);
         println();
-        exit := 1 / 0;
+        exit(1);
     }
 
     print("    leaq ");
@@ -5063,7 +5052,7 @@ type_print_basic: (basic_variant: int) -> void = {
     }
 
     println("Unhandled basic variant in type_print_basic:", basic_variant);
-    exit := 1 / 0;
+    exit(1);
 }
 
 type_print: (typeid: int) -> void = {
