@@ -1,7 +1,7 @@
 #!/bin/bash
 infile="./langc-impl/langc.lang"
-compiler="./langc-impl/v3/langc"
-ret="$(stdbuf -oL $compiler < $infile)"
+compiler="./langc-impl/v4/langc"
+ret="$(stdbuf -oL $compiler $infile)"
 status=$?
 outfile="langself"
 

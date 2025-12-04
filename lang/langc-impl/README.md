@@ -22,7 +22,7 @@ main: () -> void = {
 Not matching expected output on error.
 
 -    [x] `rule110.lang`
--    [ ] `arr-2d.lang`
+-    [x] `arr-2d.lang`
 -    [x] `arr.lang`
 -    [x] `boolean_op.lang`
 -    [x] `break.lang`
