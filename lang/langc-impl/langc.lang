@@ -467,176 +467,18 @@ lex_matches_char: () -> int = {
     return ptr - lex_ptr;
 }
 
-lex_matches_true: () -> int = {
+lex_matches_idlike: (idlike: *char) -> int = {
     ptr := lex_ptr;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 't')) {
-        return 0;
+    for (c := idlike; c.* != '\0'; c += 1) {
+        if (ptr >= nbuf || buf[ptr] != cast(int, c.*)) {
+            return 0;
+        }
+        ptr += 1;
     }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'r')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'u')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'e')) {
-        return 0;
-    }
-    ptr += 1;
     if (ptr < nbuf && lex_isidchar(buf[ptr])) {
         return 0;
     }
-    return 4;
-}
-
-lex_matches_false: () -> int = {
-    ptr := lex_ptr;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'f')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'a')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'l')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 's')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'e')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr < nbuf && lex_isidchar(buf[ptr])) {
-        return 0;
-    }
-    return 5;
-}
-
-lex_matches_if: () -> int = {
-    ptr := lex_ptr;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'i')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'f')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr < nbuf && lex_isidchar(buf[ptr])) {
-        return 0;
-    }
-    return 2;
-}
-
-lex_matches_else: () -> int = {
-    ptr := lex_ptr;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'e')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'l')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 's')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'e')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr < nbuf && lex_isidchar(buf[ptr])) {
-        return 0;
-    }
-    return 4;
-}
-
-lex_matches_while: () -> int = {
-    ptr := lex_ptr;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'w')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'h')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'i')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'l')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'e')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr < nbuf && lex_isidchar(buf[ptr])) {
-        return 0;
-    }
-    return 5;
-}
-
-lex_matches_for: () -> int = {
-    ptr := lex_ptr;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'f')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'o')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'r')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr < nbuf && lex_isidchar(buf[ptr])) {
-        return 0;
-    }
-    return 3;
-}
-
-lex_matches_return: () -> int = {
-    ptr := lex_ptr;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'r')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'e')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 't')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'u')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'r')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'n')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr < nbuf && lex_isidchar(buf[ptr])) {
-        return 0;
-    }
-    return 6;
+    return ptr - lex_ptr;
 }
 
 lex_matches_leq: () -> int = {
@@ -795,158 +637,6 @@ lex_matches_and: () -> int = {
     return 2;
 }
 
-lex_matches_break: () -> int = {
-    ptr := lex_ptr;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'b')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'r')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'e')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'a')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'k')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr < nbuf && lex_isidchar(buf[ptr])) {
-        return 0;
-    }
-    return 5;
-}
-
-lex_matches_continue: () -> int = {
-    ptr := lex_ptr;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'c')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'o')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'n')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 't')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'i')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'n')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'u')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'e')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr < nbuf && lex_isidchar(buf[ptr])) {
-        return 0;
-    }
-    return 8;
-}
-
-lex_matches_alloc: () -> int = {
-    ptr := lex_ptr;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'a')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'l')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'l')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'o')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'c')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr < nbuf && lex_isidchar(buf[ptr])) {
-        return 0;
-    }
-    return 5;
-}
-
-lex_matches_delete: () -> int = {
-    ptr := lex_ptr;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'd')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'e')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'l')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'e')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 't')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'e')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr < nbuf && lex_isidchar(buf[ptr])) {
-        return 0;
-    }
-    return 6;
-}
-
-lex_matches_cast: () -> int = {
-    ptr := lex_ptr;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'c')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 'a')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 's')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr >= nbuf || buf[ptr] != cast(int, 't')) {
-        return 0;
-    }
-    ptr += 1;
-    if (ptr < nbuf && lex_isidchar(buf[ptr])) {
-        return 0;
-    }
-    return 4;
-}
-
 lex_peek: () -> int = {
     match: int;
     if (cur_tok_beg == lex_ptr) {
@@ -963,53 +653,8 @@ lex_peek: () -> int = {
         cur_tok_end = nbuf;
         return cur_tok;
     }
-
-    if (lex_matches_arrow()) {
-        cur_tok = TOK_ARROW;
-        cur_tok_end = cur_tok_beg + 2;
-        return cur_tok;
-    }
-
-    if (lex_matches_deref()) {
-        cur_tok = TOK_DEREF;
-        cur_tok_end = cur_tok_beg + 2;
-        return cur_tok;
-    }
-
-    match = lex_matches_if();
-    if (match > 0) {
-        cur_tok = TOK_IF;
-        cur_tok_end = cur_tok_beg + match;
-        return cur_tok;
-    }
-
-    match = lex_matches_else();
-    if (match > 0) {
-        cur_tok = TOK_ELSE;
-        cur_tok_end = cur_tok_beg + match;
-        return cur_tok;
-    }
-
-    match = lex_matches_while();
-    if (match > 0) {
-        cur_tok = TOK_WHILE;
-        cur_tok_end = cur_tok_beg + match;
-        return cur_tok;
-    }
-
-    match = lex_matches_for();
-    if (match > 0) {
-        cur_tok = TOK_FOR;
-        cur_tok_end = cur_tok_beg + match;
-        return cur_tok;
-    }
-
-    match = lex_matches_return();
-    if (match > 0) {
-        cur_tok = TOK_RETURN;
-        cur_tok_end = cur_tok_beg + match;
-        return cur_tok;
-    }
+    
+    // Literals
 
     match = lex_matches_str();
     if (match > 0) {
@@ -1032,52 +677,19 @@ lex_peek: () -> int = {
         return cur_tok;
     }
 
-    match = lex_matches_true();
-    if (match > 0) {
-        cur_tok = TOK_TRUE;
-        cur_tok_end = cur_tok_beg + match;
+    // Ad hoc operator
+
+    if (lex_matches_arrow()) {
+        cur_tok = TOK_ARROW;
+        cur_tok_end = cur_tok_beg + 2;
         return cur_tok;
     }
 
-    match = lex_matches_break();
-    if (match > 0) {
-        cur_tok = TOK_BREAK;
-        cur_tok_end = cur_tok_beg + match;
-        return cur_tok;
-    }
+    // Operators
 
-    match = lex_matches_continue();
-    if (match > 0) {
-        cur_tok = TOK_CONTINUE;
-        cur_tok_end = cur_tok_beg + match;
-        return cur_tok;
-    }
-
-    match = lex_matches_false();
-    if (match > 0) {
-        cur_tok = TOK_FALSE;
-        cur_tok_end = cur_tok_beg + match;
-        return cur_tok;
-    }
-
-    match = lex_matches_alloc();
-    if (match > 0) {
-        cur_tok = TOK_ALLOC;
-        cur_tok_end = cur_tok_beg + match;
-        return cur_tok;
-    }
-
-    match = lex_matches_delete();
-    if (match > 0) {
-        cur_tok = TOK_DELETE;
-        cur_tok_end = cur_tok_beg + match;
-        return cur_tok;
-    }
-
-    match = lex_matches_cast();
-    if (match > 0) {
-        cur_tok = TOK_CAST;
-        cur_tok_end = cur_tok_beg + match;
+    if (lex_matches_deref()) {
+        cur_tok = TOK_DEREF;
+        cur_tok_end = cur_tok_beg + 2;
         return cur_tok;
     }
 
@@ -1168,6 +780,92 @@ lex_peek: () -> int = {
     match = lex_matches_and();
     if (match > 0) {
         cur_tok = TOK_AND;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    // Keywords
+
+    match = lex_matches_idlike(cast(*char, "if"));
+    if (match > 0) {
+        cur_tok = TOK_IF;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_idlike(cast(*char, "else"));
+    if (match > 0) {
+        cur_tok = TOK_ELSE;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_idlike(cast(*char, "while"));
+    if (match > 0) {
+        cur_tok = TOK_WHILE;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_idlike(cast(*char, "for"));
+    if (match > 0) {
+        cur_tok = TOK_FOR;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_idlike(cast(*char, "return"));
+    if (match > 0) {
+        cur_tok = TOK_RETURN;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_idlike(cast(*char, "true"));
+    if (match > 0) {
+        cur_tok = TOK_TRUE;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_idlike(cast(*char, "break"));
+    if (match > 0) {
+        cur_tok = TOK_BREAK;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_idlike(cast(*char, "continue"));
+    if (match > 0) {
+        cur_tok = TOK_CONTINUE;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_idlike(cast(*char, "false"));
+    if (match > 0) {
+        cur_tok = TOK_FALSE;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_idlike(cast(*char, "alloc"));
+    if (match > 0) {
+        cur_tok = TOK_ALLOC;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_idlike(cast(*char, "delete"));
+    if (match > 0) {
+        cur_tok = TOK_DELETE;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_idlike(cast(*char, "cast"));
+    if (match > 0) {
+        cur_tok = TOK_CAST;
         cur_tok_end = cur_tok_beg + match;
         return cur_tok;
     }
@@ -3389,7 +3087,7 @@ resolve_node: (node: int, scope: int) -> void = {
         // TODO: infer if unknown?
         if (!types_equivalent(lhs_type, rhs_type)) {
             print("Cannot apply operator ");
-            print(cast(char, node_data_op[node]));
+            tok_print(node_data_op[node]);
             print(" to LHS of type ");
             type_print(lhs_type);
             print(" and RHS of type ");
