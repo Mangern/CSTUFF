@@ -60,7 +60,7 @@ printcstr: (c_str: *char) -> void = {
 }
 
 // ==================== UTILITY ====================
-read_content: () -> void = {
+read_content: (file_path: *char) -> bool = {
     buf = alloc(int, 16777216);
     nbuf = 0;
     while (true) {
@@ -71,6 +71,7 @@ read_content: () -> void = {
         buf[nbuf] = c;
         nbuf += 1;
     }
+    return true;
 };
 
 STRING_PRINTLN: *int;
@@ -3673,43 +3674,10 @@ resolve_node: (node: int, scope: int) -> void = {
     }
 
     if (node_type[node] == NODE_CAST) {
-        ch0 := children[0];
-        ch1 := children[1];
-
-        resolve_node(ch0, new_scope);
-        resolve_node(ch1, new_scope);
-
-        type_dst := node_data_type[ch0];
-        type_src := node_data_type[ch1];
-
-        if (types_equivalent(type_src, type_dst)) {
-            // OK, nop
-            node_data_type[node] = type_dst;
-            return;
-        }
-
-        if (type_is_int(type_src) && type_is_char(type_dst)
-         || type_is_char(type_src) && type_is_int(type_dst)
-         || type_is_ptr(type_src) && type_is_int(type_dst)) {
-            // OK int <-> char
-            node_data_type[node] = type_dst;
-            return;
-        }
-
-        if (type_is_strlit(type_src) 
-         && type_is_ptr(type_dst) 
-         && type_is_char(type_data_subtype[type_dst])) {
-            // OK strlit -> *char
-            node_data_type[node] = type_dst;
-            return;
-        }
-
-        print("Unable to cast from: ");
-        type_print(type_src);
-        print(" to ");
-        type_print(type_dst);
-        println();
-        exit := 1 / 0;
+        resolve_node(children[0], new_scope);
+        resolve_node(children[1], new_scope);
+        resolve_cast(node);
+        return;
     }
 
     if (node_type[node] == NODE_TYPE) {
@@ -3768,6 +3736,51 @@ set_operator_type: (operator_node: int, lhs_type: int, rhs_type: int) -> void = 
 
     print("set_operator_type unhandled operator:");
     tok_print(op);
+    println();
+    exit := 1 / 0;
+}
+
+resolve_cast: (node: int) -> void = {
+    children := node_children[node];
+    ch0 := children[0];
+    ch1 := children[1];
+
+    type_dst := node_data_type[ch0];
+    type_src := node_data_type[ch1];
+
+    if (types_equivalent(type_src, type_dst)) {
+        // OK, nop
+        node_data_type[node] = type_dst;
+        return;
+    }
+
+    if (type_is_int(type_src) && type_is_char(type_dst)
+     || type_is_char(type_src) && type_is_int(type_dst)
+     || type_is_ptr(type_src) && type_is_int(type_dst)) {
+        // OK int <-> char
+        node_data_type[node] = type_dst;
+        return;
+    }
+
+    if (type_is_strlit(type_src) 
+     && type_is_ptr(type_dst) 
+     && type_is_char(type_data_subtype[type_dst])) {
+        // OK strlit -> *char
+        node_data_type[node] = type_dst;
+        return;
+    }
+
+    if (type_is_file(type_src)
+     && type_is_int(type_dst)) {
+        // OK File -> int but not back
+        node_data_type[node] = type_dst;
+        return;
+    }
+
+    print("Unable to cast from: ");
+    type_print(type_src);
+    print(" to ");
+    type_print(type_dst);
     println();
     exit := 1 / 0;
 }
@@ -5514,10 +5527,12 @@ print_symbols: () -> void = {
     }
 }
 
-main: () -> void = {
+main: (argc: int, argv: **char) -> int = {
     EOF = 255;
 
-    read_content();
+    infile := argv[1];
+
+    read_content(infile);
 
     lex_init();
     parser_init();
@@ -5540,4 +5555,6 @@ main: () -> void = {
     generate_code(root);
 
     delete(buf);
+
+    return 0;
 }
