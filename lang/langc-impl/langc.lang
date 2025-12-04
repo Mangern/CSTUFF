@@ -77,6 +77,7 @@ STRING_READCHAR: *int;
 STRING_MAIN: *int;
 STRING_FILE_OPEN: *int;
 STRING_FILE_CLOSE: *int;
+STRING_FILE_READ: *int;
 
 ST_ID: int;
 ST_LIT: int;
@@ -198,6 +199,20 @@ string_table_init: () -> void = {
         STRING_FILE_CLOSE[8] = cast(int, 's');
         STRING_FILE_CLOSE[9] = cast(int, 'e');
         STRING_FILE_CLOSE[10] = 0;
+    }
+
+    {
+        STRING_FILE_READ   = alloc(int, 10);
+        STRING_FILE_READ[0] = cast(int, 'f');
+        STRING_FILE_READ[1] = cast(int, 'i');
+        STRING_FILE_READ[2] = cast(int, 'l');
+        STRING_FILE_READ[3] = cast(int, 'e');
+        STRING_FILE_READ[4] = cast(int, '_');
+        STRING_FILE_READ[5] = cast(int, 'r');
+        STRING_FILE_READ[6] = cast(int, 'e');
+        STRING_FILE_READ[7] = cast(int, 'a');
+        STRING_FILE_READ[8] = cast(int, 'd');
+        STRING_FILE_READ[9] = 0;
     }
 }
 
@@ -3091,6 +3106,7 @@ resolve_symbols: (root: int) -> void = {
         symbol_table_insert(-1, readchar_idx, 0, type_create_func(type_create_basic(TYPE_B_CHAR), 0));
     }
     {
+        // file_open: (path: *char, mode: strlit) -> File
         file_open_idx := string_table_add(STRING_FILE_OPEN, 9);
         file_open_t := type_create_func(type_create_file(), 2);
         type_data_argtypes[file_open_t][0] = type_create_ptr(type_create_basic(TYPE_B_CHAR));
@@ -3099,10 +3115,21 @@ resolve_symbols: (root: int) -> void = {
     }
 
     {
+        // file_close: (f: File) -> bool
         file_close_idx := string_table_add(STRING_FILE_CLOSE, 10);
         file_close_t := type_create_func(type_create_basic(TYPE_B_BOOL), 1);
         type_data_argtypes[file_close_t][0] = type_create_file();
         symbol_table_insert(-1, file_close_idx, 0, file_close_t);
+    }
+
+    {
+        // file_read: (f: File, buf: *char, count: int) -> int
+        file_read_idx := string_table_add(STRING_FILE_READ, 9);
+        file_read_t := type_create_func(type_create_basic(TYPE_B_INT), 3);
+        type_data_argtypes[file_read_t][0] = type_create_file();
+        type_data_argtypes[file_read_t][1] = type_create_ptr(type_create_basic(TYPE_B_CHAR));
+        type_data_argtypes[file_read_t][2] = type_create_basic(TYPE_B_INT);
+        symbol_table_insert(-1, file_read_idx, 0, file_read_t);
     }
 
     // register top level
@@ -4263,6 +4290,14 @@ generate_function_call: (node: int) -> void = {
         return;
     }
 
+    if (streq(
+        string_table[id_stridx],
+        STRING_FILE_READ,
+        string_table_len[id_stridx])) {
+        generate_call_file_read(children[1]);
+        return;
+    }
+
     call_arg_list_node := children[1];
     call_args := node_children[call_arg_list_node];
 
@@ -4487,6 +4522,38 @@ generate_call_file_close: (args_node: int) -> void = {
     println("    test %rax, %rax");
     println("    setz %al");
     println("    movzx %al, %rax");
+}
+
+generate_call_file_read: (args_node: int) -> void = {
+    args := node_children[args_node];
+    // fread(ptr, size, nmemb, stream)
+    // we have: file, buf, count
+    generate_expression(args[0]); // file
+    println("    pushq %rax");
+    generate_expression(args[1]); //  buf
+    println("    pushq %rax");
+    generate_expression(args[2]); //  count
+    println("    pushq %rax");
+
+    print("    popq ");
+    emit_arg_reg(2, 8);
+    println();
+    print("    popq ");
+    emit_arg_reg(0, 8);
+    println();
+    print("    popq ");
+    emit_arg_reg(3, 8);
+    println();
+    print("    movq $1, "); // size of element: 1 byte
+    emit_arg_reg(1, 8);
+    println();
+
+    println("    pushq %rbp");
+    println("    movq %rsp, %rbp");
+    println("    andq $-16, %rsp");
+    println("    call fread");
+    println("    movq %rbp, %rsp");
+    println("    popq %rbp");
 }
 
 // expect subexpression in %rcx
