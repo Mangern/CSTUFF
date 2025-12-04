@@ -76,6 +76,7 @@ STRING_CHAR: *int;
 STRING_READCHAR: *int;
 STRING_MAIN: *int;
 STRING_FILE_OPEN: *int;
+STRING_FILE_CLOSE: *int;
 
 ST_ID: int;
 ST_LIT: int;
@@ -182,6 +183,21 @@ string_table_init: () -> void = {
         STRING_FILE_OPEN[7] = cast(int, 'e');
         STRING_FILE_OPEN[8] = cast(int, 'n');
         STRING_FILE_OPEN[9] = 0;
+    }
+
+    {
+        STRING_FILE_CLOSE   = alloc(int, 11);
+        STRING_FILE_CLOSE[0] = cast(int, 'f');
+        STRING_FILE_CLOSE[1] = cast(int, 'i');
+        STRING_FILE_CLOSE[2] = cast(int, 'l');
+        STRING_FILE_CLOSE[3] = cast(int, 'e');
+        STRING_FILE_CLOSE[4] = cast(int, '_');
+        STRING_FILE_CLOSE[5] = cast(int, 'c');
+        STRING_FILE_CLOSE[6] = cast(int, 'l');
+        STRING_FILE_CLOSE[7] = cast(int, 'o');
+        STRING_FILE_CLOSE[8] = cast(int, 's');
+        STRING_FILE_CLOSE[9] = cast(int, 'e');
+        STRING_FILE_CLOSE[10] = 0;
     }
 }
 
@@ -2842,6 +2858,9 @@ types_equivalent: (type_a: int, type_b: int) -> bool = {
     if (tc == TYPE_STRLIT) {
         return true;
     }
+    if (tc == TYPE_FILE) {
+        return true;
+    }
     if (tc == TYPE_BASIC) {
         return type_data_subtype[type_a] == type_data_subtype[type_b];
     }
@@ -3079,6 +3098,12 @@ resolve_symbols: (root: int) -> void = {
         symbol_table_insert(-1, file_open_idx, 0, file_open_t);
     }
 
+    {
+        file_close_idx := string_table_add(STRING_FILE_CLOSE, 10);
+        file_close_t := type_create_func(type_create_basic(TYPE_B_BOOL), 1);
+        type_data_argtypes[file_close_t][0] = type_create_file();
+        symbol_table_insert(-1, file_close_idx, 0, file_close_t);
+    }
 
     // register top level
 
@@ -4230,6 +4255,14 @@ generate_function_call: (node: int) -> void = {
         return;
     }
 
+    if (streq(
+        string_table[id_stridx],
+        STRING_FILE_CLOSE,
+        string_table_len[id_stridx])) {
+        generate_call_file_close(children[1]);
+        return;
+    }
+
     call_arg_list_node := children[1];
     call_args := node_children[call_arg_list_node];
 
@@ -4435,6 +4468,25 @@ generate_call_file_open: (args_node: int) -> void = {
     println("    popq %rbp");
 
     // %rax holds our file pointer
+}
+
+generate_call_file_close: (args_node: int) -> void = {
+    args := node_children[args_node];
+    generate_expression(args[0]);
+    print("    movq %rax, ");
+    emit_arg_reg(0, 8);
+    println();
+    println("    pushq %rbp");
+    println("    movq %rsp, %rbp");
+    println("    andq $-16, %rsp");
+    println("    call fclose");
+    println("    movq %rbp, %rsp");
+    println("    popq %rbp");
+
+    // invert result: return true if success.
+    println("    test %rax, %rax");
+    println("    setz %al");
+    println("    movzx %al, %rax");
 }
 
 // expect subexpression in %rcx
