@@ -61,16 +61,42 @@ printcstr: (c_str: *char) -> void = {
 
 // ==================== UTILITY ====================
 read_content: (file_path: *char) -> bool = {
-    buf = alloc(int, 16777216);
-    nbuf = 0;
-    while (true) {
-        c := cast(int, readchar());
-        if (c == EOF) {
-            break;
-        }
-        buf[nbuf] = c;
-        nbuf += 1;
+    file := file_open(file_path, "r");
+
+    if (cast(int, file) == 0) {
+        // failed to open
+        return false;
     }
+
+    MAX_SIZE := 16777216;
+
+    buf = alloc(int, MAX_SIZE);
+    cbuf := alloc(char, MAX_SIZE);
+
+    nbuf = file_read(file, cbuf, MAX_SIZE);
+    if (nbuf >= MAX_SIZE) {
+        println("File too large! Please increase MAX_SIZE");
+        if (!file_close(file)) {
+            println("Also I failed to close, this is not good.");
+        }
+        delete(buf);
+        delete(cbuf);
+        return false;
+    }
+    if (!file_close(file)) {
+        println("Failed to close file");
+        delete(buf);
+        delete(cbuf);
+        return false;
+    }
+
+    for (i := 0; i < nbuf; i += 1) {
+        buf[i] = cast(int, cbuf[i]);
+    }
+    buf[nbuf] = EOF;
+    nbuf += 1;
+
+    delete(cbuf);
     return true;
 };
 
@@ -5530,9 +5556,21 @@ print_symbols: () -> void = {
 main: (argc: int, argv: **char) -> int = {
     EOF = 255;
 
+    if (argc < 2) {
+        print("Usage: ");
+        printcstr(argv[0]);
+        println(" <file>");
+        return 1;
+    }
+
     infile := argv[1];
 
-    read_content(infile);
+    if (!read_content(infile)) {
+        print("Failed to read ");
+        printcstr(infile);
+        println();
+        return 1;
+    }
 
     lex_init();
     parser_init();

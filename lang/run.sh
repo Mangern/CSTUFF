@@ -1,5 +1,5 @@
 #!/bin/bash
-ret="$(stdbuf -oL ./langself < "$1")"
+ret="$(stdbuf -oL ./langself "$1")"
 status=$?
 outfile="tmp"
 
@@ -8,6 +8,7 @@ if [ $status -eq 0 ]; then
     gccstat=$?
     if [ $gccstat -eq 0 ]; then
         ./$outfile
+        rm $outfile
     else
         echo "Assembler failed"
         printf "%s\n" "$ret"
