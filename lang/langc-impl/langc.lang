@@ -132,6 +132,7 @@ STRING_FILE_OPEN: *int;
 STRING_FILE_CLOSE: *int;
 STRING_FILE_READ: *int;
 STRING_EXIT: *int;
+STRING_FILE: *int;
 
 ST_ID: int;
 ST_LIT: int;
@@ -159,6 +160,7 @@ string_table_init: () -> void = {
         STRING_FILE_CLOSE = cstr_to_intstr(cast(*char, "file_close"));
         STRING_FILE_READ  = cstr_to_intstr(cast(*char, "file_read"));
         STRING_EXIT       = cstr_to_intstr(cast(*char, "exit"));
+        STRING_FILE       = cstr_to_intstr(cast(*char, "File"));
     }
 }
 
@@ -2514,6 +2516,11 @@ type_get_type: (type_node: int) -> int = {
 
         if (streq(string_table[id_stridx], STRING_CHAR, 4)) {
             node_data_type[type_node] = type_create_basic(TYPE_B_CHAR);
+            return node_data_type[type_node];
+        }
+
+        if (streq(string_table[id_stridx], STRING_FILE, 4)) {
+            node_data_type[type_node] = type_create_file();
             return node_data_type[type_node];
         }
 
