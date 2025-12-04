@@ -3701,7 +3701,7 @@ generate_code: (root: int) -> void = {
         }
     }
 
-    { // global vars
+    { // non-initialized global vars
         println(".section .bss");
         println(".align 8");
 
@@ -3714,9 +3714,53 @@ generate_code: (root: int) -> void = {
              || type_is_strlit(sym_type)) {
                 continue;
             }
+            decl_node := symbol_table_decl_node[sym];
+            if (decl_get_body(decl_node) != -1) {
+                // Don't put in .bss
+                continue;
+            }
             print(".");
             string_table_print(symbol_table_str[sym]);
+            print(": ");
             println(": .zero", type_sizeof(sym_type));
+        }
+    }
+
+    { // initialized global vars
+        println(".section .data");
+        println(".align 8");
+        global_syms := scope_syms[0];
+        for (i := 0; i < scope_szs[0]; i += 1) {
+            sym := global_syms[i];
+            sym_type := symbol_table_type[sym];
+            if (type_is_func(sym_type)
+             || type_is_strlit(sym_type)) {
+                continue;
+            }
+            decl_node := symbol_table_decl_node[sym];
+            decl_body := decl_get_body(decl_node);
+            if (decl_body == -1) {
+                // Don't put in .data
+                continue;
+            }
+
+            print(".");
+            string_table_print(symbol_table_str[sym]);
+            print(": ");
+
+            if (node_type[decl_body] == NODE_LIT_INT) {
+                println(".quad", node_data_int[decl_body]);
+            } else if (node_type[decl_body] == NODE_LIT_CHAR) {
+                println(".byte", cast(int, node_data_char[decl_body]));
+            } else if (node_type[decl_body] == NODE_LIT_BOOL) {
+                println(".quad", node_data_bool[decl_body]);
+            } else {
+                print("Cannot initialize '");
+                string_table_print(symbol_table_str[sym]);
+                println("' to non-constant value");
+                exit(1);
+            }
+
         }
     }
 
