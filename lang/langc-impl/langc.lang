@@ -330,9 +330,9 @@ lex_init: () -> void = {
     operator_prec[TOK_STAR]       = 140;
     operator_prec[TOK_DEREF]      = 150;
     operator_prec[TOK_PREADD]     = 140;
-    operator_prec[TOK_POSTADD]     = 150;
+    operator_prec[TOK_POSTADD]    = 150;
     operator_prec[TOK_PRESUB]     = 140;
-    operator_prec[TOK_POSTSUB]     = 150;
+    operator_prec[TOK_POSTSUB]    = 150;
 }
 
 
@@ -1068,7 +1068,7 @@ TYPE_UNKNOWN: int;
 TYPE_VOID: int;
 TYPE_BASIC: int; // subtype: basic variant
 TYPE_FUNC: int;  // subtype: return type, length: num args (-1: variadic), argtypes: argument types
-TYPE_ARR: int;   // subtype: subtype, length: length
+TYPE_ARR: int;   // subtype: subtype, length: num dims, argtypes: list of dims
 TYPE_STRLIT: int; // nothing
 TYPE_PTR: int; // subtype: subtype
 TYPE_FILE: int; // opaque type wrapping a C FILE*. TODO: represent attrs "rwa+" in the type!
@@ -1478,6 +1478,17 @@ parse_type: () -> int = {
         node_set_intdata(int_node);
         node_add_child(supertype_node, int_node);
 
+        token = lex_peek();
+
+        while (token == cast(int, ',')) {
+            lex_advance();
+            peek_expect_advance(TOK_INT);
+            int_node := node_create(NODE_LIT_INT);
+            node_set_intdata(int_node);
+            node_add_child(supertype_node, int_node);
+            token = lex_peek();
+        }
+
         peek_expect_advance(cast(int, ']'));
         return supertype_node;
     }
@@ -1657,6 +1668,12 @@ parse_indexing: (node: int) -> int = {
 
     peek_expect_advance(cast(int, '['));
     node_add_child(indexing_node, parse_expression());
+    token := lex_peek();
+    while (token == cast(int, ',')) {
+        lex_advance();
+        node_add_child(indexing_node, parse_expression());
+        token = lex_peek();
+    }
     peek_expect_advance(cast(int, ']'));
     return indexing_node;
 }
@@ -2038,7 +2055,6 @@ parse: () -> int = {
         lex_advance();
     }
 
-    parse_simplify(root);
 
     return root;
 }
@@ -2260,6 +2276,7 @@ type_create_array: (subtype_id: int, length: int) -> int = {
     typeid := type_create(TYPE_ARR);
     type_data_subtype[typeid] = subtype_id;
     type_data_length[typeid] = length;
+    type_data_argtypes[typeid] = alloc(int, length);
     return typeid;
 }
 
@@ -2317,8 +2334,11 @@ type_sizeof: (typeid: int) -> int = {
     }
 
     if (tc == TYPE_ARR) {
-        subsize := type_sizeof(type_data_subtype[typeid]);
-        return subsize * type_data_length[typeid];
+        sz := type_sizeof(type_data_subtype[typeid]);
+        for (i := 0; i < type_data_length[typeid]; i += 1) {
+            sz *= type_data_argtypes[typeid][i];
+        }
+        return sz;
     }
 
     if (tc == TYPE_PTR) {
@@ -2456,11 +2476,15 @@ type_get_type: (type_node: int) -> int = {
     ch0 := children[0];
     ch1 := children[1];
 
-    if (node_type[ch1] == NODE_LIT_INT) {
+    if (node_parse_tc[type_node] == TYPE_ARR) {
         // array type
         subtype := type_get_type(ch0);
-
-        node_data_type[type_node] = type_create_array(subtype, node_data_int[ch1]);
+        typeid := type_create_array(subtype, node_children_sz[type_node] - 1);
+        // set dims
+        node_data_type[type_node] = typeid;
+        for (i := 1; i < node_children_sz[type_node]; i += 1) {
+            type_data_argtypes[typeid][i-1] = node_data_int[children[i]];
+        }
         return node_data_type[type_node];
     }
 
@@ -2534,6 +2558,11 @@ types_equivalent: (type_a: int, type_b: int) -> bool = {
         }
         if (type_data_length[type_a] != type_data_length[type_b]) {
             return false;
+        }
+        for (i := 0; i < type_data_length[type_a]; i += 1) {
+            if (type_data_argtypes[type_a][i] != type_data_argtypes[type_b][i]) {
+                return false;
+            }
         }
         return true;
     }
@@ -3192,13 +3221,13 @@ resolve_node: (node: int, scope: int) -> void = {
     }
 
     if (node_type[node] == NODE_INDEX) {
-        id_node := children[0];
-        expr_node := children[1];
-        resolve_node(id_node, new_scope);
-        resolve_node(expr_node, new_scope);
+        num_children := node_children_sz[node];
+        for (i := 0; i < num_children; i += 1) {
+            resolve_node(children[i], new_scope);
+        }
 
+        id_node := children[0];
         id_type := node_data_type[id_node];
-        expr_type := node_data_type[expr_node];
 
         if (!type_is_arr(id_type) && !type_is_ptr(id_type)) {
             print("Cannot index non-array/pointer '");
@@ -3207,13 +3236,31 @@ resolve_node: (node: int, scope: int) -> void = {
             exit := 1 / 0;
         }
 
-        if (!type_is_int(expr_type)) {
-            print("Cannot index array '");
+        if (type_is_ptr(id_type) && num_children > 2) {
+            println("Indexing a pointer using multiple indices is not yet supported. Use [][] syntax");
+            exit := 1 / 0;
+        }
+
+        if (type_is_arr(id_type) && num_children - 1 != type_data_length[id_type]) {
+            print("Array '");
             string_table_print(node_data_str[id_node]);
-            print("' using non-integral data type ");
-            type_print(expr_type);
+            print("' has", type_data_length[id_type], "dimensions but was indexed using", num_children-1);
             println();
             exit := 1 / 0;
+        }
+
+        for (i := 1; i < num_children; i += 1) {
+            expr_node := children[i];
+            expr_type := node_data_type[expr_node];
+            if (!type_is_int(expr_type)) {
+                print("Cannot index '");
+                string_table_print(node_data_str[id_node]);
+                print("' using non-integral data type ");
+                type_print(expr_type);
+                print(" at index", i - 1);
+                println();
+                exit := 1 / 0;
+            }
         }
 
         // an indexed element gets type == subtype of arr
@@ -3476,6 +3523,54 @@ check_main_signature: (main_decl: int) -> void = {
         }
     }
     // alles gut
+}
+
+// =============== POST SIMPLIFY ===============
+
+post_resolve_simplify: (node: int) -> void = {
+    for (i := 0; i < node_children_sz[node]; i += 1) {
+        post_resolve_simplify(node_children[node][i]);
+    }
+
+    if (node_type[node] == NODE_INDEX) {
+        // convert indexing of ND arrays into equivalent 1D indexing
+        if (node_children_sz[node] <= 2) {
+            // no need to do anything
+            return;
+        }
+        id_node := node_children[node][0];
+        id_type := node_data_type[id_node];
+        if (!type_is_arr(id_type)) {
+            println("Expected type to be array when indexed with more than one index!");
+            exit := 1 / 0;
+        }
+        num_dims := type_data_length[id_type];
+        dims     := type_data_argtypes[id_type];
+
+        multiplier := 1;
+
+        // TODO: watch out for overflow
+        for (i := node_children_sz[node] - 2; i > 0; i -= 1) {
+            multiplier *= dims[i]; // dims[(i - 1) + 1]
+
+            mul_node := node_create(NODE_BINOP);
+            int_node := node_create(NODE_LIT_INT);
+            node_data_int[int_node] = multiplier;
+            node_data_op[mul_node] = cast(int, '*');
+            node_add_child(mul_node, node_children[node][i]);
+            node_add_child(mul_node, int_node);
+
+            add_node := node_create(NODE_BINOP);
+            node_data_op[add_node] = cast(int, '+');
+            node_add_child(add_node, mul_node);
+            node_add_child(add_node, node_children[node][i + 1]);
+            node_children[node][i] = add_node;
+
+            node_children[node][i + 1] = 0;
+        }
+
+        node_children_sz[node] = 2;
+    }
 }
 
 // ==================== GEN ====================
@@ -5001,7 +5096,12 @@ type_print: (typeid: int) -> void = {
     if (tc == TYPE_ARR) {
         type_print(type_data_subtype[typeid]);
         print("[");
-        print(type_data_length[typeid]);
+        for (i := 0; i < type_data_length[typeid]; i += 1) {
+            if (i > 0) {
+                print(",");
+            }
+            print(type_data_argtypes[typeid][i]);
+        }
         print("]");
         return;
     }
@@ -5225,9 +5325,13 @@ main: (argc: int, argv: **char) -> int = {
 
     symbol_table_init();
 
-    //print_tree(root, 0);
+    parse_simplify(root);
 
     resolve_symbols(root);
+
+    //print_tree(root, 0);
+
+    post_resolve_simplify(root);
 
     //print_tree(root, 0);
 
