@@ -53,10 +53,30 @@ stoi: (str: *int, len: int) -> int = {
     return res;
 }
 
-printcstr: (c_str: *char) -> void = {
-    for (c := c_str; c.* != '\0'; c += 1) {
+// Small *char lib
+
+cstr_print: (cstr: *char) -> void = {
+    for (c := cstr; c.* != '\0'; c += 1) {
         print(c.*);
     }
+}
+
+cstr_strlen: (cstr: *char) -> int = {
+    len := 0;
+    // interesting syntax we got.
+    for (c := cstr; c.* != '\0'; {c += 1; len += 1;}) {}
+    return len;
+}
+
+// allocates an integer string containing the contents of cstr.
+cstr_to_intstr: (cstr: *char) -> *int = {
+    len := cstr_strlen(cstr);
+    // + 1 for zero termination.
+    intstr := alloc(int, len + 1);
+    for (i := 0; i < len; i += 1) {
+        intstr[i] = cast(int, cstr[i]);
+    }
+    return intstr;
 }
 
 // ==================== UTILITY ====================
@@ -126,136 +146,19 @@ string_table_init: () -> void = {
     ST_ID = 0;
     ST_LIT = 1;
 
-    // bruhest moment
     {
-        STRING_PRINT    = alloc(int, 6);
-        STRING_PRINT[0] = cast(int, 'p');
-        STRING_PRINT[1] = cast(int, 'r');
-        STRING_PRINT[2] = cast(int, 'i');
-        STRING_PRINT[3] = cast(int, 'n');
-        STRING_PRINT[4] = cast(int, 't');
-        STRING_PRINT[5] = 0;
-    }
-
-    {
-        STRING_PRINTLN    = alloc(int, 8);
-        STRING_PRINTLN[0] = cast(int, 'p');
-        STRING_PRINTLN[1] = cast(int, 'r');
-        STRING_PRINTLN[2] = cast(int, 'i');
-        STRING_PRINTLN[3] = cast(int, 'n');
-        STRING_PRINTLN[4] = cast(int, 't');
-        STRING_PRINTLN[5] = cast(int, 'l');
-        STRING_PRINTLN[6] = cast(int, 'n');
-        STRING_PRINTLN[7] = 0;
-    }
-
-    {
-        STRING_INT = alloc(int, 4);
-        STRING_INT[0] = cast(int, 'i');
-        STRING_INT[1] = cast(int, 'n');
-        STRING_INT[2] = cast(int, 't');
-        STRING_INT[3] = 0;
-    }
-
-    {
-        STRING_VOID = alloc(int, 5);
-        STRING_VOID[0] = cast(int, 'v');
-        STRING_VOID[1] = cast(int, 'o');
-        STRING_VOID[2] = cast(int, 'i');
-        STRING_VOID[3] = cast(int, 'd');
-        STRING_VOID[4] = 0;
-    }
-
-    {
-        STRING_BOOL = alloc(int, 5);
-        STRING_BOOL[0] = cast(int, 'b');
-        STRING_BOOL[1] = cast(int, 'o');
-        STRING_BOOL[2] = cast(int, 'o');
-        STRING_BOOL[3] = cast(int, 'l');
-        STRING_BOOL[4] = 0;
-    }
-
-    {
-        STRING_CHAR = alloc(int, 5);
-        STRING_CHAR[0] = cast(int, 'c');
-        STRING_CHAR[1] = cast(int, 'h');
-        STRING_CHAR[2] = cast(int, 'a');
-        STRING_CHAR[3] = cast(int, 'r');
-        STRING_CHAR[4] = 0;
-    }
-
-    {
-        STRING_READCHAR = alloc(int, 9);
-        STRING_READCHAR[0] = cast(int, 'r');
-        STRING_READCHAR[1] = cast(int, 'e');
-        STRING_READCHAR[2] = cast(int, 'a');
-        STRING_READCHAR[3] = cast(int, 'd');
-        STRING_READCHAR[4] = cast(int, 'c');
-        STRING_READCHAR[5] = cast(int, 'h');
-        STRING_READCHAR[6] = cast(int, 'a');
-        STRING_READCHAR[7] = cast(int, 'r');
-        STRING_READCHAR[8] = 0;
-    }
-
-    {
-        STRING_MAIN = alloc(int, 5);
-        STRING_MAIN[0] = cast(int, 'm');
-        STRING_MAIN[1] = cast(int, 'a');
-        STRING_MAIN[2] = cast(int, 'i');
-        STRING_MAIN[3] = cast(int, 'n');
-        STRING_MAIN[4] = 0;
-    }
-
-    {
-        STRING_FILE_OPEN   = alloc(int, 10);
-        STRING_FILE_OPEN[0] = cast(int, 'f');
-        STRING_FILE_OPEN[1] = cast(int, 'i');
-        STRING_FILE_OPEN[2] = cast(int, 'l');
-        STRING_FILE_OPEN[3] = cast(int, 'e');
-        STRING_FILE_OPEN[4] = cast(int, '_');
-        STRING_FILE_OPEN[5] = cast(int, 'o');
-        STRING_FILE_OPEN[6] = cast(int, 'p');
-        STRING_FILE_OPEN[7] = cast(int, 'e');
-        STRING_FILE_OPEN[8] = cast(int, 'n');
-        STRING_FILE_OPEN[9] = 0;
-    }
-
-    {
-        STRING_FILE_CLOSE   = alloc(int, 11);
-        STRING_FILE_CLOSE[0] = cast(int, 'f');
-        STRING_FILE_CLOSE[1] = cast(int, 'i');
-        STRING_FILE_CLOSE[2] = cast(int, 'l');
-        STRING_FILE_CLOSE[3] = cast(int, 'e');
-        STRING_FILE_CLOSE[4] = cast(int, '_');
-        STRING_FILE_CLOSE[5] = cast(int, 'c');
-        STRING_FILE_CLOSE[6] = cast(int, 'l');
-        STRING_FILE_CLOSE[7] = cast(int, 'o');
-        STRING_FILE_CLOSE[8] = cast(int, 's');
-        STRING_FILE_CLOSE[9] = cast(int, 'e');
-        STRING_FILE_CLOSE[10] = 0;
-    }
-
-    {
-        STRING_FILE_READ   = alloc(int, 10);
-        STRING_FILE_READ[0] = cast(int, 'f');
-        STRING_FILE_READ[1] = cast(int, 'i');
-        STRING_FILE_READ[2] = cast(int, 'l');
-        STRING_FILE_READ[3] = cast(int, 'e');
-        STRING_FILE_READ[4] = cast(int, '_');
-        STRING_FILE_READ[5] = cast(int, 'r');
-        STRING_FILE_READ[6] = cast(int, 'e');
-        STRING_FILE_READ[7] = cast(int, 'a');
-        STRING_FILE_READ[8] = cast(int, 'd');
-        STRING_FILE_READ[9] = 0;
-    }
-
-    {
-        STRING_EXIT = alloc(int, 5);
-        STRING_EXIT[0] = cast(int, 'e');
-        STRING_EXIT[1] = cast(int, 'x');
-        STRING_EXIT[2] = cast(int, 'i');
-        STRING_EXIT[3] = cast(int, 't');
-        STRING_EXIT[4] = 0;
+        STRING_PRINT      = cstr_to_intstr(cast(*char, "print"));
+        STRING_PRINTLN    = cstr_to_intstr(cast(*char, "println"));
+        STRING_INT        = cstr_to_intstr(cast(*char, "int"));
+        STRING_VOID       = cstr_to_intstr(cast(*char, "void"));
+        STRING_BOOL       = cstr_to_intstr(cast(*char, "bool"));
+        STRING_CHAR       = cstr_to_intstr(cast(*char, "char"));
+        STRING_READCHAR   = cstr_to_intstr(cast(*char, "readchar"));
+        STRING_MAIN       = cstr_to_intstr(cast(*char, "main"));
+        STRING_FILE_OPEN  = cstr_to_intstr(cast(*char, "file_open"));
+        STRING_FILE_CLOSE = cstr_to_intstr(cast(*char, "file_close"));
+        STRING_FILE_READ  = cstr_to_intstr(cast(*char, "file_read"));
+        STRING_EXIT       = cstr_to_intstr(cast(*char, "exit"));
     }
 }
 
@@ -5602,7 +5505,7 @@ main: (argc: int, argv: **char) -> int = {
 
     if (argc < 2) {
         print("Usage: ");
-        printcstr(argv[0]);
+        cstr_print(argv[0]);
         println(" <file>");
         return 1;
     }
@@ -5611,7 +5514,7 @@ main: (argc: int, argv: **char) -> int = {
 
     if (!read_content(infile)) {
         print("Failed to read ");
-        printcstr(infile);
+        cstr_print(infile);
         println();
         return 1;
     }
