@@ -1,0 +1,44 @@
+EOF: char;
+buf: char[100];
+nbuf: int;
+
+readline: () -> bool = {
+    c := readchar();
+    if (c == EOF) {
+        return false;
+    }
+
+    nbuf = 0;
+
+    while (c != '\n' && c != EOF) {
+        buf[nbuf] = c;
+        nbuf += 1;
+
+        c = readchar();
+    }
+
+    return true;
+}
+main: () -> void = {
+    EOF = cast(char, 255);
+
+    ans := 0;
+    while (readline()) {
+        i := 0;
+        mx := 0;
+        while (i < nbuf) {
+            j := i + 1;
+            while (j < nbuf) {
+                cur := (cast(int,buf[i]) - cast(int, '0')) * 10 + cast(int, buf[j]) - cast(int, '0');
+                if (cur > mx) {
+                    mx = cur;
+                }
+                j += 1;
+            }
+            i += 1;
+        }
+
+        ans += mx;
+    }
+    println(ans);
+}

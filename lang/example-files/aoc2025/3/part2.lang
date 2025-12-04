@@ -1,0 +1,75 @@
+EOF: char;
+buf: char[100];
+nbuf: int;
+arr: int[100];
+dp: int[13, 100];
+p10: int[13];
+INF: int;
+
+readline: () -> bool = {
+    c := readchar();
+    if (c == EOF) {
+        return false;
+    }
+
+    nbuf = 0;
+
+    while (c != '\n' && c != EOF) {
+        buf[nbuf] = c;
+        nbuf += 1;
+
+        c = readchar();
+    }
+
+    return true;
+}
+
+solve: (i: int, numleft: int) -> int = {
+    // max(dig[i] * 10**(numleft - 1) + solve(i + 1, numleft - 1), solve(i + 1, numleft)
+    if (numleft == 0) {
+        return 0;
+    }
+    if (nbuf - i < numleft) {
+        return -INF;
+    }
+
+    if (dp[numleft, i] != -1) {
+        return dp[numleft, i];
+    }
+    alt1 := arr[i] * p10[numleft - 1] + solve(i + 1, numleft - 1);
+    alt2 := solve(i + 1, numleft);
+    if (alt2 > alt1) {
+        alt1 = alt2;
+    }
+    dp[numleft, i] = alt1;
+    return alt1;
+}
+
+main: () -> void = {
+    EOF = cast(char, 255);
+    INF := 1000000000000000;
+
+    p10[0] = 1;
+    i := 1;
+    while (i < 13) {
+        p10[i] = p10[i-1] * 10;
+        i += 1;
+    }
+
+    ans := 0;
+    while (readline()) {
+        i := 0;
+        while (i < nbuf) {
+            arr[i] = cast(int, buf[i]) - cast(int, '0');
+            j := 0;
+            while (j < 13) {
+                dp[j, i] = -1;
+                j += 1;
+            }
+            i += 1;
+        }
+        mx := solve(0, 12);
+        ans += mx;
+    }
+    println(ans);
+}
