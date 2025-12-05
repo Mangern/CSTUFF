@@ -1115,7 +1115,7 @@ NODE_DEREF    : int; // [expr]
 NODE_ALLOC    : int; // [type] | [type, expr]
 NODE_DELETE   : int; // [expr]
 NODE_CAST     : int; // [type, expr]
-NODE_ACCESS   : int; // [expr, id_node]
+NODE_ACCESS   : int; // [expr, id_node]. Expr type: struct or *struct.
 
 node_da_cap: int;
 node_da_sz: int;
@@ -2786,6 +2786,32 @@ types_equivalent: (type_a: int, type_b: int) -> bool = {
         return true;
     }
 
+    if (tc == TYPE_STRUCT) {
+        // they need the number of fields, the same field names and the same field types in the same order
+        num_fields := type_data_length[type_a];
+        if (type_data_length[type_b] != num_fields) {
+            return false;
+        }
+
+        for (i := 0; i < num_fields; i += 1) {
+            a_field_str := type_data_fields[type_a][i];
+            b_field_str := type_data_fields[type_b][i];
+
+            if (string_table_len[a_field_str] != string_table_len[b_field_str]) {
+                return false;
+            }
+
+            if (!streq(string_table[a_field_str], string_table[b_field_str], string_table_len[a_field_str])) {
+                return false;
+            }
+
+            if (!types_equivalent(type_data_argtypes[type_a][i], type_data_argtypes[type_b][i])) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     print("Unhandled type equivalence: ");
     type_print(type_a);
     print(" vs. ");
@@ -3600,7 +3626,12 @@ resolve_node: (node: int, scope: int) -> void = {
         rhs := children[1];
         resolve_node(lhs, new_scope);
         lhs_type := node_data_type[lhs];
-        if (!type_is_struct(lhs_type)) {
+        struct_type := lhs_type;
+
+        if (type_is_ptr(lhs_type)) {
+            struct_type = type_data_subtype[lhs_type];
+        }
+        if (!type_is_struct(struct_type)) {
             println("Attempt to access non-struct");
             exit(1);
         }
@@ -3611,7 +3642,7 @@ resolve_node: (node: int, scope: int) -> void = {
         }
 
 
-        access_idx := type_struct_get_field_idx(lhs_type, node_data_str[rhs]);
+        access_idx := type_struct_get_field_idx(struct_type, node_data_str[rhs]);
 
         if (access_idx < 0) {
             print("Unknown field '");
@@ -3620,11 +3651,11 @@ resolve_node: (node: int, scope: int) -> void = {
             exit(1);
         }
 
-        node_data_type[node] = type_data_argtypes[lhs_type][access_idx];
+        node_data_type[node] = type_data_argtypes[struct_type][access_idx];
 
         // Translate to an access offset
         lit_int := node_create(NODE_LIT_INT);
-        node_data_int[lit_int] = type_data_offsets[lhs_type][access_idx];
+        node_data_int[lit_int] = type_data_offsets[struct_type][access_idx];
         node_data_type[lit_int] = type_create_basic(TYPE_B_INT);
 
         children[1] = lit_int;
@@ -3828,7 +3859,8 @@ post_resolve_simplify: (node: int) -> void = {
     if (node_type[node] == NODE_ACCESS) {
         lhs := node_children[node][0];
 
-        if (node_type[lhs] == NODE_ACCESS) {
+        // this only applies to structs, not if LHS is pointer
+        if (node_type[lhs] == NODE_ACCESS && type_is_struct(node_data_type[lhs])) {
             // a.b.c
             // -> a.(b+c)
             base := node_children[lhs][0];
@@ -4986,23 +5018,36 @@ generate_expression: (node: int) -> void = {
             exit(1);
         }
 
-        if (!type_is_struct(node_data_type[accessed_node])) {
+        // Either struct or pointer to struct
+        if (!type_is_struct(node_data_type[accessed_node]) &&
+            !(
+                type_is_ptr(node_data_type[accessed_node]) 
+             && type_is_struct(type_data_subtype[node_data_type[accessed_node]])
+        )) {
             println("Error: expected accessed node to be struct!");
             exit(1);
         }
 
         offset := node_data_int[lit_int_node];
 
-        if (node_data_sym[accessed_node] == 0) {
-            println("No symbol found for struct access!");
-            exit(1);
-        }
 
-        print("    leaq ");
-        emit_sym_access(node_data_sym[accessed_node]);
-        println(", %rcx");
-        print("    leaq", offset);
-        println("(%rcx), %rcx");
+        if (type_is_struct(node_data_type[accessed_node])) {
+            if (node_data_sym[accessed_node] == 0) {
+                println("No symbol found for struct access!");
+                exit(1);
+            }
+            print("    leaq ");
+            emit_sym_access(node_data_sym[accessed_node]);
+            println(", %rcx");
+            print("    leaq", offset);
+            println("(%rcx), %rcx");
+        } else {
+            // ptr
+            generate_expression(accessed_node);
+            // pointer value in %rax
+            print("    leaq", offset);
+            println("(%rax), %rcx");
+        }
 
         // memory address where we want to read is now in %rcx
         println("    xor %rax, %rax");
@@ -5247,24 +5292,42 @@ generate_assign: (node: int) -> void = {
         lit_int_node := node_children[lhs][1];
         sz := type_sizeof(node_data_type[lhs]);
 
+        // Either struct or pointer to struct
+        if (!type_is_struct(node_data_type[accessed_node]) &&
+            !(
+                type_is_ptr(node_data_type[accessed_node]) 
+             && type_is_struct(type_data_subtype[node_data_type[accessed_node]])
+        )) {
+            println("Error: expected accessed node to be struct!");
+            exit(1);
+        }
+
         if (node_type[lit_int_node] != NODE_LIT_INT) {
             println("Error: expected accessor node to be int literal!");
             exit(1);
         }
         offset := node_data_int[lit_int_node];
 
-        if (node_data_sym[accessed_node] == 0) {
-            println("No symbol found for struct access!");
-            exit(1);
+
+        if (type_is_struct(node_data_type[accessed_node])) {
+            if (node_data_sym[accessed_node] == 0) {
+                println("No symbol found for struct access!");
+                exit(1);
+            }
+            print("    leaq ");
+            emit_sym_access(node_data_sym[accessed_node]);
+            println(", %rcx");
+            print("    leaq", offset);
+            println("(%rcx), %rcx");
+        } else {
+            // ptr
+            generate_expression(accessed_node);
+            // pointer value in %rax
+            print("    leaq", offset);
+            println("(%rax), %rcx");
         }
 
-        // get the base
-        print("    leaq ");
-        emit_sym_access(node_data_sym[accessed_node]);
-        println(", %rcx");
-        // offset it
-        print("    leaq", offset);
-        println("(%rcx), %rcx");
+        // memory we want to write to is now in %rcx
         println("    pushq %rcx");
         generate_expression(rhs);
         println("    popq %rcx");
