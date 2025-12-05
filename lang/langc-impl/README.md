@@ -26,8 +26,8 @@ Not matching expected output on error.
 -    [x] `arr.lang`
 -    [x] `boolean_op.lang`
 -    [x] `break.lang`
--    [ ] `call-type.lang`
--    [ ] `cast.lang`
+-    [x] `call-type.lang`
+-    [x] `cast.lang`
 -    [x] `charlit.lang`
 -    [x] `continue.lang`
 -    [x] `edge.lang`
@@ -49,8 +49,8 @@ Not matching expected output on error.
 -    [x] `simple-expr.lang`
 -    [x] `simple-func.lang`
 -    [x] `simple-if.lang`
--    [ ] `simple-struct.lang`
--    [ ] `simple-typedef.lang`
+-    [x] `simple-struct.lang`
+-    [x] `simple-typedef.lang`
 -    [x] `simple-var.lang`
 -    [x] `simple-while.lang`
 -    [x] `sorting.lang`

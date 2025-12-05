@@ -260,6 +260,7 @@ TOK_PRESUB   : int; // for operators
 TOK_POSTSUB  : int; // for operators
 TOK_FOR      : int; 
 TOK_STRUCT   : int;
+TOK_TYPE     : int;
 
 operator_prec: *int;
 
@@ -307,6 +308,7 @@ lex_init: () -> void = {
     TOK_POSTSUB  = 301;
     TOK_FOR      = 302;
     TOK_STRUCT   = 303;
+    TOK_TYPE     = 304;
 
     operator_prec = alloc(int, 512);
     // 10 * (17 - original lang implementation in C precedence)
@@ -875,6 +877,13 @@ lex_peek: () -> int = {
         return cur_tok;
     }
 
+    match = lex_matches_idlike(cast(*char, "type"));
+    if (match > 0) {
+        cur_tok = TOK_TYPE;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
     // I think identifier should be checked last
     match = lex_matches_id();
     if (match > 0) {
@@ -1038,6 +1047,11 @@ tok_print: (t: int) -> void = {
         return;
     }
 
+    if (t == TOK_TYPE) {
+        print("type");
+        return;
+    }
+
     if (t == TOK_PLUSX2
      || t == TOK_PREADD
      || t == TOK_POSTADD) {
@@ -1083,6 +1097,7 @@ TYPE_STRLIT: int; // nothing
 TYPE_PTR: int; // subtype: subtype
 TYPE_FILE: int; // opaque type wrapping a C FILE*. TODO: represent attrs "rwa+" in the type?
 TYPE_STRUCT: int; // length: num fields, fields: field names (string idx), argtypes: field types
+TYPE_TAGGED: int; // A named type. subtype: the type that is named. name: name.
 
 // basic variants
 TYPE_B_INT:  int;
@@ -1116,6 +1131,7 @@ NODE_ALLOC    : int; // [type] | [type, expr]
 NODE_DELETE   : int; // [expr]
 NODE_CAST     : int; // [type, expr]
 NODE_ACCESS   : int; // [expr, id_node]. Expr type: struct or *struct.
+NODE_TYPEDECL : int; // [id_node, type_node]
 
 node_da_cap: int;
 node_da_sz: int;
@@ -1390,6 +1406,7 @@ parser_init: () -> void = {
     NODE_DELETE   = 23;
     NODE_CAST     = 24;
     NODE_ACCESS   = 25;
+    NODE_TYPEDECL = 26;
 
     TYPE_UNKNOWN = 0;
     TYPE_VOID    = 1;
@@ -1400,6 +1417,7 @@ parser_init: () -> void = {
     TYPE_PTR     = 6;
     TYPE_FILE    = 7;
     TYPE_STRUCT  = 8;
+    TYPE_TAGGED  = 9;
 
     // basic variants
     TYPE_B_INT  = 0;
@@ -2087,6 +2105,26 @@ parse: () -> int = {
             continue;
         }
 
+        if (tok == TOK_TYPE) {
+            lex_advance();
+            tok = lex_peek();
+            if (tok != TOK_ID) {
+                println("Expected an identifier");
+                exit(1);
+            }
+            id_node := node_create(NODE_ID);
+            node_set_idstr(id_node);
+            lex_advance();
+            peek_expect_advance(cast(int, '='));
+            type_node := parse_type();
+
+            typedecl_node := node_create(NODE_TYPEDECL);
+            node_add_child(typedecl_node, id_node);
+            node_add_child(typedecl_node, type_node);
+            node_add_child(root, typedecl_node);
+            continue;
+        }
+
         print("Unexpected token: ");
         tok_print(tok);
         println();
@@ -2301,7 +2339,8 @@ type_data_argtypes: **int;
 // for stuff with fields
 type_data_fields: **int;
 type_data_offsets: **int;
-
+// for tagged type
+type_data_name: *int;
 
 // first index: by scope. 
 // array at location: list of indices in string table
@@ -2356,6 +2395,7 @@ type_create: (tc: int) -> int = {
         new_data_argtypes := alloc(*int, new_cap);
         new_data_fields := alloc(*int, new_cap);
         new_data_offsets := alloc(*int, new_cap);
+        new_data_name := alloc(int, new_cap);
 
         for (i := 0; i < type_table_cap; i += 1) {
             new_class[i] = type_class[i];
@@ -2364,6 +2404,7 @@ type_create: (tc: int) -> int = {
             new_data_argtypes[i] = type_data_argtypes[i];
             new_data_fields[i] = type_data_fields[i];
             new_data_offsets[i] = type_data_offsets[i];
+            new_data_name[i] = type_data_name[i];
         }
 
         if (type_table_cap != 0) {
@@ -2373,6 +2414,7 @@ type_create: (tc: int) -> int = {
             delete(type_data_argtypes);
             delete(type_data_fields);
             delete(type_data_offsets);
+            delete(type_data_name);
         }
 
         type_class         = new_class;
@@ -2381,6 +2423,7 @@ type_create: (tc: int) -> int = {
         type_data_argtypes = new_data_argtypes;
         type_data_fields   = new_data_fields;
         type_data_offsets  = new_data_offsets;
+        type_data_name     = new_data_name;
 
         type_table_cap = new_cap;
     }
@@ -2449,20 +2492,25 @@ type_create_struct: (num_fields: int) -> int = {
 
 type_struct_set_offsets: (typeid: int) -> void = {
     offs := 0;
-    for (i := 0; i < type_data_length[typeid]; i += 1) {
-        field_type := type_data_argtypes[typeid][i];
+    num_fields := type_get_length(typeid);
+    argtypes := type_get_argtypes(typeid);
+    offsets := type_get_offsets(typeid);
+    for (i := 0; i < num_fields; i += 1) {
+        field_type := argtypes[i];
         field_sz := type_sizeof(field_type);
         // offs -> nearest multiple of field_sz >= offs
         offs = ((offs + field_sz - 1) / field_sz) * field_sz;
-        type_data_offsets[typeid][i] = offs;
+        offsets[i] = offs;
         offs += field_sz;
     }
 }
 
 // return -1 if not exists
 type_struct_get_field_idx: (struct_type: int, field_stridx: int) -> int = {
-    for (i := 0; i < type_data_length[struct_type]; i += 1) {
-        candidate_str := type_data_fields[struct_type][i];
+    num_fields := type_get_length(struct_type);
+    fields := type_get_fields(struct_type);
+    for (i := 0; i < num_fields; i += 1) {
+        candidate_str := fields[i];
 
         if (string_table_len[candidate_str] != string_table_len[field_stridx]) {
             continue;
@@ -2477,6 +2525,20 @@ type_struct_get_field_idx: (struct_type: int, field_stridx: int) -> int = {
         }
     }
     return -1;
+}
+
+// Warning: this creates a tagged type without a subtype (yet).
+// Needs to be this way to allow for recursive types (pointer to self-type).
+type_create_tagged: (id_stridx: int) -> int = {
+    // check if a type with that name exists
+    if (type_get_named(id_stridx) >= 0) {
+        return -1;
+    }
+
+    // OK does not exist
+    typeid := type_create(TYPE_TAGGED);
+    type_data_name[typeid] = id_stridx;
+    return typeid;
 }
 
 // Return size of a type in bytes
@@ -2543,6 +2605,10 @@ type_sizeof: (typeid: int) -> int = {
         return ((end_offset + max_subsize - 1) / max_subsize) * max_subsize;
     }
 
+    if (tc == TYPE_TAGGED) {
+        return type_sizeof(type_data_subtype[typeid]);
+    }
+
     print("Unhandled type class in type_sizeof: ");
     type_print(typeid);
     println();
@@ -2555,10 +2621,16 @@ type_is_unknown: (typeid: int) -> bool = {
 }
 
 type_is_void: (typeid: int) -> bool = {
+    if (type_class[typeid] == TYPE_TAGGED) {
+        return type_is_void(type_data_subtype[typeid]);
+    }
     return type_class[typeid] == TYPE_VOID;
 }
 
 type_is_int: (typeid: int) -> bool = {
+    if (type_class[typeid] == TYPE_TAGGED) {
+        return type_is_int(type_data_subtype[typeid]);
+    }
     if (type_class[typeid] != TYPE_BASIC) {
         return false;
     }
@@ -2569,6 +2641,9 @@ type_is_int: (typeid: int) -> bool = {
 }
 
 type_is_bool: (typeid: int) -> bool = {
+    if (type_class[typeid] == TYPE_TAGGED) {
+        return type_is_bool(type_data_subtype[typeid]);
+    }
     if (type_class[typeid] != TYPE_BASIC) {
         return false;
     }
@@ -2579,6 +2654,9 @@ type_is_bool: (typeid: int) -> bool = {
 }
 
 type_is_char: (typeid: int) -> bool = {
+    if (type_class[typeid] == TYPE_TAGGED) {
+        return type_is_char(type_data_subtype[typeid]);
+    }
     if (type_class[typeid] != TYPE_BASIC) {
         return false;
     }
@@ -2589,27 +2667,127 @@ type_is_char: (typeid: int) -> bool = {
 }
 
 type_is_strlit: (typeid: int) -> bool = {
+    if (type_class[typeid] == TYPE_TAGGED) {
+        return type_is_strlit(type_data_subtype[typeid]);
+    }
     return type_class[typeid] == TYPE_STRLIT;
 }
 
 type_is_func: (typeid: int) -> bool = {
+    if (type_class[typeid] == TYPE_TAGGED) {
+        return type_is_func(type_data_subtype[typeid]);
+    }
     return type_class[typeid] == TYPE_FUNC;
 }
 
 type_is_arr: (typeid: int) -> bool = {
+    if (type_class[typeid] == TYPE_TAGGED) {
+        return type_is_arr(type_data_subtype[typeid]);
+    }
     return type_class[typeid] == TYPE_ARR;
 }
 
 type_is_ptr: (typeid: int) -> bool = {
+    if (type_class[typeid] == TYPE_TAGGED) {
+        return type_is_ptr(type_data_subtype[typeid]);
+    }
     return type_class[typeid] == TYPE_PTR;
 }
 
 type_is_file: (typeid: int) -> bool = {
+    if (type_class[typeid] == TYPE_TAGGED) {
+        return type_is_file(type_data_subtype[typeid]);
+    }
     return type_class[typeid] == TYPE_FILE;
 }
 
 type_is_struct: (typeid: int) -> bool = {
+    if (type_class[typeid] == TYPE_TAGGED) {
+        return type_is_struct(type_data_subtype[typeid]);
+    }
     return type_class[typeid] == TYPE_STRUCT;
+}
+
+type_get_subtype: (typeid: int) -> int = {
+    if (type_class[typeid] == TYPE_TAGGED) {
+        return type_get_subtype(type_data_subtype[typeid]);
+    }
+    return type_data_subtype[typeid];
+}
+
+type_get_length: (typeid: int) -> int = {
+    if (type_class[typeid] == TYPE_TAGGED) {
+        return type_get_length(type_data_subtype[typeid]);
+    }
+    return type_data_length[typeid];
+}
+
+type_get_argtypes: (typeid: int) -> *int = {
+    if (type_class[typeid] == TYPE_TAGGED) {
+        return type_get_argtypes(type_data_subtype[typeid]);
+    }
+    return type_data_argtypes[typeid];
+}
+
+type_get_fields: (typeid: int) -> *int = {
+    if (type_class[typeid] == TYPE_TAGGED) {
+        return type_get_fields(type_data_subtype[typeid]);
+    }
+    return type_data_fields[typeid];
+}
+
+type_get_offsets: (typeid: int) -> *int = {
+    if (type_class[typeid] == TYPE_TAGGED) {
+        return type_get_offsets(type_data_subtype[typeid]);
+    }
+    return type_data_offsets[typeid];
+}
+
+type_get_builtin: (id_stridx: int) -> int = {
+    // streq: (str_a: *int, str_b: *int, len: int) -> bool
+    if (streq(string_table[id_stridx], STRING_INT, 3)) {
+        return type_create_basic(TYPE_B_INT);
+    }
+
+    if (streq(string_table[id_stridx], STRING_VOID, 4)) {
+        return type_create(TYPE_VOID);
+    }
+
+    if (streq(string_table[id_stridx], STRING_BOOL, 4)) {
+        return type_create_basic(TYPE_B_BOOL);
+    }
+
+    if (streq(string_table[id_stridx], STRING_CHAR, 4)) {
+        return type_create_basic(TYPE_B_CHAR);
+    }
+
+    if (streq(string_table[id_stridx], STRING_FILE, 4)) {
+        return type_create_file();
+    }
+
+    return -1;
+}
+
+type_get_tagged: (id_stridx: int) -> int = {
+    for (i := 0; i < type_table_sz; i += 1) {
+        if (type_class[i] != TYPE_TAGGED) continue;
+        existing_name := type_data_name[i];
+        if (string_table_len[id_stridx] != string_table_len[existing_name]) continue;
+        if (streq(
+            string_table[id_stridx],
+            string_table[existing_name],
+            string_table_len[id_stridx])) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+type_get_named: (id_stridx: int) -> int = {
+    idx := type_get_builtin(id_stridx);
+    if (idx >= 0) return idx;
+    return type_get_tagged(id_stridx);
 }
 
 type_get_type: (type_node: int) -> int = {
@@ -2630,30 +2808,11 @@ type_get_type: (type_node: int) -> int = {
         id_node := children[0];
         id_stridx := node_data_str[id_node];
 
-        // streq: (str_a: *int, str_b: *int, len: int) -> bool
-        if (streq(string_table[id_stridx], STRING_INT, 3)) {
-            node_data_type[type_node] = type_create_basic(TYPE_B_INT);
-            return node_data_type[type_node];
-        }
+        typeid_builtin := type_get_named(id_stridx);
 
-        if (streq(string_table[id_stridx], STRING_VOID, 4)) {
-            node_data_type[type_node] = type_create(TYPE_VOID);
-            return node_data_type[type_node];
-        }
-
-        if (streq(string_table[id_stridx], STRING_BOOL, 4)) {
-            node_data_type[type_node] = type_create_basic(TYPE_B_BOOL);
-            return node_data_type[type_node];
-        }
-
-        if (streq(string_table[id_stridx], STRING_CHAR, 4)) {
-            node_data_type[type_node] = type_create_basic(TYPE_B_CHAR);
-            return node_data_type[type_node];
-        }
-
-        if (streq(string_table[id_stridx], STRING_FILE, 4)) {
-            node_data_type[type_node] = type_create_file();
-            return node_data_type[type_node];
+        if (typeid_builtin >= 0) {
+            node_data_type[type_node] = typeid_builtin;
+            return typeid_builtin;
         }
 
         print("Unknown type: ");
@@ -2747,6 +2906,12 @@ types_equivalent: (type_a: int, type_b: int) -> bool = {
         return false;
     }
     tc := type_class[type_a];
+
+    if (tc == TYPE_TAGGED) {
+        // Tagged types should end up having the same id.
+        return type_a == type_b;
+    }
+
     if (tc == TYPE_VOID) {
         return true;
     }
@@ -3060,6 +3225,12 @@ resolve_symbols: (root: int) -> void = {
 
     for (i := 0; i < node_children_sz[root]; i += 1) {
         child := children[i];
+
+        if (node_type[child] == NODE_TYPEDECL) {
+            resolve_typedecl(child);
+            continue;
+        }
+
         if (node_type[child] != NODE_DECL) {
             print("Unhandled root node type in resolve_symbols: ");
             node_print(child);
@@ -3107,10 +3278,10 @@ resolve_symbols: (root: int) -> void = {
                 // arg declarations
                 resolve_node(type_children[0], func_scope);
                 CURRENT_FUNC_BLOCK = body;
-                node_data_type[body] = type_data_subtype[decl_type];
+                node_data_type[body] = type_get_subtype(decl_type);
                 resolve_node(body, func_scope);
 
-                func_ret_type := type_data_subtype[decl_type];
+                func_ret_type := type_get_subtype(decl_type);
 
                 if (node_data_type[body] == TYPEID_UNKNOWN) {
                     if (func_ret_type == TYPEID_UNKNOWN) {
@@ -3171,6 +3342,23 @@ resolve_symbols: (root: int) -> void = {
             }
         }
     }
+}
+
+resolve_typedecl: (node: int) -> void = {
+    id_node := node_children[node][0];
+    type_node := node_children[node][1];
+
+    typeid := type_create_tagged(node_data_str[id_node]);
+
+    if (typeid == -1) {
+        print("Cannot define type '");
+        string_table_print(node_data_str[id_node]);
+        println("': It already exists");
+        exit(1);
+    }
+
+    subtype := type_get_type(type_node);
+    type_data_subtype[typeid] = subtype;
 }
  
 // Resolve symbols and register types!
@@ -3289,14 +3477,14 @@ resolve_node: (node: int, scope: int) -> void = {
         call_list := children[1];
         arg_nodes := node_children[call_list];
         num_arg_nodes := node_children_sz[call_list];
-        req_argtypes := type_data_argtypes[func_type];
+        req_argtypes := type_get_argtypes(func_type);
 
-        if (type_data_length[func_type] >= 0) {
+        if (type_get_length(func_type) >= 0) {
             // if not variadic, do type checks
-            if (type_data_length[func_type] != num_arg_nodes) {
+            if (type_get_length(func_type) != num_arg_nodes) {
                 print("Function '");
                 string_table_print(node_data_str[func_id_node]);
-                println("' requires", type_data_length[func_type], "args but was called with", num_arg_nodes);
+                println("' requires", type_get_length(func_type), "args but was called with", num_arg_nodes);
                 exit(1);
             }
             for (i := 0; i < num_arg_nodes; i += 1) {
@@ -3317,7 +3505,7 @@ resolve_node: (node: int, scope: int) -> void = {
             }
         }
         // call expression gets type == return type of func
-        node_data_type[node] = type_data_subtype[func_type];
+        node_data_type[node] = type_get_subtype(func_type);
         return;
     }
 
@@ -3333,7 +3521,7 @@ resolve_node: (node: int, scope: int) -> void = {
         if (type_is_ptr(lhs_type) && type_is_int(rhs_type) && node_data_op[node] == cast(int, '+')) {
             // OK, pointer + int, but we have to multiply integer with inner type size
             // create int literal with value sizeof(*ptr)
-            subt_size := type_sizeof(type_data_subtype[lhs_type]);
+            subt_size := type_sizeof(type_get_subtype(lhs_type));
             literal_node := node_create(NODE_LIT_INT);
             node_data_int[literal_node] = subt_size;
             node_data_type[literal_node] = rhs_type;
@@ -3482,10 +3670,10 @@ resolve_node: (node: int, scope: int) -> void = {
             exit(1);
         }
 
-        if (type_is_arr(id_type) && num_children - 1 != type_data_length[id_type]) {
+        if (type_is_arr(id_type) && num_children - 1 != type_get_length(id_type)) {
             print("Array '");
             string_table_print(node_data_str[id_node]);
-            print("' has", type_data_length[id_type], "dimensions but was indexed using", num_children-1);
+            print("' has", type_get_length(id_type), "dimensions but was indexed using", num_children-1);
             println();
             exit(1);
         }
@@ -3505,7 +3693,7 @@ resolve_node: (node: int, scope: int) -> void = {
         }
 
         // an indexed element gets type == subtype of arr
-        node_data_type[node] = type_data_subtype[id_type];
+        node_data_type[node] = type_get_subtype(id_type);
         return;
     }
 
@@ -3569,7 +3757,7 @@ resolve_node: (node: int, scope: int) -> void = {
             println();
             exit(1);
         }
-        node_data_type[node] = type_data_subtype[subtype];
+        node_data_type[node] = type_get_subtype(subtype);
         return;
     }
 
@@ -3629,7 +3817,7 @@ resolve_node: (node: int, scope: int) -> void = {
         struct_type := lhs_type;
 
         if (type_is_ptr(lhs_type)) {
-            struct_type = type_data_subtype[lhs_type];
+            struct_type = type_get_subtype(lhs_type);
         }
         if (!type_is_struct(struct_type)) {
             println("Attempt to access non-struct");
@@ -3651,11 +3839,11 @@ resolve_node: (node: int, scope: int) -> void = {
             exit(1);
         }
 
-        node_data_type[node] = type_data_argtypes[struct_type][access_idx];
+        node_data_type[node] = type_get_argtypes(struct_type)[access_idx];
 
         // Translate to an access offset
         lit_int := node_create(NODE_LIT_INT);
-        node_data_int[lit_int] = type_data_offsets[struct_type][access_idx];
+        node_data_int[lit_int] = type_get_offsets(struct_type)[access_idx];
         node_data_type[lit_int] = type_create_basic(TYPE_B_INT);
 
         children[1] = lit_int;
@@ -3742,7 +3930,7 @@ resolve_cast: (node: int) -> void = {
 
     if (type_is_strlit(type_src) 
      && type_is_ptr(type_dst) 
-     && type_is_char(type_data_subtype[type_dst])) {
+     && type_is_char(type_get_subtype(type_dst))) {
         // OK strlit -> *char
         node_data_type[node] = type_dst;
         return;
@@ -3771,8 +3959,8 @@ check_main_signature: (main_decl: int) -> void = {
     }
 
     main_type := node_data_type[type_node];
-    nargs := type_data_length[main_type];
-    ret_type := type_data_subtype[main_type];
+    nargs := type_get_length(main_type);
+    ret_type := type_get_subtype(main_type);
 
     if (nargs != 0 && nargs != 2) {
         println("Function main must take exactly 0 or exactly 2 arguments!");
@@ -3785,8 +3973,8 @@ check_main_signature: (main_decl: int) -> void = {
     }
 
     if (nargs == 2) {
-        first_argt := type_data_argtypes[main_type][0];
-        second_argt := type_data_argtypes[main_type][1];
+        first_argt := type_get_argtypes(main_type)[0];
+        second_argt := type_get_argtypes(main_type)[1];
 
         if (!type_is_int(first_argt)) {
             print("First argument of main must be int, not ");
@@ -3827,8 +4015,8 @@ post_resolve_simplify: (node: int) -> void = {
             println("Expected type to be array when indexed with more than one index!");
             exit(1);
         }
-        num_dims := type_data_length[id_type];
-        dims     := type_data_argtypes[id_type];
+        num_dims := type_get_length(id_type);
+        dims     := type_get_argtypes(id_type);
 
         multiplier := 1;
 
@@ -4035,6 +4223,9 @@ generate_code: (root: int) -> void = {
                     child_children[2]
                 );
             }
+        } else if (node_type[child] == NODE_TYPEDECL) {
+            // TODO: perhaps default initialization
+            continue;
         } else {
             println("Not implemented: root decl node type");
             exit(1);
@@ -4344,7 +4535,7 @@ generate_function_code: (func_scope: int, id_node: int, type_node: int, body_nod
         string_table[node_data_str[id_node]], 
         STRING_MAIN, 
         string_table_len[node_data_str[id_node]]
-    ) && type_is_void(type_data_subtype[node_data_type[type_node]])) {
+    ) && type_is_void(type_get_subtype(node_data_type[type_node]))) {
         println("    movq $0, %rax");
     }
 
@@ -4993,7 +5184,7 @@ generate_expression: (node: int) -> void = {
         generate_expression(expr_node);
         println("    popq %rcx");
 
-        sz := type_sizeof(type_data_subtype[node_data_type[id_node]]);
+        sz := type_sizeof(type_get_subtype(node_data_type[id_node]));
         println("    leaq (%rcx, %rax,", sz, "), %rcx");
 
         // now the memory address of indexed item in rcx
@@ -5022,7 +5213,7 @@ generate_expression: (node: int) -> void = {
         if (!type_is_struct(node_data_type[accessed_node]) &&
             !(
                 type_is_ptr(node_data_type[accessed_node]) 
-             && type_is_struct(type_data_subtype[node_data_type[accessed_node]])
+             && type_is_struct(type_get_subtype(node_data_type[accessed_node]))
         )) {
             println("Error: expected accessed node to be struct!");
             exit(1);
@@ -5252,7 +5443,7 @@ generate_assign: (node: int) -> void = {
 
         println("    popq %rcx");
 
-        sz := type_sizeof(type_data_subtype[node_data_type[id_node]]);
+        sz := type_sizeof(type_get_subtype(node_data_type[id_node]));
         println("    leaq (%rcx, %rax,", sz, "), %rcx");
         // address where we want to store is in %rcx
         println("    pushq %rcx");
@@ -5272,7 +5463,7 @@ generate_assign: (node: int) -> void = {
         lhs_children := node_children[lhs];
         ch0 := lhs_children[0];
         // type of dereffed ptr
-        sz := type_sizeof(type_data_subtype[node_data_type[ch0]]);
+        sz := type_sizeof(type_get_subtype(node_data_type[ch0]));
         generate_expression(ch0);
         println("    pushq %rax");
         generate_expression(rhs);
@@ -5296,7 +5487,7 @@ generate_assign: (node: int) -> void = {
         if (!type_is_struct(node_data_type[accessed_node]) &&
             !(
                 type_is_ptr(node_data_type[accessed_node]) 
-             && type_is_struct(type_data_subtype[node_data_type[accessed_node]])
+             && type_is_struct(type_get_subtype(node_data_type[accessed_node]))
         )) {
             println("Error: expected accessed node to be struct!");
             exit(1);
@@ -5382,7 +5573,7 @@ generate_deref: (node: int) -> void = {
 generate_alloc: (node: int) -> void = {
     children := node_children[node];
     ptr_type := node_data_type[node];
-    subtype  := type_data_subtype[ptr_type];
+    subtype  := type_get_subtype(ptr_type);
     base_sz  := type_sizeof(subtype);
     print("    movq $");
     print(base_sz);
@@ -5530,7 +5721,7 @@ type_print: (typeid: int) -> void = {
     }
     if (tc == TYPE_BASIC) {
         print("basic<");
-        type_print_basic(type_data_subtype[typeid]);
+        type_print_basic(type_get_subtype(typeid));
         print(">");
         return;
     }
@@ -5545,11 +5736,11 @@ type_print: (typeid: int) -> void = {
         }
         print(")");
         print("->");
-        type_print(type_data_subtype[typeid]);
+        type_print(type_get_subtype(typeid));
         return;
     }
     if (tc == TYPE_ARR) {
-        type_print(type_data_subtype[typeid]);
+        type_print(type_get_subtype(typeid));
         print("[");
         for (i := 0; i < type_data_length[typeid]; i += 1) {
             if (i > 0) {
@@ -5568,7 +5759,7 @@ type_print: (typeid: int) -> void = {
 
     if (tc == TYPE_PTR) {
         print("*");
-        type_print(type_data_subtype[typeid]);
+        type_print(type_get_subtype(typeid));
         return;
     }
 
@@ -5590,6 +5781,13 @@ type_print: (typeid: int) -> void = {
             type_print(type_data_argtypes[typeid][i]);
         }
         print("}");
+        return;
+    }
+
+    if (tc == TYPE_TAGGED) {
+        string_table_print(type_data_name[typeid]);
+        print("=");
+        type_print(type_data_subtype[typeid]);
         return;
     }
 
@@ -5728,6 +5926,10 @@ node_print: (node: int) -> void = {
     }
     if (typ == NODE_ACCESS) {
         print("ACCESS");
+        return;
+    }
+    if (typ == NODE_TYPEDECL) {
+        print("TYPEDECL");
         return;
     }
     print("????");
