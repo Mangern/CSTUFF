@@ -261,6 +261,7 @@ TOK_POSTSUB  : int; // for operators
 TOK_FOR      : int; 
 TOK_STRUCT   : int;
 TOK_TYPE     : int;
+TOK_SIZEOF   : int;
 
 operator_prec: *int;
 
@@ -309,6 +310,7 @@ lex_init: () -> void = {
     TOK_FOR      = 302;
     TOK_STRUCT   = 303;
     TOK_TYPE     = 304;
+    TOK_SIZEOF   = 305;
 
     operator_prec = alloc(int, 512);
     // 10 * (17 - original lang implementation in C precedence)
@@ -884,6 +886,13 @@ lex_peek: () -> int = {
         return cur_tok;
     }
 
+    match = lex_matches_idlike(cast(*char, "sizeof"));
+    if (match > 0) {
+        cur_tok = TOK_SIZEOF;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
     // I think identifier should be checked last
     match = lex_matches_id();
     if (match > 0) {
@@ -1052,6 +1061,11 @@ tok_print: (t: int) -> void = {
         return;
     }
 
+    if (t == TOK_SIZEOF) {
+        print("sizeof");
+        return;
+    }
+
     if (t == TOK_PLUSX2
      || t == TOK_PREADD
      || t == TOK_POSTADD) {
@@ -1132,6 +1146,7 @@ NODE_DELETE   : int; // [expr]
 NODE_CAST     : int; // [type, expr]
 NODE_ACCESS   : int; // [expr, id_node]. Expr type: struct or *struct.
 NODE_TYPEDECL : int; // [id_node, type_node]
+NODE_SIZEOF   : int; // [type]. TODO: expression as well?
 
 node_da_cap: int;
 node_da_sz: int;
@@ -1407,6 +1422,7 @@ parser_init: () -> void = {
     NODE_CAST     = 24;
     NODE_ACCESS   = 25;
     NODE_TYPEDECL = 26;
+    NODE_SIZEOF   = 27;
 
     TYPE_UNKNOWN = 0;
     TYPE_VOID    = 1;
@@ -1695,6 +1711,16 @@ parse_cast_expr: () -> int = {
     return cast_node;
 }
 
+parse_sizeof_expr: () -> int = {
+    peek_expect_advance(TOK_SIZEOF);
+    sizeof_node := node_create(NODE_SIZEOF);
+    peek_expect_advance(cast(int, '('));
+    // TODO: I want expression as well, but that is a bit ambiguous ATM
+    node_add_child(sizeof_node, parse_type());
+    peek_expect_advance(cast(int, ')'));
+    return sizeof_node;
+}
+
 parse_function_call: (id_node: int) -> int = {
     call_node := node_create(NODE_CALL);
     node_add_child(call_node, id_node);
@@ -1846,6 +1872,7 @@ parse_return_expr: () -> int = {
 //     ::= allocexpr
 //     ::= deleteexpr
 //     ::= castexpr
+//     ::= sizeofexpr
 parse_primary_expr: () -> int = {
     token := lex_peek();
 
@@ -1898,6 +1925,10 @@ parse_primary_expr: () -> int = {
 
     if (token == TOK_CAST) {
         return parse_cast_expr();
+    }
+
+    if (token == TOK_SIZEOF) {
+        return parse_sizeof_expr();
     }
 
     if (token == TOK_ID) {
@@ -3804,6 +3835,12 @@ resolve_node: (node: int, scope: int) -> void = {
         return;
     }
 
+    if (node_type[node] == NODE_SIZEOF) {
+        resolve_node(children[0], new_scope);
+        node_data_type[node] = type_create_basic(TYPE_B_INT);
+        return;
+    }
+
     if (node_type[node] == NODE_TYPE) {
         node_data_type[node] = type_get_type(node);
         return;
@@ -3924,6 +3961,7 @@ resolve_cast: (node: int) -> void = {
      || type_is_char(type_src) && type_is_int(type_dst)
      || type_is_ptr(type_src) && type_is_int(type_dst)) {
         // OK int <-> char
+        //   ptr -> int (not int -> ptr)
         node_data_type[node] = type_dst;
         return;
     }
@@ -4064,6 +4102,15 @@ post_resolve_simplify: (node: int) -> void = {
             node_data_int[last_lit_int] = result_offset;
             return;
         }
+    }
+
+    if (node_type[node] == NODE_SIZEOF) {
+        inner_type := node_data_type[node_children[node][0]];
+        sizeof_val := type_sizeof(inner_type);
+        node_type[node] = NODE_LIT_INT;
+        node_data_int[node] = sizeof_val;
+        node_children_sz[node] = 0;
+        return;
     }
 }
 
@@ -5786,8 +5833,7 @@ type_print: (typeid: int) -> void = {
 
     if (tc == TYPE_TAGGED) {
         string_table_print(type_data_name[typeid]);
-        print("=");
-        type_print(type_data_subtype[typeid]);
+        // it would be dangerous to print the subtype if it is recursive
         return;
     }
 
@@ -5922,6 +5968,10 @@ node_print: (node: int) -> void = {
     }
     if (typ == NODE_CAST) {
         print("CAST");
+        return;
+    }
+    if (typ == NODE_SIZEOF) {
+        print("SIZEOF");
         return;
     }
     if (typ == NODE_ACCESS) {
