@@ -5270,15 +5270,9 @@ generate_expression: (node: int) -> void = {
 
 
         if (type_is_struct(node_data_type[accessed_node])) {
-            if (node_data_sym[accessed_node] == 0) {
-                println("No symbol found for struct access!");
-                exit(1);
-            }
-            print("    leaq ");
-            emit_sym_access(node_data_sym[accessed_node]);
-            println(", %rcx");
+            generate_node_address(accessed_node);
             print("    leaq", offset);
-            println("(%rcx), %rcx");
+            println("(%rax), %rcx");
         } else {
             // ptr
             generate_expression(accessed_node);
@@ -5441,6 +5435,37 @@ generate_continue: (node: int) -> void = {
     }
 }
 
+// generate_expression, but get the location of something
+generate_node_address: (node: int) -> void = {
+    if (node_data_sym[node] != 0) {
+        print("    leaq ");
+        emit_sym_access(node_data_sym[node]);
+        println(", %rax");
+        return;
+    }
+
+    if (node_type[node] == NODE_INDEX) {
+        sz := type_sizeof(node_data_type[node]);
+        generate_node_address(node_children[node][0]);
+        println("    pushq %rax");
+        generate_expression(node_children[node][1]);
+        println("    popq %rcx");
+
+        // rax := base(%rcx) + index(%rax) * size(const)
+        print("    imulq $");
+        print(sz);
+        println(", %rax");
+
+        println("    leaq (%rcx, %rax, 1), %rax");
+        return;
+    }
+
+    print("Error: ");
+    node_print(node);
+    println(" is not something we can get the address of");
+    exit(1);
+}
+
 // TODO: we could benefit from some lvalue-rvalue stuff here
 generate_assign: (node: int) -> void = {
     children := node_children[node];
@@ -5548,15 +5573,9 @@ generate_assign: (node: int) -> void = {
 
 
         if (type_is_struct(node_data_type[accessed_node])) {
-            if (node_data_sym[accessed_node] == 0) {
-                println("No symbol found for struct access!");
-                exit(1);
-            }
-            print("    leaq ");
-            emit_sym_access(node_data_sym[accessed_node]);
-            println(", %rcx");
+            generate_node_address(accessed_node);
             print("    leaq", offset);
-            println("(%rcx), %rcx");
+            println("(%rax), %rcx");
         } else {
             // ptr
             generate_expression(accessed_node);
