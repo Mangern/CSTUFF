@@ -1,0 +1,65 @@
+EOF: char;
+buf: char[200];
+nbuf: int;
+grid: **int;
+
+readline: () -> bool = {
+    c := readchar();
+    if (c == EOF) {
+        return false;
+    }
+
+    nbuf = 0;
+
+    while (c != '\n' && c != EOF) {
+        buf[nbuf] = c;
+        nbuf += 1;
+
+        c = readchar();
+    }
+
+    return true;
+}
+
+main: () -> void = {
+    EOF = cast(char, 255);
+    rows := 0;
+    cols := 0;
+    grid = alloc(*int, 200);
+    grid[0] = alloc(int, 200);
+    while (readline()) {
+        rows += 1;
+        grid[rows] = alloc(int, 200);
+        cols = nbuf;
+        for (i := 0; i < nbuf; i += 1) {
+            if (buf[i] == '@') {
+                grid[rows][i + 1] = 1;
+            }
+        }
+    }
+    grid[rows+1] = alloc(int, 200);
+
+    ans := 0;
+    for (i := 1; i <= rows; i += 1) {
+        for (j := 1; j <= cols; j += 1) {
+            if (grid[i][j] == 0) continue;
+            count := 0;
+            for (ni := i - 1; ni <= i + 1; ni += 1) {
+                for (nj := j - 1; nj <= j + 1; nj += 1) {
+                    if (ni == i && nj == j) continue;
+                    count += grid[ni][nj];
+                }
+            }
+
+            if (count < 4) {
+                ans += 1;
+            }
+        }
+    }
+    println(ans);
+
+    for (i := 0; i < rows+2; i += 1) {
+        delete(grid[i]);
+    }
+    delete(grid);
+}

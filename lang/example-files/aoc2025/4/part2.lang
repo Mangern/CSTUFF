@@ -1,0 +1,119 @@
+EOF: char;
+buf: char[200];
+nbuf: int;
+grid: **int;
+queue: int[40000];
+qfront: int;
+qback: int;
+nqueue: int;
+
+readline: () -> bool = {
+    c := readchar();
+    if (c == EOF) {
+        return false;
+    }
+
+    nbuf = 0;
+
+    while (c != '\n' && c != EOF) {
+        buf[nbuf] = c;
+        nbuf += 1;
+
+        c = readchar();
+    }
+
+    return true;
+}
+
+qhas: () -> bool = {
+    return qfront != qback;
+}
+
+qpush: (x: int) -> void = {
+    queue[qback] = x;
+    qback += 1;
+    if (qback == nqueue) qback = 0;
+}
+
+qpop: () -> int = {
+    ret := queue[qfront];
+    qfront += 1;
+    if (qfront == nqueue) qfront = 0;
+    return ret;
+}
+
+main: () -> void = {
+    EOF = cast(char, 255);
+    nqueue = 40000;
+    rows := 0;
+    cols := 0;
+    grid = alloc(*int, 200);
+    grid[0] = alloc(int, 200);
+    while (readline()) {
+        rows += 1;
+        grid[rows] = alloc(int, 200);
+        cols = nbuf;
+        for (i := 0; i < nbuf; i += 1) {
+            if (buf[i] == '@') {
+                grid[rows][i + 1] = 1;
+            }
+        }
+    }
+    grid[rows+1] = alloc(int, 200);
+    M := rows + 2;
+
+    for (i := 1; i <= rows; i += 1) {
+        for (j := 1; j <= cols; j += 1) {
+            if (grid[i][j] == 0) {
+                continue;
+            }
+            count := 0;
+            for (ni := i - 1; ni <= i + 1; ni += 1) {
+                for (nj := j - 1; nj <= j + 1; nj += 1) {
+                    if (ni == i && nj == j) continue;
+                    if (grid[ni][nj] > 0) {
+                        count += 1;
+                    }
+                }
+            }
+
+            grid[i][j] = count + 1;
+            if (count < 4) {
+                qpush(i * M + j);
+            }
+        }
+    }
+
+    for (qptr := qfront; qptr != qback; qptr = (qptr + 1) % nqueue) {
+        i := queue[qptr] / M;
+        j := queue[qptr] % M;
+        grid[i][j] = 0;
+    }
+
+    ans := 0;
+    while (qhas()) {
+        u := qpop();
+        i := u / M;
+        j := u % M;
+
+        ans += 1;
+
+        for (ni := i - 1; ni <= i + 1; ni += 1) {
+            for (nj := j - 1; nj <= j + 1; nj += 1) {
+                if (grid[ni][nj] > 0) {
+                    grid[ni][nj] -= 1;
+                }
+                if (0 < grid[ni][nj] && grid[ni][nj] < 5) {
+                    grid[ni][nj] = 0;
+                    qpush(ni * M + nj);
+                }
+            }
+        }
+    }
+    println(ans);
+
+    for (i := 0; i < rows+2; i += 1) {
+        delete(grid[i]);
+    }
+    delete(grid);
+}
