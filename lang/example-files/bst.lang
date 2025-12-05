@@ -1,0 +1,81 @@
+type Node = struct {
+    val: int;
+    lft_child: *Node;
+    rgt_child: *Node;
+};
+
+root: *Node;
+
+// Return true if it was inserted
+tree_insert: (val: int) -> bool = {
+    if (cast(int, root) == 0) {
+        root = alloc(Node);
+        root.val = val;
+        return true;
+    }
+
+    ptr := root;
+
+    while (true) {
+        if (ptr.val == val) {
+            return false;
+        }
+
+        if (val < ptr.val) {
+            if (cast(int, ptr.lft_child) == 0) {
+                ptr.lft_child = alloc(Node);
+                ptr.lft_child.val = val;
+                return true;
+            }
+            ptr = ptr.lft_child;
+        } else {
+            if (cast(int, ptr.rgt_child) == 0) {
+                ptr.rgt_child = alloc(Node);
+                ptr.rgt_child.val = val;
+                return true;
+            }
+            ptr = ptr.rgt_child;
+        }
+    }
+    return false;
+}
+
+print_tree: (node: *Node, indent: int) -> void = {
+    if (cast(int, node) == 0) return;
+    print_tree(node.lft_child, indent + 2);
+
+    for (i := 0; i < indent; i += 1) {
+        print(" ");
+    }
+    println(node.val);
+    print_tree(node.rgt_child, indent + 2);
+}
+
+delete_tree: (node: *Node) -> void = {
+    if (cast(int, node) == 0) return;
+    delete_tree(node.lft_child);
+    delete_tree(node.rgt_child);
+    delete(node);
+}
+
+main: () -> void = {
+    tree_insert(8);
+    tree_insert(4);
+    tree_insert(12);
+    tree_insert(2);
+    tree_insert(6);
+    tree_insert(10);
+    tree_insert(14);
+    tree_insert(1);
+    tree_insert(3);
+    tree_insert(5);
+    tree_insert(7);
+    tree_insert(9);
+    tree_insert(11);
+    tree_insert(13);
+    tree_insert(15);
+
+    print_tree(root, 0);
+
+    delete_tree(root); // All heap blocks are freed -- no leaks are possible
+}
