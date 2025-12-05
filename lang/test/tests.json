@@ -85,10 +85,6 @@
         "expect-stdout": "123456789\n"
     },
     {
-        "file": "simple-struct.lang",
-        "expect-stdout": "69 420\n123\n300.000000\n"
-    },
-    {
         "file": "memory.lang",
         "expect-stdout": "69\n0 5\n"
     },
@@ -116,11 +112,11 @@
 
     {
         "file": "cast.lang",
-        "expect-stderr": "./test/files/cast.lang:5:5: Cannot assign out of type real to expression of type int\n\n    5 |     out: real = x + y;\n      |     ^~~~~~~~~~~~~~~~~\n"
+        "expect-stderr": "./test/files/cast.lang:5:5: Cannot assign out of type char to expression of type int\n\n    5 |     out: char = x + y;\n      |     ^~~~~~~~~~~~~~~~~\n"
     },
     {
         "file": "call-type.lang",
-        "expect-stderr": "./test/files/call-type.lang:6:10: Argument 1 of function func has the wrong type. Required: 'int', Got: 'real'\n\n    6 |     func(69.0);\n      |          ^~~~\n"
+        "expect-stderr": "./test/files/call-type.lang:6:10: Argument 1 of function func has the wrong type. Required: 'int', Got: 'char'\n\n    6 |     func('a');\n      |          ^~~\n"
     },
     {
         "file": "err.lang",

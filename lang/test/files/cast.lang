@@ -2,6 +2,6 @@ main: () -> void = {
     x: int = 34;
     y: int = 35;
 
-    out: real = x + y;
+    out: char = x + y;
     println(out);
 }

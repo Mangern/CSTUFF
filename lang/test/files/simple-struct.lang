@@ -1,13 +1,13 @@
 //outside: struct { foo: int; y: int; };
 main: () -> void = {
-    p: struct { x: int; y: int; z: struct { a: real; }; };
+    p: struct { x: int; y: int; z: struct { a: char; }; };
 
     x := 123;
 
     p.x = 69;
     p.y = 351 + p.x;
 
-    p.z.a = 300.0;
+    p.z.a = 'x';
 
     println(p.x, p.y);
     println(x);

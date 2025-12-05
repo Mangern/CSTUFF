@@ -148,7 +148,7 @@ static node_t* parse_type_declaration() {
     token_t token = peek_expect_advance(LEX_IDENTIFIER);
     node_t* identifier_node = node_create_leaf(IDENTIFIER, token);
     identifier_node->data.identifier_str = lexer_substring(token.begin_offset, token.end_offset);
-    peek_expect_advance(LEX_COLON);
+    peek_expect_advance(LEX_EQUAL);
     node_t* type_node = parse_type();
 
     peek_expect_advance(LEX_SEMICOLON);

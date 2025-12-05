@@ -3,5 +3,5 @@ func: (x: int) -> int = {
 }
 
 main: () -> void = {
-    func(69.0);
+    func('a');
 }
