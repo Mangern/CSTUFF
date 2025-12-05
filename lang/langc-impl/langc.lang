@@ -259,6 +259,7 @@ TOK_POSTADD  : int; // for operators
 TOK_PRESUB   : int; // for operators
 TOK_POSTSUB  : int; // for operators
 TOK_FOR      : int; 
+TOK_STRUCT   : int;
 
 operator_prec: *int;
 
@@ -305,6 +306,7 @@ lex_init: () -> void = {
     TOK_PRESUB   = 300;
     TOK_POSTSUB  = 301;
     TOK_FOR      = 302;
+    TOK_STRUCT   = 303;
 
     operator_prec = alloc(int, 512);
     // 10 * (17 - original lang implementation in C precedence)
@@ -335,6 +337,7 @@ lex_init: () -> void = {
     operator_prec[TOK_POSTADD]    = 150;
     operator_prec[TOK_PRESUB]     = 140;
     operator_prec[TOK_POSTSUB]    = 150;
+    operator_prec[cast(int, '.')] = 150;
 }
 
 
@@ -865,6 +868,13 @@ lex_peek: () -> int = {
         return cur_tok;
     }
 
+    match = lex_matches_idlike(cast(*char, "struct"));
+    if (match > 0) {
+        cur_tok = TOK_STRUCT;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
     // I think identifier should be checked last
     match = lex_matches_id();
     if (match > 0) {
@@ -1023,6 +1033,11 @@ tok_print: (t: int) -> void = {
         return;
     }
 
+    if (t == TOK_STRUCT) {
+        print("struct");
+        return;
+    }
+
     if (t == TOK_PLUSX2
      || t == TOK_PREADD
      || t == TOK_POSTADD) {
@@ -1066,7 +1081,8 @@ TYPE_FUNC: int;  // subtype: return type, length: num args (-1: variadic), argty
 TYPE_ARR: int;   // subtype: subtype, length: num dims, argtypes: list of dims
 TYPE_STRLIT: int; // nothing
 TYPE_PTR: int; // subtype: subtype
-TYPE_FILE: int; // opaque type wrapping a C FILE*. TODO: represent attrs "rwa+" in the type!
+TYPE_FILE: int; // opaque type wrapping a C FILE*. TODO: represent attrs "rwa+" in the type?
+TYPE_STRUCT: int; // length: num fields, fields: field names (string idx), argtypes: field types
 
 // basic variants
 TYPE_B_INT:  int;
@@ -1099,6 +1115,7 @@ NODE_DEREF    : int; // [expr]
 NODE_ALLOC    : int; // [type] | [type, expr]
 NODE_DELETE   : int; // [expr]
 NODE_CAST     : int; // [type, expr]
+NODE_ACCESS   : int; // [expr, id_node]
 
 node_da_cap: int;
 node_da_sz: int;
@@ -1372,6 +1389,7 @@ parser_init: () -> void = {
     NODE_ALLOC    = 22;
     NODE_DELETE   = 23;
     NODE_CAST     = 24;
+    NODE_ACCESS   = 25;
 
     TYPE_UNKNOWN = 0;
     TYPE_VOID    = 1;
@@ -1381,6 +1399,7 @@ parser_init: () -> void = {
     TYPE_STRLIT  = 5;
     TYPE_PTR     = 6;
     TYPE_FILE    = 7;
+    TYPE_STRUCT  = 8;
 
     // basic variants
     TYPE_B_INT  = 0;
@@ -1440,6 +1459,39 @@ parse_type: () -> int = {
 
         subtype_node := parse_type();
         node_add_child(type_node, subtype_node);
+        return type_node;
+    }
+
+    if (token == TOK_STRUCT) {
+        // struct type
+        lex_advance();
+        peek_expect_advance(cast(int, '{'));
+        node_parse_tc[type_node] = TYPE_STRUCT;
+
+        while (true) {
+            token := lex_peek();
+            if (token == cast(int, '}')) break;
+
+            if (token != TOK_ID) {
+                print("Unexpected token: ");
+                tok_print(token);
+                exit(1);
+            }
+            id_node := node_create(NODE_ID);
+            node_set_idstr(id_node);
+            lex_advance();
+            peek_expect_advance(cast(int, ':'));
+            subtype_node := parse_type();
+
+            decl_node := node_create(NODE_DECL);
+            node_add_child(decl_node, id_node);
+            node_add_child(decl_node, subtype_node);
+            node_add_child(type_node, decl_node);
+
+            peek_expect_advance(cast(int, ';'));
+        }
+
+        peek_expect_advance(cast(int, '}'));
         return type_node;
     }
 
@@ -2160,6 +2212,20 @@ parse_simplify: (node: int) -> void = {
             return;
         }
 
+        // binop[.] -> ACCESS
+        if (node_op == cast(int, '.')) {
+            lhs := children[0];
+            rhs := children[1];
+
+            if (node_type[rhs] != NODE_ID) {
+                // TODO: change this if we add methods
+                println("Structs can only be accessed by identifiers");
+                exit(1);
+            }
+            node_type[node] = NODE_ACCESS;
+            return;
+        }
+
         return;
     }
 
@@ -2232,6 +2298,9 @@ type_data_subtype: *int;
 type_data_length: *int;
 // for stuff with a list of params
 type_data_argtypes: **int;
+// for stuff with fields
+type_data_fields: **int;
+type_data_offsets: **int;
 
 
 // first index: by scope. 
@@ -2285,12 +2354,16 @@ type_create: (tc: int) -> int = {
         new_data_subtype := alloc(int, new_cap);
         new_data_length := alloc(int, new_cap);
         new_data_argtypes := alloc(*int, new_cap);
+        new_data_fields := alloc(*int, new_cap);
+        new_data_offsets := alloc(*int, new_cap);
 
         for (i := 0; i < type_table_cap; i += 1) {
             new_class[i] = type_class[i];
             new_data_subtype[i] = type_data_subtype[i];
             new_data_length[i] = type_data_length[i];
             new_data_argtypes[i] = type_data_argtypes[i];
+            new_data_fields[i] = type_data_fields[i];
+            new_data_offsets[i] = type_data_offsets[i];
         }
 
         if (type_table_cap != 0) {
@@ -2298,12 +2371,16 @@ type_create: (tc: int) -> int = {
             delete(type_data_subtype);
             delete(type_data_length);
             delete(type_data_argtypes);
+            delete(type_data_fields);
+            delete(type_data_offsets);
         }
 
         type_class         = new_class;
         type_data_subtype  = new_data_subtype;
         type_data_length   = new_data_length;
         type_data_argtypes = new_data_argtypes;
+        type_data_fields   = new_data_fields;
+        type_data_offsets  = new_data_offsets;
 
         type_table_cap = new_cap;
     }
@@ -2361,6 +2438,47 @@ type_create_func: (ret_type: int, num_args: int) -> int = {
     return typeid;
 }
 
+type_create_struct: (num_fields: int) -> int = {
+    typeid := type_create(TYPE_STRUCT);
+    type_data_length[typeid]   = num_fields;
+    type_data_argtypes[typeid] = alloc(int, num_fields);
+    type_data_fields[typeid]   = alloc(int, num_fields);
+    type_data_offsets[typeid]  = alloc(int, num_fields);
+    return typeid;
+}
+
+type_struct_set_offsets: (typeid: int) -> void = {
+    offs := 0;
+    for (i := 0; i < type_data_length[typeid]; i += 1) {
+        field_type := type_data_argtypes[typeid][i];
+        field_sz := type_sizeof(field_type);
+        // offs -> nearest multiple of field_sz >= offs
+        offs = ((offs + field_sz - 1) / field_sz) * field_sz;
+        type_data_offsets[typeid][i] = offs;
+        offs += field_sz;
+    }
+}
+
+// return -1 if not exists
+type_struct_get_field_idx: (struct_type: int, field_stridx: int) -> int = {
+    for (i := 0; i < type_data_length[struct_type]; i += 1) {
+        candidate_str := type_data_fields[struct_type][i];
+
+        if (string_table_len[candidate_str] != string_table_len[field_stridx]) {
+            continue;
+        }
+
+        if (streq(
+            string_table[candidate_str],
+            string_table[field_stridx],
+            string_table_len[field_stridx]
+        )) {
+            return i;
+        }
+    }
+    return -1;
+}
+
 // Return size of a type in bytes
 type_sizeof: (typeid: int) -> int = {
     tc := type_class[typeid];
@@ -2406,6 +2524,23 @@ type_sizeof: (typeid: int) -> int = {
     if (tc == TYPE_FILE) {
         // pointer basically
         return 8;
+    }
+
+    if (tc == TYPE_STRUCT) {
+        num_fields := type_data_length[typeid];
+        if (num_fields == 0) return 0;
+
+        max_subsize := 0;
+        end_offset := 0;
+
+        for (i := 0; i < num_fields; i += 1) {
+            offs := type_data_offsets[typeid][i];
+            sz   := type_sizeof(type_data_argtypes[typeid][i]);
+            end_offset = offs + sz;
+            if (sz > max_subsize) max_subsize = sz;
+        }
+        // size: smallest multiple of max_subsize >= end_offset
+        return ((end_offset + max_subsize - 1) / max_subsize) * max_subsize;
     }
 
     print("Unhandled type class in type_sizeof: ");
@@ -2473,6 +2608,10 @@ type_is_file: (typeid: int) -> bool = {
     return type_class[typeid] == TYPE_FILE;
 }
 
+type_is_struct: (typeid: int) -> bool = {
+    return type_class[typeid] == TYPE_STRUCT;
+}
+
 type_get_type: (type_node: int) -> int = {
     if (node_data_type[type_node] != TYPEID_UNKNOWN) {
         return node_data_type[type_node];
@@ -2486,16 +2625,9 @@ type_get_type: (type_node: int) -> int = {
         return node_data_type[type_node];
     }
 
-    if (node_children_sz[type_node] == 1) {
+    if (node_children_sz[type_node] == 1 
+     && node_type[children[0]] == NODE_ID) {
         id_node := children[0];
-
-        if (node_type[id_node] != NODE_ID) {
-            print("Unexpected only-child of TYPE: ");
-            node_print(id_node);
-            println();
-            exit(1);
-        }
-
         id_stridx := node_data_str[id_node];
 
         // streq: (str_a: *int, str_b: *int, len: int) -> bool
@@ -2530,10 +2662,10 @@ type_get_type: (type_node: int) -> int = {
         exit(1);
     }
 
-    ch0 := children[0];
-    ch1 := children[1];
 
     if (node_parse_tc[type_node] == TYPE_ARR) {
+        ch0 := children[0];
+        ch1 := children[1];
         // array type
         subtype := type_get_type(ch0);
         typeid := type_create_array(subtype, node_children_sz[type_node] - 1);
@@ -2549,7 +2681,9 @@ type_get_type: (type_node: int) -> int = {
         return node_data_type[type_node];
     }
 
-    if (node_type[ch0] == NODE_LIST && node_type[ch1] == NODE_TYPE) {
+    if (node_parse_tc[type_node] == TYPE_FUNC) {
+        ch0 := children[0];
+        ch1 := children[1];
         // function
         ret_type := type_get_type(ch1);
         num_args := node_children_sz[ch0];
@@ -2579,6 +2713,23 @@ type_get_type: (type_node: int) -> int = {
             argtypes[i] = decl_type;
         }
 
+        node_data_type[type_node] = typeid;
+        return typeid;
+    }
+
+    if (node_parse_tc[type_node] == TYPE_STRUCT) {
+        num_fields := node_children_sz[type_node];
+        typeid := type_create_struct(num_fields);
+
+        for (i := 0; i < num_fields; i += 1) {
+            decl_node := children[i];
+            id_node := node_children[decl_node][0];
+            field_type_node := node_children[decl_node][1];
+
+            type_data_fields[typeid][i] = node_data_str[id_node];
+            type_data_argtypes[typeid][i] = type_get_type(field_type_node);
+        }
+        type_struct_set_offsets(typeid);
         node_data_type[type_node] = typeid;
         return typeid;
     }
@@ -3147,6 +3298,7 @@ resolve_node: (node: int, scope: int) -> void = {
     if (node_type[node] == NODE_BINOP) {
         lhs := children[0];
         rhs := children[1];
+
         resolve_node(lhs, new_scope);
         resolve_node(rhs, new_scope);
         lhs_type := node_data_type[lhs];
@@ -3287,6 +3439,8 @@ resolve_node: (node: int, scope: int) -> void = {
             resolve_node(children[i], new_scope);
         }
 
+        // TODO: it is not necessarily an id node
+        // checks seems to be fine, but error messages are off
         id_node := children[0];
         id_type := node_data_type[id_node];
 
@@ -3438,6 +3592,43 @@ resolve_node: (node: int, scope: int) -> void = {
 
     if (node_type[node] == NODE_TYPE) {
         node_data_type[node] = type_get_type(node);
+        return;
+    }
+
+    if (node_type[node] == NODE_ACCESS) {
+        lhs := children[0];
+        rhs := children[1];
+        resolve_node(lhs, new_scope);
+        lhs_type := node_data_type[lhs];
+        if (!type_is_struct(lhs_type)) {
+            println("Attempt to access non-struct");
+            exit(1);
+        }
+
+        if (node_type[rhs] != NODE_ID) {
+            println("RHS of access should be ID");
+            exit(1);
+        }
+
+
+        access_idx := type_struct_get_field_idx(lhs_type, node_data_str[rhs]);
+
+        if (access_idx < 0) {
+            print("Unknown field '");
+            string_table_print(node_data_str[rhs]);
+            println("'");
+            exit(1);
+        }
+
+        node_data_type[node] = type_data_argtypes[lhs_type][access_idx];
+
+        // Translate to an access offset
+        lit_int := node_create(NODE_LIT_INT);
+        node_data_int[lit_int] = type_data_offsets[lhs_type][access_idx];
+        node_data_type[lit_int] = type_create_basic(TYPE_B_INT);
+
+        children[1] = lit_int;
+
         return;
     }
 
@@ -3632,6 +3823,28 @@ post_resolve_simplify: (node: int) -> void = {
 
         node_children_sz[node] = 2;
     }
+
+    // Convert nested access into 1D access from top level struct
+    if (node_type[node] == NODE_ACCESS) {
+        lhs := node_children[node][0];
+
+        if (node_type[lhs] == NODE_ACCESS) {
+            // a.b.c
+            // -> a.(b+c)
+            base := node_children[lhs][0];
+            mid_lit_int := node_children[lhs][1];
+            last_lit_int := node_children[node][1];
+
+            if (node_type[mid_lit_int] != NODE_LIT_INT || node_type[last_lit_int] != NODE_LIT_INT) {
+                println("Expected resolved struct access to use int literals!");
+                exit(1);
+            }
+            result_offset := node_data_int[mid_lit_int] + node_data_int[last_lit_int];
+            node_children[node][0] = base;
+            node_data_int[last_lit_int] = result_offset;
+            return;
+        }
+    }
 }
 
 // ==================== GEN ====================
@@ -3728,7 +3941,6 @@ generate_code: (root: int) -> void = {
             }
             print(".");
             string_table_print(symbol_table_str[sym]);
-            print(": ");
             println(": .zero", type_sizeof(sym_type));
         }
     }
@@ -4763,6 +4975,45 @@ generate_expression: (node: int) -> void = {
         return;
     }
 
+    if (node_type[node] == NODE_ACCESS) {
+        // similar to index array
+        accessed_node := node_children[node][0];
+        lit_int_node := node_children[node][1];
+        sz := type_sizeof(node_data_type[node]);
+
+        if (node_type[lit_int_node] != NODE_LIT_INT) {
+            println("Error: expected accessor node to be int literal!");
+            exit(1);
+        }
+
+        if (!type_is_struct(node_data_type[accessed_node])) {
+            println("Error: expected accessed node to be struct!");
+            exit(1);
+        }
+
+        offset := node_data_int[lit_int_node];
+
+        if (node_data_sym[accessed_node] == 0) {
+            println("No symbol found for struct access!");
+            exit(1);
+        }
+
+        print("    leaq ");
+        emit_sym_access(node_data_sym[accessed_node]);
+        println(", %rcx");
+        print("    leaq", offset);
+        println("(%rcx), %rcx");
+
+        // memory address where we want to read is now in %rcx
+        println("    xor %rax, %rax");
+        print("    ");
+        MOVS(sz);
+        print(" (%rcx), ");
+        REGS(RAX, sz);
+        println();
+        return;
+    }
+
     if (node_type[node] == NODE_ADDROF) {
         generate_addrof(node);
         return;
@@ -4979,6 +5230,42 @@ generate_assign: (node: int) -> void = {
         sz := type_sizeof(type_data_subtype[node_data_type[ch0]]);
         generate_expression(ch0);
         println("    pushq %rax");
+        generate_expression(rhs);
+        println("    popq %rcx");
+        print("    ");
+        MOVS(sz);
+        print(" ");
+        REGS(RAX, sz);
+        println(", (%rcx)");
+        return;
+    }
+
+    if (node_type[lhs] == NODE_ACCESS) {
+        // s.offs = rhs
+        // almost like s[offs] = rhs
+        accessed_node := node_children[lhs][0];
+        lit_int_node := node_children[lhs][1];
+        sz := type_sizeof(node_data_type[lhs]);
+
+        if (node_type[lit_int_node] != NODE_LIT_INT) {
+            println("Error: expected accessor node to be int literal!");
+            exit(1);
+        }
+        offset := node_data_int[lit_int_node];
+
+        if (node_data_sym[accessed_node] == 0) {
+            println("No symbol found for struct access!");
+            exit(1);
+        }
+
+        // get the base
+        print("    leaq ");
+        emit_sym_access(node_data_sym[accessed_node]);
+        println(", %rcx");
+        // offset it
+        print("    leaq", offset);
+        println("(%rcx), %rcx");
+        println("    pushq %rcx");
         generate_expression(rhs);
         println("    popq %rcx");
         print("    ");
@@ -5227,6 +5514,22 @@ type_print: (typeid: int) -> void = {
         return;
     }
 
+    if (tc == TYPE_STRUCT) {
+        print("struct{");
+        for (i := 0; i < type_data_length[typeid]; i += 1) {
+            if (i > 0) {
+                print(",");
+            }
+            string_table_print(type_data_fields[typeid][i]);
+            print("[");
+            print(type_data_offsets[typeid][i]);
+            print("]:");
+            type_print(type_data_argtypes[typeid][i]);
+        }
+        print("}");
+        return;
+    }
+
     if (tc == TYPE_UNKNOWN) {
         print("?");
         return;
@@ -5360,6 +5663,10 @@ node_print: (node: int) -> void = {
         print("CAST");
         return;
     }
+    if (typ == NODE_ACCESS) {
+        print("ACCESS");
+        return;
+    }
     print("????");
 }
 
@@ -5430,7 +5737,11 @@ main: (argc: int, argv: **char) -> int = {
 
     symbol_table_init();
 
+    //print_tree(root, 0);
+
     parse_simplify(root);
+
+    //print_tree(root, 0);
 
     resolve_symbols(root);
 
