@@ -1,0 +1,46 @@
+// TODO: parameterized type
+type DynamicArray(t) = struct {
+    size: int;
+    capacity: int;
+    items: *t;
+};
+
+// TODO: parameterized function type
+append(t): (arr: *DynamicArray(t), item: t) -> int = {
+    if (arr.size == arr.capacity) {
+        new_cap := arr.capacity * 2;
+        if (new_cap == 0) {
+            new_cap = 1;
+        }
+
+        // TODO: check types using 'variable' type.
+        new_items := alloc(t, new_cap);
+
+        for (i := 0; i < arr.capacity; i += 1) {
+            // TODO: is t assignable like this?
+            new_items[i] = arr.items[i];
+        }
+
+        if (arr.capacity > 0) {
+            delete(arr.items);
+        }
+
+        arr.items = new_items;
+        arr.capacity = new_cap;
+    }
+
+    idx := arr.size;
+    arr.size += 1;
+    arr.items[idx] = item;
+    return idx;
+}
+
+main: () -> void = {
+    p: DynamicArray(int);
+    // TODO: shorthand dynamic array notation
+    p2: int[..];
+
+    append(p, 2);
+
+    p.append(2);
+}
