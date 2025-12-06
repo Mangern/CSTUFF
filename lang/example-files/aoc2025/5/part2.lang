@@ -1,0 +1,143 @@
+lft: int[1000];
+rgt: int[1000];
+idx: int[1000];
+nrange: int;
+
+cstr_print: (cstr: *char) -> void = {
+    for (c := cstr; c.* != '\0'; c += 1) {
+        print(c.*);
+    }
+}
+
+cstr_parse_int: (cstr: *char, n: int) -> int = {
+    ret := 0;
+
+    for (i := 0; i < n; i += 1) {
+        ret *= 10;
+        ret += cast(int, cstr[i]) - cast(int, '0');
+    }
+    return ret;
+}
+
+readline: (f: File, buf: *char) -> int = {
+    tot := 0;
+    for (;;) {
+        n := file_read(f, buf, 1);
+        if (n == 0) {
+            return tot;
+        }
+        if (buf.* == '\n') {
+            buf.* = '\0';
+            return tot + 1;
+        }
+        tot += n;
+        buf += n;
+    }
+    println("Unreachable");
+    exit(1);
+    return -1;
+}
+
+less: (i1: int, i2: int) -> bool = {
+    if (lft[i1] == lft[i2]) {
+        return rgt[i1] > rgt[i2];
+    }
+    return lft[i1] < lft[i2];
+}
+
+quick_sort: (l: int, r: int) -> void = {
+    if (l >= r) {
+        return;
+    }
+
+    piv := (l+r)/2;
+    tmp := idx[piv];
+    idx[piv] = idx[r];
+    idx[r] = tmp;
+    p := tmp;
+    i := l - 1;
+    j := l;
+
+    while (j < r) {
+        if (less(idx[j], p)) {
+            i += 1;
+            t := idx[j];
+            idx[j] = idx[i];
+            idx[i] = t;
+        }
+        j += 1;
+    }
+
+    t := idx[i+1];
+    idx[i+1] = idx[r];
+    idx[r] = t;
+
+    quick_sort(l, i);
+    quick_sort(i + 2, r);
+}
+
+main: (argc: int, argv: **char) -> void = {
+    if (argc < 2) {
+        println("Missing input");
+        return;
+    }
+
+    infile := file_open(argv[1], "r");
+    if (cast(int, infile) == 0) {
+        println("Failed to open file");
+        return;
+    }
+
+    buf: *char = alloc(char, 1024);
+
+    for (;;) {
+        n := readline(infile, buf);
+        if (n == 0) break;
+
+        if (n == 1) {
+            // part2 only cares about ranges
+            break;
+        }
+
+        dashidx: int;
+        for (dashidx = 0; dashidx < n; dashidx += 1) {
+            if (buf[dashidx] == '-') break;
+        }
+        if (dashidx == n) {
+            println("Missing '-'");
+            exit(1);
+        }
+
+        lft[nrange] = cstr_parse_int(buf, dashidx);
+        rgt[nrange] = cstr_parse_int(buf + dashidx + 1, n - dashidx - 2);
+
+        nrange += 1;
+    }
+
+    for (i := 0; i < nrange; i += 1) {
+        idx[i] = i;
+    }
+
+    quick_sort(0, nrange - 1);
+
+    rgt_ptr := 0; // the last we counted
+    ans := 0;
+    for (i := 0; i < nrange; i += 1) {
+        l := lft[idx[i]];
+        r := rgt[idx[i]];
+
+        if (r <= rgt_ptr) continue;
+
+        if (rgt_ptr + 1 > l) {
+            l = rgt_ptr + 1;
+        }
+
+        ans += r - l + 1;
+        rgt_ptr = r;
+    }
+
+    println(ans);
+
+    file_close(infile);
+    delete(buf);
+}
