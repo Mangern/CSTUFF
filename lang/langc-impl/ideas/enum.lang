@@ -1,0 +1,27 @@
+type Node = enum {
+    NOP,
+    If {condition: *Node, body: *Node},
+    IfElse {condition: *Node, body: *Node, else_body: *Node},
+    For {pre: *Node, condition: *Node, post: *Node, body: *Node},
+    Binop {op: char, lhs: *Node, rhs: *Node},
+    Unop {op: char, operand: *Node},
+    Block {statements: *Node[]},
+    LitInt {val: int}
+};
+
+resolve_node: (node: *Node) -> void = {
+    match(node) {
+        If(condition, body) = {
+            // check if condition
+            resolve_node(condition);
+            resolve_node(body);
+            assert_boolean(condition);
+        },
+        Binop(op, lhs, rhs) = {
+            if (!op_supported(op, lhs, rhs)) {
+            }
+        }
+        //...
+    }
+
+}
