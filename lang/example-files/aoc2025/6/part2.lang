@@ -1,0 +1,96 @@
+grid: char[5, 5000];
+ops: char[5000];
+
+readline: (f: File, buf: *char) -> int = {
+    tot := 0;
+    for (;;) {
+        n := file_read(f, buf, 1);
+        if (n == 0) {
+            return tot;
+        }
+        if (buf.* == '\n') {
+            buf.* = '\0';
+            return tot + 1;
+        }
+        tot += n;
+        buf += n;
+    }
+    println("Unreachable");
+    exit(1);
+    return -1;
+}
+
+main: (argc: int, argv: **char) -> void = {
+    if (argc < 2) {
+        println("Missing input");
+        return;
+    }
+
+
+    infile := file_open(argv[1], "r");
+    if (cast(int, infile) == 0) {
+        println("Failed to open file");
+        return;
+    }
+
+    buf := alloc(char, 4000);
+    rows := 0;
+    cols := 0;
+    while (readline(infile, buf) > 0) {
+        i: int;
+        for (i = 0; buf[i] != '\0'; i += 1) {
+            grid[rows, i] = buf[i];
+        }
+        cols = i;
+        rows += 1;
+    }
+
+    ans := 0;
+
+    for (col := 0; col < cols ;) {
+        nxt_col: int;
+
+        for (nxt_col = col; nxt_col < cols; nxt_col += 1) {
+            empty := true;
+            for (i := 0; i < rows; i += 1) {
+                if (grid[i, nxt_col] != ' ') {
+                    empty = false;
+                }
+            }
+            if (empty) break;
+        }
+        op: char;
+
+        for (j := col; j < nxt_col; j += 1) {
+            if (grid[rows - 1, j] != ' ')op = grid[rows - 1, j];
+        }
+
+        cur := 0;
+        if (op == '*')cur = 1;
+
+        for (j := col; j < nxt_col; j += 1) {
+            num := 0;
+            for (i := 0; i < rows - 1; i += 1) {
+                if (grid[i, j] != ' ') {
+                    num *= 10;
+                    num += cast(int, grid[i, j]) - cast(int, '0');
+                }
+            }
+
+            if (op == '*') {
+                cur *= num;
+            }
+            else {
+                cur += num;
+            }
+        }
+
+        ans += cur;
+
+        col = nxt_col + 1;
+    }
+    println(ans);
+
+    file_close(infile);
+    delete(buf);
+}

@@ -1,0 +1,183 @@
+arr: int[5, 5000];
+ops: char[5000];
+
+type TokenList = struct {
+    tokens: **char;
+    count: int;
+    capacity: int;
+};
+
+readline: (f: File, buf: *char) -> int = {
+    tot := 0;
+    for (;;) {
+        n := file_read(f, buf, 1);
+        if (n == 0) {
+            return tot;
+        }
+        if (buf.* == '\n') {
+            buf.* = '\0';
+            return tot + 1;
+        }
+        tot += n;
+        buf += n;
+    }
+    println("Unreachable");
+    exit(1);
+    return -1;
+}
+
+cstr_strlen: (cstr: *char) -> int = {
+    len := 0;
+    // interesting syntax we got.
+    for (c := cstr; c.* != '\0'; {c += 1; len += 1;}) {}
+    return len;
+}
+
+cstr_ndup: (cstr: *char, len: int) -> *char = {
+    new_str := alloc(char, len + 1);
+    for (i := 0; i < len; i += 1) {
+        new_str[i] = cstr[i];
+    }
+    return new_str;
+}
+
+cstr_print: (cstr: *char) -> void = {
+    for (c := cstr; c.* != '\0'; c += 1) {
+        print(c.*);
+    }
+}
+
+cstr_stoi: (cstr: *char) -> int = {
+    ret := 0;
+    for (c := cstr; '0' <= c.* && c.* <= '9' ; c += 1) {
+        ret *= 10;
+        ret += cast(int, c.*) - cast(int, '0');
+    }
+    return ret;
+}
+
+list_add: (list: *TokenList, tok: *char, len: int) -> void = {
+    if (list.count == list.capacity) {
+        new_cap := list.capacity * 2;
+        if (new_cap == 0) {
+            new_cap = 1;
+        }
+        new_tokens := alloc(*char, new_cap);
+        old_tokens := list.tokens;
+        for (i := 0; i < list.capacity; i += 1) {
+            new_tokens[i] = old_tokens[i];
+        }
+
+        if (list.capacity > 0) {
+            delete(list.tokens);
+        }
+
+        list.tokens = new_tokens;
+        list.capacity = new_cap;
+    }
+    toks := list.tokens;
+    toks[list.count] = cstr_ndup(tok, len);
+    list.count += 1;
+}
+
+list_delete: (list: *TokenList) -> void = {
+    toks := list.tokens;
+
+    for (i := 0; i < list.count; i += 1) {
+        delete(toks[i]);
+    }
+
+    delete(list.tokens);
+    delete(list);
+}
+
+isspace: (c: char) -> bool = {
+    return c == ' ' || c == '\n' || c == '\t';
+}
+
+parse_tokens: (buf: *char) -> *TokenList = {
+    list := alloc(TokenList);
+
+    ptr := 0;
+    for (;;) {
+        while (buf[ptr] == ' ' || buf[ptr] == '\t') ptr += 1;
+        if (buf[ptr] == '\n' || buf[ptr] == '\0') break;
+
+        i: int;
+        for (i = ptr; buf[i] != '\0'; i += 1) {
+            if (isspace(buf[i])) break;
+        }
+        list_add(list, buf + ptr, i - ptr);
+        ptr = i;
+    }
+
+    return list;
+}
+
+main: (argc: int, argv: **char) -> void = {
+    if (argc < 2) {
+        println("Missing input");
+        return;
+    }
+
+
+    infile := file_open(argv[1], "r");
+    if (cast(int, infile) == 0) {
+        println("Failed to open file");
+        return;
+    }
+
+    buf := alloc(char, 4000);
+    rows := 0;
+    cols := 0;
+    while (readline(infile, buf) > 0) {
+        list := parse_tokens(buf);
+
+        tokens := list.tokens;
+        operator_row := false;
+        if (cols > 0 && list.count != cols) {
+            println("Weird, they should have the same amount of columns");
+        }
+        cols = list.count;
+        for (i := 0; i < list.count; i += 1) {
+            tok := tokens[i];
+
+            if (tok[0] == '+' || tok[0] == '*') {
+                operator_row = true;
+                ops[i] = tok[0];
+            } else {
+                arr[rows, i] = cstr_stoi(tok);
+            }
+        }
+
+        if (!operator_row) {
+            rows += 1;
+        }
+
+        list_delete(list);
+    }
+
+    ans := 0;
+    for (col := 0; col < cols; col += 1) {
+        cur: int;
+        if (ops[col] == '*') {
+            cur = 1;
+
+            for (i := 0; i < rows; i += 1) {
+                cur *= arr[i, col];
+            }
+        } else {
+            cur = 0;
+            for (i := 0; i < rows; i += 1) {
+                cur += arr[i, col];
+            }
+        }
+
+        ans += cur;
+    }
+
+    println(ans);
+
+    delete(buf);
+    file_close(infile);
+}
