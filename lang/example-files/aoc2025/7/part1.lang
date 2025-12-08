@@ -1,0 +1,79 @@
+grid: char[200, 200];
+
+readline: (f: File, buf: *char) -> int = {
+    tot := 0;
+    for (;;) {
+        n := file_read(f, buf, 1);
+        if (n == 0) {
+            return tot;
+        }
+        if (buf.* == '\n') {
+            buf.* = '\0';
+            return tot + 1;
+        }
+        tot += n;
+        buf += n;
+    }
+    println("Unreachable");
+    exit(1);
+    return -1;
+}
+
+main: (argc: int, argv: **char) -> void = {
+    if (argc < 2) {
+        println("Missing input");
+        return;
+    }
+
+    infile := file_open(argv[1], "r");
+    if (cast(int, infile) == 0) {
+        println("Failed to open file");
+        return;
+    }
+
+    n := 0;
+    m := 0;
+    buf := alloc(char, 200);
+
+    for (;;) {
+        nread := readline(infile, buf);
+        if (nread == 0) break;
+
+        m = nread;
+
+        for (i := 0; i < nread; i += 1) {
+            if (buf[i] == '\0') break;
+            grid[n, i] = buf[i];
+        }
+
+        n += 1;
+    }
+    file_close(infile);
+    delete(buf);
+
+    numsplit := 0;
+    for (row := 0; row < n - 1; row += 1) {
+        for (j := 0; j < m; j += 1) {
+            if (grid[row, j] == 'S' || grid[row, j] == '|') {
+                // grid[row+1, j] should be |
+                if (grid[row+1, j] != '^') {
+                    grid[row+1, j] = '|';
+                } else {
+                    // split
+                    if (j == 0 || j == m - 1) {
+                        println("OUT OF BOUNDS!!");
+                        exit(1);
+                    }
+                    if (grid[row+1, j-1] == '^' || grid[row+1, j+1] == '^') {
+                        println("Double splitter???");
+                        exit(1);
+                    }
+                    numsplit += 1;
+                    grid[row+1, j-1] = '|';
+                    grid[row+1, j+1] = '|';
+                }
+            }
+        }
+    }
+    println(numsplit);
+}
