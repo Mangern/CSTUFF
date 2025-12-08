@@ -241,6 +241,7 @@ TOK_ASUB     : int;
 TOK_AMUL     : int;
 TOK_ADIV     : int;
 TOK_AMOD     : int;
+TOK_AXOR     : int;
 TOK_OR       : int;
 TOK_AND      : int;
 TOK_BREAK    : int;
@@ -290,27 +291,28 @@ lex_init: () -> void = {
     TOK_AMUL     = 272;
     TOK_ADIV     = 273;
     TOK_AMOD     = 274;
-    TOK_OR       = 275;
-    TOK_AND      = 276;
-    TOK_BREAK    = 277;
-    TOK_CONTINUE = 278;
-    TOK_NEG      = 289;
-    TOK_STAR     = 290;
-    TOK_DEREF    = 291;
-    TOK_ALLOC    = 292;
-    TOK_DELETE   = 293;
-    TOK_CHAR     = 294;
-    TOK_CAST     = 295;
-    TOK_PLUSX2   = 296;
-    TOK_MINUSX2  = 297;
-    TOK_PREADD   = 298;
-    TOK_POSTADD  = 299;
-    TOK_PRESUB   = 300;
-    TOK_POSTSUB  = 301;
-    TOK_FOR      = 302;
-    TOK_STRUCT   = 303;
-    TOK_TYPE     = 304;
-    TOK_SIZEOF   = 305;
+    TOK_AXOR     = 275;
+    TOK_OR       = 276;
+    TOK_AND      = 277;
+    TOK_BREAK    = 278;
+    TOK_CONTINUE = 279;
+    TOK_NEG      = 290;
+    TOK_STAR     = 291;
+    TOK_DEREF    = 292;
+    TOK_ALLOC    = 293;
+    TOK_DELETE   = 294;
+    TOK_CHAR     = 295;
+    TOK_CAST     = 296;
+    TOK_PLUSX2   = 297;
+    TOK_MINUSX2  = 298;
+    TOK_PREADD   = 299;
+    TOK_POSTADD  = 300;
+    TOK_PRESUB   = 301;
+    TOK_POSTSUB  = 302;
+    TOK_FOR      = 303;
+    TOK_STRUCT   = 304;
+    TOK_TYPE     = 305;
+    TOK_SIZEOF   = 306;
 
     operator_prec = alloc(int, 512);
     // 10 * (17 - original lang implementation in C precedence)
@@ -331,6 +333,7 @@ lex_init: () -> void = {
     operator_prec[TOK_AMUL]       = 10;
     operator_prec[TOK_ADIV]       = 10;
     operator_prec[TOK_AMOD]       = 10;
+    operator_prec[TOK_AXOR]       = 10;
     operator_prec[TOK_OR]         = 20;
     operator_prec[TOK_AND]        = 30;
     operator_prec[cast(int, '!')] = 140;
@@ -342,6 +345,7 @@ lex_init: () -> void = {
     operator_prec[TOK_PRESUB]     = 140;
     operator_prec[TOK_POSTSUB]    = 150;
     operator_prec[cast(int, '.')] = 150;
+    operator_prec[cast(int, '^')] = 50;
 }
 
 
@@ -591,6 +595,18 @@ lex_matches_amod: () -> int = {
     return 2;
 }
 
+lex_matches_axor: () -> int = {
+    ptr := lex_ptr;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '^')) {
+        return 0;
+    }
+    ptr += 1;
+    if (ptr >= nbuf || buf[ptr] != cast(int, '=')) {
+        return 0;
+    }
+    return 2;
+}
+
 lex_matches_plusx2: () -> int = {
     ptr := lex_ptr;
     if (ptr >= nbuf || buf[ptr] != cast(int, '+')) {
@@ -754,6 +770,13 @@ lex_peek: () -> int = {
     match = lex_matches_amod();
     if (match > 0) {
         cur_tok = TOK_AMOD;
+        cur_tok_end = cur_tok_beg + match;
+        return cur_tok;
+    }
+
+    match = lex_matches_axor();
+    if (match > 0) {
+        cur_tok = TOK_AXOR;
         cur_tok_end = cur_tok_beg + match;
         return cur_tok;
     }
@@ -990,6 +1013,10 @@ tok_print: (t: int) -> void = {
     }
     if (t == TOK_AMOD) {
         print("%=");
+        return;
+    }
+    if (t == TOK_AXOR) {
+        print("^=");
         return;
     }
     if (t == TOK_OR) {
@@ -2198,7 +2225,8 @@ parse_simplify: (node: int) -> void = {
          || node_op == TOK_ASUB
          || node_op == TOK_AMUL
          || node_op == TOK_ADIV
-         || node_op == TOK_AMOD) {
+         || node_op == TOK_AMOD
+         || node_op == TOK_AXOR) {
             new_op: int;
 
             if (node_op == TOK_AADD) {
@@ -2215,6 +2243,9 @@ parse_simplify: (node: int) -> void = {
             }
             if (node_op == TOK_AMOD) {
                 new_op = cast(int, '%');
+            }
+            if (node_op == TOK_AXOR) {
+                new_op = cast(int, '^');
             }
 
             lhs := children[0];
@@ -3960,7 +3991,8 @@ set_operator_type: (operator_node: int, lhs_type: int, rhs_type: int) -> void = 
       || op == cast(int, '-')
       || op == cast(int, '*')
       || op == cast(int, '/')
-      || op == cast(int, '%')) {
+      || op == cast(int, '%')
+      || op == cast(int, '^')) {
         node_data_type[operator_node] = lhs_type;
         return;
     }
@@ -3977,7 +4009,7 @@ set_operator_type: (operator_node: int, lhs_type: int, rhs_type: int) -> void = 
         return;
     }
 
-    print("set_operator_type unhandled operator:");
+    print("set_operator_type unhandled operator: ");
     tok_print(op);
     println();
     exit(1);
@@ -5061,6 +5093,11 @@ generate_binop: (op: int) -> void = {
         println("    idivq %rcx");
         // get remainder
         println("    movq %rdx, %rax");
+        return;
+    }
+
+    if (op == cast(int, '^')) {
+        println("    xorq %rcx, %rax");
         return;
     }
 
