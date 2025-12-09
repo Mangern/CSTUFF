@@ -1,0 +1,232 @@
+type Point = struct {
+    x: int;
+    y: int;
+    z: int;
+};
+
+points: Point[1005];
+
+type Edge = struct {
+    u: int;
+    v: int;
+    w: int;
+};
+
+edges: Edge[1000005];
+
+type UnionFind = struct {
+    par: *int;
+    rnk: *int;
+    sz: *int;
+};
+
+create_uf: (n: int) -> *UnionFind = {
+    par := alloc(int, n);
+    rnk := alloc(int, n);
+    sz  := alloc(int, n);
+
+    for (i := 0; i < n; i += 1) {
+        par[i] = i;
+        sz[i] = 1;
+    }
+    uf := alloc(UnionFind);
+    uf.par = par;
+    uf.rnk = rnk;
+    uf.sz = sz;
+    return uf;
+}
+
+uf_find: (uf: *UnionFind, i: int) -> int = {
+    par := uf.par;
+    if (par[i] == i) {
+        return i;
+    }
+    par[i] = uf_find(uf, par[i]);
+    return par[i];
+}
+
+uf_join: (uf: *UnionFind, i: int, j: int) -> bool = {
+    i = uf_find(uf, i);
+    j = uf_find(uf, j);
+
+    if (i == j) {
+        return false;
+    }
+    par := uf.par;
+    rnk := uf.rnk;
+    sz  := uf.sz;
+
+    if (rnk[i] < rnk[j]) {
+        par[i] = j;
+        sz[j] += sz[i];
+    } else {
+        par[j] = i;
+        sz[i] += sz[j];
+        if (rnk[i] == rnk[j]) {
+            rnk[i] += 1;
+        }
+    }
+
+    return true;
+}
+
+readline: (f: File, buf: *char) -> int = {
+    tot := 0;
+    for (;;) {
+        n := file_read(f, buf, 1);
+        if (n == 0) {
+            return tot;
+        }
+        if (buf.* == '\n') {
+            buf.* = '\0';
+            return tot + 1;
+        }
+        tot += n;
+        buf += n;
+    }
+    println("Unreachable");
+    exit(1);
+    return -1;
+}
+
+parse_point: (buf: *char, point_idx: int) -> void = {
+    for (i := 0; i < 3; i += 1) {
+        val := 0;
+
+        while (buf.* != ',' && buf.* != '\0') {
+            val *= 10;
+            val += cast(int, buf.*) - cast(int, '0');
+            buf += 1;
+        }
+        if (i == 0) points[point_idx].x = val;
+        if (i == 1) points[point_idx].y = val;
+        if (i == 2) {
+            points[point_idx].z = val;
+            break;
+        }
+        buf += 1;
+    }
+}
+
+edge_swap: (i: int, j: int) -> void = {
+    if (i == j) {
+        return;
+    }
+    edges[i].u ^= edges[j].u;
+    edges[j].u ^= edges[i].u;
+    edges[i].u ^= edges[j].u;
+
+    edges[i].v ^= edges[j].v;
+    edges[j].v ^= edges[i].v;
+    edges[i].v ^= edges[j].v;
+
+    edges[i].w ^= edges[j].w;
+    edges[j].w ^= edges[i].w;
+    edges[i].w ^= edges[j].w;
+}
+
+quick_sort: (l: int, r: int, topk: int) -> void = {
+    if (l >= r) {
+        return;
+    }
+
+    if (topk <= 0) {
+        return;
+    }
+
+    if (topk > r - l + 1) {
+        topk = r - l + 1;
+    }
+
+    piv := (l+r)/2;
+    edge_swap(piv, r);
+    p := edges[r].w;
+    i := l - 1;
+    j := l;
+
+    while (j < r) {
+        if (edges[j].w <= p) {
+            i += 1;
+            edge_swap(j, i);
+        }
+        j += 1;
+    }
+
+    edge_swap(r, i + 1);
+
+    quick_sort(l, i, topk);
+    quick_sort(i + 2, r, topk - (i - l + 1));
+}
+
+main: (argc: int, argv: **char) -> void = {
+    if (argc < 2) {
+        println("Missing input");
+        return;
+    }
+
+    infile := file_open(argv[1], "r");
+    if (cast(int, infile) == 0) {
+        println("Failed to open file");
+        return;
+    }
+
+    n := 0;
+    buf := alloc(char, 200);
+
+    for (;;) {
+        nread := readline(infile, buf);
+        if (nread == 0) break;
+
+        parse_point(buf, n);
+        n += 1;
+    }
+    file_close(infile);
+    delete(buf);
+
+    println("Parsed", n, "points");
+
+    m := 0;
+
+    for (i := 0; i < n; i += 1) {
+        for (j := i + 1; j < n; j += 1) {
+            dist := (points[i].x - points[j].x) * (points[i].x - points[j].x)
+                  + (points[i].y - points[j].y) * (points[i].y - points[j].y)
+                  + (points[i].z - points[j].z) * (points[i].z - points[j].z);
+            edges[m].u = i;
+            edges[m].v = j;
+            edges[m].w = dist;
+            m += 1;
+        }
+    }
+
+    quick_sort(0, m - 1, 1000);
+
+    uf := create_uf(n);
+
+    for (i := 0; i < 1000; i += 1) {
+        uf_join(uf, edges[i].u, edges[i].v);
+    }
+
+    big1 := 0;
+    big2 := 0;
+    big3 := 0;
+    for (i := 0; i < n; i += 1) {
+        p := uf_find(uf, i);
+        if (p != i) continue;
+        sz := uf.sz;
+        cur := sz[p];
+
+        if (cur >= big1) {
+            big3 = big2;
+            big2 = big1;
+            big1 = cur;
+        } else if (cur >= big2) {
+            big3 = big2;
+            big2 = cur;
+        } else if (cur >= big3) {
+            big3 = cur;
+        }
+    }
+    ans := big1 * big2 * big3;
+    println(ans);
+}
