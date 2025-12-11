@@ -1,0 +1,162 @@
+type Queue = struct {
+    buffer: *int;
+    head: int;
+    tail: int;
+};
+
+QSIZE := 2000;
+dist: int[2000];
+btns: int[20];
+
+qcreate: () -> *Queue = {
+    q := alloc(Queue);
+    q.buffer = alloc(int, QSIZE);
+    q.head = 0;
+    q.tail = 0;
+    return q;
+}
+
+qfree: (q: **Queue) -> void = {
+    qq := q.*;
+    delete(qq.buffer);
+    delete(qq);
+}
+
+qpush: (q: *Queue, item: int) -> void = {
+    buf := q.buffer;
+    buf[q.tail] = item;
+    q.tail += 1;
+    if (q.tail == QSIZE) {
+        q.tail = 0;
+    }
+}
+
+qpop: (q: *Queue) -> int = {
+    buf := q.buffer;
+    ret := buf[q.head];
+    q.head += 1;
+    if (q.head == QSIZE) {
+        q.head = 0;
+    }
+    return ret;
+}
+
+qsize: (q: *Queue) -> int = {
+    sz := q.tail - q.head;
+    if (sz < 0) {
+        sz += QSIZE;
+    }
+    return sz;
+}
+
+p2: (x: int) -> int = {
+    val := 1;
+    for (i := 0; i < x; i += 1) {
+        val *= 2;
+    }
+    return val;
+}
+
+parse_button: (buf: *char) -> int = {
+    btn_val := 0;
+    for (ptr := buf + 1; ptr.* != ')';) {
+        nxt_ptr := ptr;
+        val := 0;
+        for (; nxt_ptr.* != ',' && nxt_ptr.* != ')'; nxt_ptr += 1) { 
+            val *= 10;
+            val += cast(int, nxt_ptr.*) - cast(int, '0');
+        }
+        btn_val += p2(val);
+
+        ptr = nxt_ptr;
+        if (ptr.* == ',') ptr += 1;
+    }
+    return btn_val;
+}
+
+solve_line: (line: *char) -> int = {
+    goal_state := 0;
+
+    ptr := line + 1;
+    mul := 1;
+    for (i := 0; ptr.* != ']'; {i += 1; ptr += 1;}) {
+        if (ptr.* == '#') {
+            goal_state += mul;
+        }
+        mul *= 2;
+    }
+    num_btn := 0;
+    for (; ptr.* != '{'; ptr += 1) {
+        if (ptr.* == '(') {
+            btns[num_btn] = parse_button(ptr);
+            num_btn += 1;
+        }
+    }
+
+    for (i := 1; i < 2000; i += 1) {
+        dist[i] = 10000000;
+    }
+
+    q := qcreate();
+    qpush(q, 0);
+
+    while (qsize(q) > 0) {
+        u := qpop(q);
+
+        for (i := 0; i < num_btn; i += 1) {
+            v := u ^ btns[i];
+            if (dist[v] > dist[u] + 1) {
+                dist[v] = dist[u] + 1;
+                qpush(q, v);
+            }
+        }
+    }
+
+    qfree(*q);
+
+    return dist[goal_state];
+}
+
+readline: (f: File, buf: *char) -> int = {
+    tot := 0;
+    for (;;) {
+        n := file_read(f, buf, 1);
+        if (n == 0) {
+            return tot;
+        }
+        if (buf.* == '\n') {
+            buf.* = '\0';
+            return tot + 1;
+        }
+        tot += n;
+        buf += n;
+    }
+    println("Unreachable");
+    exit(1);
+    return -1;
+}
+
+main: (argc: int, argv: **char) -> void = {
+    if (argc != 2) {
+        println("Missing argument <file>");
+        exit(1);
+    }
+
+    infile := file_open(argv[1], "r");
+    if (cast(int, infile) == 0) {
+        println("Failed to open file");
+        return;
+    }
+
+    buf := alloc(char, 512);
+    ans := 0;
+    for (;;) {
+        nread := readline(infile, buf);
+        if (nread == 0) break;
+        ans += solve_line(buf);
+    }
+    file_close(infile);
+    delete(buf);
+
+    println(ans);
+}
