@@ -1,0 +1,169 @@
+MAXN := 1000;
+n: int;
+nameid: **char;
+adj: **int;
+adj_sz: *int;
+npaths: int[1000, 1000];
+
+svr_id: int;
+fft_id: int;
+dac_id: int;
+out_id: int;
+
+readline: (f: File, buf: *char) -> int = {
+    tot := 0;
+    for (;;) {
+        n := file_read(f, buf, 1);
+        if (n == 0) {
+            return tot;
+        }
+        if (buf.* == '\n') {
+            buf.* = '\0';
+            return tot + 1;
+        }
+        tot += n;
+        buf += n;
+    }
+    println("Unreachable");
+    exit(1);
+    return -1;
+}
+
+cstrlen: (cstr: *char) -> int = {
+    len := 0;
+    // interesting syntax we got.
+    for (c := cstr; c.* != '\0'; {c += 1; len += 1;}) {}
+    return len;
+}
+
+cstrndup: (cstr: *char, len: int) -> *char = {
+    new_str := alloc(char, len + 1);
+    for (i := 0; i < len; i += 1) {
+        new_str[i] = cstr[i];
+    }
+    return new_str;
+}
+
+cstrneq: (s1: *char, s2: *char, len: int) -> bool = {
+    for (i := 0; i < len; i += 1) {
+        if (s1[i] == '\0' || s2[i] == '\0') return false;
+        if (s1[i] != s2[i]) return false;
+    }
+    return true;
+}
+
+getid: (name: *char, len: int) -> int = {
+    for (i := 0; i < n; i += 1) {
+        if (cstrneq(name, nameid[i], len)) {
+            return i;
+        }
+    }
+    nameid[n] = cstrndup(name, len);
+    n += 1;
+    if (n >= MAXN) {
+        println("TOO SMALL");
+        exit(1);
+    }
+    return n - 1;
+}
+
+parse_line: (line: *char) -> void = {
+    ptr := line;
+    i: int;
+    for (i = 0; ptr.* != ':'; {i += 1; ptr += 1;}) {}
+    id := getid(line, i);
+    num := 0;
+    neis_start := i + 1;
+    for (; line[i] != '\0'; i += 1) {
+        if (line[i] == ' ') {
+            num += 1;
+        }
+    }
+    adj[id] = alloc(int, num);
+    adj_sz[id] = num;
+
+    adj_ptr := 0;
+    for (i := neis_start; line[i] != '\0'; ) {
+        if (line[i] == ' ') {
+            i += 1;
+            continue;
+        }
+        j: int;
+        for(j = i; line[j] != ' ' && line[j] != '\0'; j += 1) {}
+        nei := getid(line + i, j - i);
+        adj[id][adj_ptr] = nei;
+        adj_ptr += 1;
+        i = j;
+    }
+}
+
+main: (argc: int, argv: **char) -> void = {
+    nameid = alloc(*char, MAXN);
+    adj    = alloc(*int, MAXN);
+    adj_sz = alloc(int, MAXN);
+
+    if (argc != 2) {
+        println("Missing argument <file>");
+        exit(1);
+    }
+
+    infile := file_open(argv[1], "r");
+    if (cast(int, infile) == 0) {
+        println("Failed to open file");
+        return;
+    }
+
+    buf := alloc(char, 512);
+    for (;;) {
+        nread := readline(infile, buf);
+        if (nread == 0) break;
+        parse_line(buf);
+    }
+    file_close(infile);
+    delete(buf);
+
+
+    for (i := 0; i < n; i += 1) {
+        if (cstrneq(nameid[i], cast(*char, "svr"), 3)) {
+            svr_id = i;
+        }
+        if (cstrneq(nameid[i], cast(*char, "fft"), 3)) {
+            fft_id = i;
+        }
+        if (cstrneq(nameid[i], cast(*char, "dac"), 3)) {
+            dac_id = i;
+        }
+        if (cstrneq(nameid[i], cast(*char, "out"), 3)) {
+            out_id = i;
+        }
+    }
+
+    for (i := 0; i < n; i += 1) {
+        for (j := 0; j < adj_sz[i]; j += 1) {
+            npaths[i, adj[i][j]] = 1;
+        }
+    }
+
+    for (k := 0; k < n; k += 1) {
+        for (i := 0; i < n; i += 1) {
+            if (npaths[i, k] == 0) continue;
+            for (j := 0; j < n; j += 1) {
+                npaths[i, j] += npaths[i, k] * npaths[k, j];
+            }
+        }
+    }
+
+    ans := npaths[svr_id, fft_id] * npaths[fft_id, dac_id] * npaths[dac_id, out_id]
+         + npaths[svr_id, dac_id] * npaths[dac_id, fft_id] * npaths[fft_id, out_id];
+
+    println(ans);
+
+    for (i := 0; i < n; i += 1) {
+        delete(nameid[i]);
+        delete(adj[i]);
+    }
+
+    delete(nameid);
+    delete(adj);
+    delete(adj_sz);
+}
