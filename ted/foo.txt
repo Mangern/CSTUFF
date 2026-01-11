@@ -1,5 +1,12 @@
+#include <stdio.h>
+
+int foo() {
+    return 69;
+}
+
 int main() {
     printf("Hello World!\n");
-    int x;
-    return x;
+    return foo();
 }
+
+

@@ -60,6 +60,14 @@ void gap_buffer_gap_insert(struct gap_buffer_t *gb, char c) {
     --gb->gap_size;
 }
 
+void gap_buffer_gap_delete(struct gap_buffer_t *gb) {
+    if (gb->gap_start == 0) {
+        return;
+    }
+    gb->gap_start--;
+    ++gb->gap_size;
+}
+
 void gap_buffer_str(struct gap_buffer_t *gb, char *dst) {
     memmove(dst, gb->buffer, gb->gap_start);
 
@@ -76,4 +84,8 @@ void gap_buffer_deinit(struct gap_buffer_t *gb) {
         free(gb->buffer);
         gb->buffer = 0;
     }
+}
+
+size_t gap_buffer_count(struct gap_buffer_t *gb) {
+    return gb->gap_start + gb->end - (gb->gap_start + gb->gap_size);
 }

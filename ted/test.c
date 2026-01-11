@@ -39,6 +39,7 @@ TEST_GROUP(gap_buffer_test)
 
         TEST_ASSERT_MSG(gap_buffer.gap_start == 0, "gap_start did not match expected");
         TEST_ASSERT_MSG(gap_buffer.gap_size == GAP_BUFFER_SIZE, "gap_size did not match expected");
+        TEST_ASSERT(gap_buffer_count(&gap_buffer) == 0);
     TEST_END;
 
     TEST_START("gap_insert_start");
@@ -47,6 +48,7 @@ TEST_GROUP(gap_buffer_test)
         gap_buffer_gap_insert(&gap_buffer, 'b');
         gap_buffer_gap_insert(&gap_buffer, 'a');
 
+        TEST_ASSERT(gap_buffer_count(&gap_buffer) == 4);
         TEST_ASSERT(memcmp(gap_buffer.buffer, "fo", 2) == 0);
     TEST_END;
 
@@ -68,6 +70,7 @@ TEST_GROUP(gap_buffer_test)
         gap_buffer_gap_insert(&gap_buffer, 'a');
         gap_buffer_gap_insert(&gap_buffer, 'z');
 
+        TEST_ASSERT(gap_buffer_count(&gap_buffer) == 11);
         TEST_ASSERT(memcmp(gap_buffer.buffer, "foo bar baz", 11) == 0);
     TEST_END;
 
@@ -122,6 +125,7 @@ TEST_GROUP(gap_buffer_test)
 
         gap_buffer_str(&gap_buffer, result);
 
+        TEST_ASSERT(gap_buffer_count(&gap_buffer) == 22);
         TEST_ASSERT(memcmp(result, "test: foo bar some baz", 22) == 0);
 
         free(result);
