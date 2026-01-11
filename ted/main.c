@@ -221,6 +221,7 @@ int main(int argc, char **argv) {
                         gap_buffer_gap_delete(&line_buffers[cur_line]);
                         --cur_character;
                     } else if (cur_line > 0) {
+                        // TODO: slap cur line content on prev line
                         delete_line(cur_line);
                         --cur_line;
                         cur_character = gap_buffer_count(&line_buffers[cur_line]);
@@ -259,7 +260,13 @@ int main(int argc, char **argv) {
     for (int i = 0; i < num_lines; ++i) {
         size_t count = gap_buffer_count(&line_buffers[i]);
         gap_buffer_str(&line_buffers[i], print_buf);
-        fprintf(write_file, "%.*s\n", (int)count, print_buf);
+        fprintf(write_file, "%.*s", (int)count, print_buf);
+        if (i + 1 < num_lines) {
+            fprintf(write_file, "\n");
+        }
+
+        // deinit
+        gap_buffer_deinit(&line_buffers[i]);
     }
 
     if (fclose(write_file)) {
