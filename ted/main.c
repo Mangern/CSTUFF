@@ -130,15 +130,19 @@ void handle_input_insert(int c) {
         gap_buffer_gap_at(main_buffer.line_bufs[main_buffer.cur_line], main_buffer.cur_character);
         gap_buffer_gap_insert(main_buffer.line_bufs[main_buffer.cur_line], c);
         main_buffer.cur_character += 1;
-        //buffer[buffer_count++] = c;
         return;
     } 
 
     switch (c) {
         case '\n': 
             {
-                // TODO: chop current line and put content in next line
                 tb_insert_line_after(&main_buffer, main_buffer.cur_line);
+                gap_buffer_concat(
+                    main_buffer.line_bufs[main_buffer.cur_line+1], 
+                    main_buffer.line_bufs[main_buffer.cur_line], 
+                    main_buffer.cur_character
+                );
+                gap_buffer_chop_rest(main_buffer.line_bufs[main_buffer.cur_line]);
                 ++main_buffer.cur_line;
                 main_buffer.cur_character = 0;
             }
@@ -150,10 +154,12 @@ void handle_input_insert(int c) {
                     gap_buffer_gap_delete(main_buffer.line_bufs[main_buffer.cur_line]);
                     --main_buffer.cur_character;
                 } else if (main_buffer.cur_line > 0) {
-                    // TODO: slap cur line content on prev line
+                    main_buffer.cur_character = gap_buffer_count(main_buffer.line_bufs[main_buffer.cur_line - 1]);
+
+                    gap_buffer_concat(main_buffer.line_bufs[main_buffer.cur_line - 1], main_buffer.line_bufs[main_buffer.cur_line], 0);
                     tb_delete_line(&main_buffer, main_buffer.cur_line);
+
                     --main_buffer.cur_line;
-                    main_buffer.cur_character = gap_buffer_count(main_buffer.line_bufs[main_buffer.cur_line]);
                 }
             }
             break;

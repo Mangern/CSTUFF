@@ -1,11 +1,9 @@
 #include <stdio.h>
-
 int foo() {
     return 69;
 }
 
 int main() {
     printf("hello world\n");
-    return 69;
+    return foo();
 }
-

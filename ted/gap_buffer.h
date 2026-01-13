@@ -27,7 +27,12 @@ void gap_buffer_gap_insert(struct gap_buffer_t *gap_buffer, char c);
 
 void gap_buffer_gap_delete(struct gap_buffer_t *gap_buffer);
 
+/* Delete all characters after the gap */
+void gap_buffer_chop_rest(struct gap_buffer_t *gap_buffer);
+
 void gap_buffer_str(struct gap_buffer_t *gap_buffer, char *dst);
+
+void gap_buffer_concat(struct gap_buffer_t *gap_buffer, struct gap_buffer_t *other, size_t start);
 
 void gap_buffer_deinit(struct gap_buffer_t *gap_buffer);
 
