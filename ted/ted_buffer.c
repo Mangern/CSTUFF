@@ -12,7 +12,7 @@ void tb_insert_line_after(ted_buffer_t* tb, int line) {
         tb_grow(tb);
     }
 
-    for (int i = (int)tb->num_lines - 1; i > line; --i) {
+    for (int i = tb->num_lines - 1; i > line; --i) {
         tb->line_bufs[i+1] = tb->line_bufs[i];
     }
 
@@ -37,11 +37,11 @@ void tb_delete_line(ted_buffer_t* tb, int line) {
 void tb_constrain_line_char(ted_buffer_t* tb) {
     assert(tb->num_lines > 0);
     if (tb->cur_line < 0) tb->cur_line = 0;
-    if (tb->cur_line >= tb->num_lines) tb->cur_line = (int)tb->num_lines - 1;
+    if (tb->cur_line >= tb->num_lines) tb->cur_line = tb->num_lines - 1;
     if (tb->cur_character < 0) {
         tb->cur_character = 0;
     }
-    size_t count = gap_buffer_count(tb->line_bufs[tb->cur_line]);
+    int count = gap_buffer_count(tb->line_bufs[tb->cur_line]);
     if (tb->cur_character > count)tb->cur_character = count;
 }
 
@@ -51,7 +51,7 @@ void tb_fill_from_string(struct ted_buffer_t* tb, char* str, size_t len) {
         if (i + 1 == len && str[i] == '\n') break;
 
         if (i == 0 || str[i] == '\n') {
-            tb_insert_line_after(tb, (int)tb->num_lines - 1);
+            tb_insert_line_after(tb, tb->num_lines - 1);
             if (str[i] == '\n') continue; // don't include newline in buffer
         }
         gap_buffer_gap_insert(tb->line_bufs[tb->num_lines - 1], str[i]);
@@ -59,7 +59,7 @@ void tb_fill_from_string(struct ted_buffer_t* tb, char* str, size_t len) {
 }
 
 void tb_deinit(struct ted_buffer_t* tb) {
-    for (size_t i = 0; i < tb->num_lines; ++i) {
+    for (int i = 0; i < tb->num_lines; ++i) {
         gap_buffer_deinit(tb->line_bufs[i]);
         free(tb->line_bufs[i]);
     }

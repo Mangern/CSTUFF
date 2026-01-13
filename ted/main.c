@@ -17,20 +17,27 @@ typedef struct ted_buffer_t ted_buffer_t;
 static struct termios orig_termios;
 static bool opt_debug = 0;
 
-static int KEY_LEFT      = 0x445b1b;
-static int KEY_UP        = 0x415b1b;
-static int KEY_DOWN      = 0x425b1b;
-static int KEY_RIGHT     = 0x435b1b;
-static int KEY_BACKSPACE = 0x7f;
-static int KEY_ESC       = 0x1b;
-static int KEY_TAB       = 0x9;
+static const int KEY_LEFT      = 0x445b1b;
+static const int KEY_UP        = 0x415b1b;
+static const int KEY_DOWN      = 0x425b1b;
+static const int KEY_RIGHT     = 0x435b1b;
+static const int KEY_BACKSPACE = 0x7f;
+static const int KEY_ESC       = 0x1b;
+static const int KEY_TAB       = 0x9;
 
 static int tabsize = 4;
+
+typedef enum {
+    MODE_NORMAL,
+    MODE_INSERT
+} editor_mode_t;
 
 // state
 // buffer does not contain trailing newline
 ted_buffer_t main_buffer;
 char* print_buf;
+editor_mode_t editor_mode = MODE_NORMAL;
+bool should_quit = false;
 
 // Save original terminal settings
 void reset_terminal_mode() {
@@ -67,13 +74,10 @@ void debug_keyboard() {
             if (n > 0) {
                 printf("%x\n", c);
                 fflush(stdout);
-                // EOF
-                if (c == 4) break;
             } else if (n == 0) {
                 break;
             }
         }
-        // Do other work here
         usleep(1000);
     }
 }
@@ -95,6 +99,7 @@ bool buffer_char(int c) {
 }
 
 void draw() {
+    printf("\x1B[?25l"); // hide cursor
     // move home, erase until end
     printf("\x1B[H\x1B[0J");
     for (int i = 0; i < main_buffer.num_lines; ++i) {
@@ -104,7 +109,79 @@ void draw() {
     }
     // move to current location
     printf("\x1B[%d;%dH", main_buffer.cur_line+1, main_buffer.cur_character+1);
+    printf("\x1B[?25h"); // show cursor
     fflush(stdout);
+}
+
+void handle_input_normal(int c) {
+    if (c == 'i') {
+        editor_mode = MODE_INSERT;
+        return;
+    }
+    if (c == 4) {
+        // TODO: :q
+        should_quit = true;
+        return;
+    }
+}
+
+void handle_input_insert(int c) {
+    if (buffer_char(c)) {
+        gap_buffer_gap_at(main_buffer.line_bufs[main_buffer.cur_line], main_buffer.cur_character);
+        gap_buffer_gap_insert(main_buffer.line_bufs[main_buffer.cur_line], c);
+        main_buffer.cur_character += 1;
+        //buffer[buffer_count++] = c;
+        return;
+    } 
+
+    switch (c) {
+        case '\n': 
+            {
+                // TODO: chop current line and put content in next line
+                tb_insert_line_after(&main_buffer, main_buffer.cur_line);
+                ++main_buffer.cur_line;
+                main_buffer.cur_character = 0;
+            }
+            break;
+        case KEY_BACKSPACE: 
+            {
+                if (main_buffer.cur_character > 0) {
+                    gap_buffer_gap_at(main_buffer.line_bufs[main_buffer.cur_line], main_buffer.cur_character);
+                    gap_buffer_gap_delete(main_buffer.line_bufs[main_buffer.cur_line]);
+                    --main_buffer.cur_character;
+                } else if (main_buffer.cur_line > 0) {
+                    // TODO: slap cur line content on prev line
+                    tb_delete_line(&main_buffer, main_buffer.cur_line);
+                    --main_buffer.cur_line;
+                    main_buffer.cur_character = gap_buffer_count(main_buffer.line_bufs[main_buffer.cur_line]);
+                }
+            }
+            break;
+        case KEY_TAB: 
+            {
+                gap_buffer_gap_at(main_buffer.line_bufs[main_buffer.cur_line], main_buffer.cur_character);
+                for (int i = 0; i < tabsize; ++i) {
+                    gap_buffer_gap_insert(main_buffer.line_bufs[main_buffer.cur_line], ' ');
+                    main_buffer.cur_character += 1;
+                }
+            }
+            break;
+        case KEY_UP: 
+            --main_buffer.cur_line;
+            break;
+        case KEY_DOWN:
+            ++main_buffer.cur_line;
+            break;
+        case KEY_LEFT:
+            --main_buffer.cur_character;
+            break;
+        case KEY_RIGHT:
+            ++main_buffer.cur_character;
+            break;
+        case KEY_ESC:
+            editor_mode = MODE_NORMAL;
+            break;
+    }
 }
 
 int main(int argc, char **argv) {
@@ -156,59 +233,26 @@ int main(int argc, char **argv) {
     assert(main_buffer.num_lines > 0);
 
     print_buf = malloc(GAP_BUFFER_SIZE);
-    main_buffer.cur_line = (int)main_buffer.num_lines - 1;
+    main_buffer.cur_line = main_buffer.num_lines - 1;
     main_buffer.cur_character = 0;
 
     draw();
 
-    while (1) {
-        tb_constrain_line_char(&main_buffer);
+    while (!should_quit) {
         if (kbhit()) {
             int c = 0;
             int n = read(0, &c, 4);
-            if (n > 0) {
-                if (buffer_char(c)) {
-                    gap_buffer_gap_at(main_buffer.line_bufs[main_buffer.cur_line], main_buffer.cur_character);
-                    gap_buffer_gap_insert(main_buffer.line_bufs[main_buffer.cur_line], c);
-                    main_buffer.cur_character += 1;
-                    //buffer[buffer_count++] = c;
-                } else if (c == '\n') {
-                    // TODO: chop current line and put content in next line
-                    tb_insert_line_after(&main_buffer, main_buffer.cur_line);
-                    ++main_buffer.cur_line;
-                    main_buffer.cur_character = 0;
-                } else if (c == KEY_BACKSPACE) {
-                    if (main_buffer.cur_character > 0) {
-                        gap_buffer_gap_at(main_buffer.line_bufs[main_buffer.cur_line], main_buffer.cur_character);
-                        gap_buffer_gap_delete(main_buffer.line_bufs[main_buffer.cur_line]);
-                        --main_buffer.cur_character;
-                    } else if (main_buffer.cur_line > 0) {
-                        // TODO: slap cur line content on prev line
-                        tb_delete_line(&main_buffer, main_buffer.cur_line);
-                        --main_buffer.cur_line;
-                        main_buffer.cur_character = gap_buffer_count(main_buffer.line_bufs[main_buffer.cur_line]);
-                    }
-                } else if (c == KEY_TAB) {
-                    gap_buffer_gap_at(main_buffer.line_bufs[main_buffer.cur_line], main_buffer.cur_character);
-                    for (int i = 0; i < tabsize; ++i) {
-                       gap_buffer_gap_insert(main_buffer.line_bufs[main_buffer.cur_line], ' ');
-                       main_buffer.cur_character += 1;
-                    }
-                } else if (c == KEY_UP) {
-                    --main_buffer.cur_line;
-                } else if (c == KEY_DOWN) {
-                    ++main_buffer.cur_line;
-                } else if (c == KEY_LEFT) {
-                    --main_buffer.cur_character;
-                } else if (c == KEY_RIGHT) {
-                    ++main_buffer.cur_character;
-                }
-                // EOF
-                if (c == 4) break;
-            } else if (n == 0) {
-                break;
-            }
+            if (n == 0) continue;
 
+            switch (editor_mode) {
+                case MODE_NORMAL:
+                    handle_input_normal(c);
+                    break;
+                case MODE_INSERT:
+                    handle_input_insert(c);
+                    break;
+            }
+            tb_constrain_line_char(&main_buffer);
             draw();
         }
         // Do other work here

@@ -12,11 +12,11 @@
  * - Cursor character
  */
 struct ted_buffer_t {
-    size_t num_lines;
-    size_t capacity;
+    struct gap_buffer_t** line_bufs;
+    int num_lines;
+    int capacity;
     int cur_line;
     int cur_character;
-    struct gap_buffer_t** line_bufs;
 };
 
 void tb_insert_line_after(struct ted_buffer_t* tb, int line);
