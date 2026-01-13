@@ -5,8 +5,7 @@ int foo() {
 }
 
 int main() {
-    printf("Hello World!\n");
-    return foo();
+    printf("hello world\n");
+    return 69;
 }
-
 
