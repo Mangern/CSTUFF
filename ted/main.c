@@ -36,17 +36,20 @@ static int tabsize = 4;
 
 typedef enum {
     MODE_NORMAL,
-    MODE_INSERT
+    MODE_INSERT,
+    MODE_COMMAND
 } editor_mode_t;
 
 const char* EDITOR_MODE_STR[] = {
     "NORMAL",
     "INSERT",
+    "CMD"
 };
 
 // state
 // buffer does not contain trailing newline
 ted_buffer_t main_buffer;
+ted_buffer_t cmd_buffer;
 char* print_buf;
 editor_mode_t editor_mode = MODE_NORMAL;
 bool should_draw = true;
@@ -154,12 +157,19 @@ void draw() {
         printf("\x1B[38;5;241m%*d \x1B[38;5;255m%.*s\n", PAD_LFT - 1, main_buffer.scroll + i + 1, (int)count, print_buf);
     }
 
-    // Go to status field
+    // Write status field
     printf("\x1B[%d;%dH", win_size.ws_row - 1, 1);
     printf("%s", EDITOR_MODE_STR[editor_mode]);
 
-    // move to current location
-    printf("\x1B[%d;%dH", PAD_TOP + main_buffer.cur_line - main_buffer.scroll + 1, PAD_LFT + main_buffer.cur_character + 1);
+    if (editor_mode == MODE_NORMAL || editor_mode == MODE_INSERT) {
+        // move to current location
+        printf("\x1B[%d;%dH", PAD_TOP + main_buffer.cur_line - main_buffer.scroll + 1, PAD_LFT + main_buffer.cur_character + 1);
+    } else if (editor_mode == MODE_COMMAND) {
+        int count = gap_buffer_count(cmd_buffer.line_bufs[cmd_buffer.cur_line]);
+        gap_buffer_str(cmd_buffer.line_bufs[cmd_buffer.cur_line], print_buf);
+        printf("\x1B[%d;%dH:%.*s", win_size.ws_row, 1, count, print_buf);
+        printf("\x1B[%d;%dH", win_size.ws_row, cmd_buffer.cur_character + 2);
+    }
     printf("\x1B[?25h"); // show cursor
 
     fflush(stdout);
@@ -169,6 +179,9 @@ void handle_input_normal(int c) {
     switch (c) {
         case '$':
             main_buffer.cur_character = gap_buffer_count(main_buffer.line_bufs[main_buffer.cur_line]) - 1;
+            break;
+        case ':':
+            editor_mode = MODE_COMMAND;
             break;
         case '0':
             main_buffer.cur_character = 0;
@@ -278,6 +291,39 @@ void handle_input_insert(int c) {
     }
 }
 
+void handle_input_command(int c) {
+    if (buffer_char(c)) {
+        gap_buffer_gap_at(cmd_buffer.line_bufs[cmd_buffer.cur_line], cmd_buffer.cur_character);
+        gap_buffer_gap_insert(cmd_buffer.line_bufs[cmd_buffer.cur_line], c);
+        cmd_buffer.cur_character += 1;
+        return;
+    }
+
+    switch (c) {
+        case KEY_ESC:
+            editor_mode = MODE_NORMAL;
+            gap_buffer_gap_at(cmd_buffer.line_bufs[cmd_buffer.cur_line], 0);
+            gap_buffer_chop_rest(cmd_buffer.line_bufs[cmd_buffer.cur_line]);
+            cmd_buffer.cur_character = 0;
+            break;
+        case KEY_BACKSPACE: 
+            {
+                if (cmd_buffer.cur_character > 0) {
+                    gap_buffer_gap_at(cmd_buffer.line_bufs[cmd_buffer.cur_line], cmd_buffer.cur_character);
+                    gap_buffer_gap_delete(cmd_buffer.line_bufs[cmd_buffer.cur_line]);
+                    --cmd_buffer.cur_character;
+                }
+            }
+            break;
+        case KEY_LEFT:
+            --cmd_buffer.cur_character;
+            break;
+        case KEY_RIGHT:
+            ++cmd_buffer.cur_character;
+            break;
+    }
+}
+
 int main(int argc, char **argv) {
     options(argc, argv);
 
@@ -328,6 +374,8 @@ int main(int argc, char **argv) {
 
     assert(main_buffer.num_lines > 0);
 
+    tb_fill_from_string(&cmd_buffer, "", 0);
+
     print_buf = malloc(GAP_BUFFER_SIZE);
     main_buffer.cur_line = 0;
     main_buffer.cur_character = 0;
@@ -347,6 +395,9 @@ int main(int argc, char **argv) {
                     break;
                 case MODE_INSERT:
                     handle_input_insert(c);
+                    break;
+                case MODE_COMMAND:
+                    handle_input_command(c);
                     break;
             }
             tb_constrain_line_char(&main_buffer, win_size.ws_row - PAD_TOP - PAD_BOT, win_size.ws_col - PAD_LFT - PAD_RGT);

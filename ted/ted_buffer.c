@@ -57,6 +57,10 @@ void tb_constrain_line_char(ted_buffer_t* tb, int num_rows, int num_cols) {
 }
 
 void tb_fill_from_string(struct ted_buffer_t* tb, char* str, size_t len) {
+    if (len == 0) {
+        tb_insert_line_after(tb, -1);
+        return;
+    }
     for (size_t i = 0; i < len; ++i) {
         // avoid creating a new gap buffer at the end of the file
         if (i + 1 == len && str[i] == '\n') break;
