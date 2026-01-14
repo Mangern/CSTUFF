@@ -1,9 +1,11 @@
 #include <assert.h>
 #include <ctype.h>
 #include <getopt.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/ioctl.h>
 #include <sys/select.h>
 #include <termios.h>
 #include <unistd.h>
@@ -32,12 +34,20 @@ typedef enum {
     MODE_INSERT
 } editor_mode_t;
 
+const char* EDITOR_MODE_STR[] = {
+    "NORMAL",
+    "INSERT",
+};
+
 // state
 // buffer does not contain trailing newline
 ted_buffer_t main_buffer;
 char* print_buf;
 editor_mode_t editor_mode = MODE_NORMAL;
+bool should_draw = true;
+bool should_resize = true;
 bool should_quit = false;
+struct winsize win_size;
 
 // Save original terminal settings
 void reset_terminal_mode() {
@@ -82,6 +92,20 @@ void debug_keyboard() {
     }
 }
 
+void get_window_size() {
+    ioctl(STDOUT_FILENO, TIOCGWINSZ, &win_size);
+}
+
+void handler_sigwinch(int signo) {
+    (void)signo;
+    should_resize = true;
+    should_draw = true;
+}
+
+void setup_resize() {
+    signal(SIGWINCH, handler_sigwinch);
+}
+
 void options(int argc, char **argv) {
     for (;;) {
         switch(getopt(argc, argv, "d")) {
@@ -99,6 +123,12 @@ bool buffer_char(int c) {
 }
 
 void draw() {
+    should_draw = false;
+
+    if (should_resize) {
+        get_window_size();
+        should_resize = false;
+    }
     printf("\x1B[?25l"); // hide cursor
     // move home, erase until end
     printf("\x1B[H\x1B[0J");
@@ -107,9 +137,15 @@ void draw() {
         gap_buffer_str(main_buffer.line_bufs[i], print_buf);
         printf("%.*s\n", (int)count, print_buf);
     }
+
+    // Go to status field
+    printf("\x1B[%d;%dH", win_size.ws_row - 1, 1);
+    printf("%s", EDITOR_MODE_STR[editor_mode]);
+
     // move to current location
     printf("\x1B[%d;%dH", main_buffer.cur_line+1, main_buffer.cur_character+1);
     printf("\x1B[?25h"); // show cursor
+
     fflush(stdout);
 }
 
@@ -215,6 +251,8 @@ int main(int argc, char **argv) {
 
     set_conio_terminal_mode();
 
+    setup_resize();
+
     if (opt_debug) {
         debug_keyboard();
         return 0;
@@ -266,6 +304,7 @@ int main(int argc, char **argv) {
 
     while (!should_quit) {
         if (kbhit()) {
+            should_draw = true; // since we had keyboard action
             int c = 0;
             int n = read(0, &c, 4);
             if (n == 0) continue;
@@ -279,10 +318,14 @@ int main(int argc, char **argv) {
                     break;
             }
             tb_constrain_line_char(&main_buffer);
+        }
+
+        if (should_draw) {
             draw();
         }
+
         // Do other work here
-        usleep(1000);
+        usleep(50);
     }
 
     FILE * write_file = fopen(file_name, "w");
