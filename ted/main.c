@@ -27,6 +27,11 @@ static const int KEY_BACKSPACE = 0x7f;
 static const int KEY_ESC       = 0x1b;
 static const int KEY_TAB       = 0x9;
 
+static const int PAD_TOP = 0;
+static const int PAD_LFT = 7;
+static const int PAD_RGT = 0;
+static const int PAD_BOT = 2;
+
 static int tabsize = 4;
 
 typedef enum {
@@ -132,10 +137,21 @@ void draw() {
     printf("\x1B[?25l"); // hide cursor
     // move home, erase until end
     printf("\x1B[H\x1B[0J");
-    for (int i = 0; i < main_buffer.num_lines; ++i) {
-        size_t count = gap_buffer_count(main_buffer.line_bufs[i]);
-        gap_buffer_str(main_buffer.line_bufs[i], print_buf);
-        printf("%.*s\n", (int)count, print_buf);
+    int num_draw = win_size.ws_row - PAD_TOP - PAD_BOT;
+    if (main_buffer.num_lines - main_buffer.scroll < num_draw) {
+        num_draw = main_buffer.num_lines - main_buffer.scroll;
+    }
+    for (int i = 0; i < num_draw; ++i) {
+        gap_buffer_t* cur_line = main_buffer.line_bufs[main_buffer.scroll + i];
+        size_t count = gap_buffer_count(cur_line);
+        gap_buffer_str(cur_line, print_buf);
+        // move to correct spot
+        int row = PAD_TOP + i + 1;
+        int col = 1;
+        printf("\x1B[%d;%dH", row, col);
+        // print line. TODO: pad right? 
+        // -2 for ' '
+        printf("\x1B[38;5;241m%*d \x1B[38;5;255m%.*s\n", PAD_LFT - 1, main_buffer.scroll + i + 1, (int)count, print_buf);
     }
 
     // Go to status field
@@ -143,7 +159,7 @@ void draw() {
     printf("%s", EDITOR_MODE_STR[editor_mode]);
 
     // move to current location
-    printf("\x1B[%d;%dH", main_buffer.cur_line+1, main_buffer.cur_character+1);
+    printf("\x1B[%d;%dH", PAD_TOP + main_buffer.cur_line - main_buffer.scroll + 1, PAD_LFT + main_buffer.cur_character + 1);
     printf("\x1B[?25h"); // show cursor
 
     fflush(stdout);
@@ -151,6 +167,12 @@ void draw() {
 
 void handle_input_normal(int c) {
     switch (c) {
+        case '$':
+            main_buffer.cur_character = gap_buffer_count(main_buffer.line_bufs[main_buffer.cur_line]) - 1;
+            break;
+        case '0':
+            main_buffer.cur_character = 0;
+            break;
         case 'A':
             main_buffer.cur_character = gap_buffer_count(main_buffer.line_bufs[main_buffer.cur_line]);
             editor_mode = MODE_INSERT;
@@ -159,8 +181,15 @@ void handle_input_normal(int c) {
             main_buffer.cur_character = 0;
             editor_mode = MODE_INSERT;
             break;
+        case 'O':
+            tb_insert_line_after(&main_buffer, main_buffer.cur_line - 1);
+            main_buffer.cur_character = 0;
+            break;
         case 'h':
             main_buffer.cur_character -= 1;
+            break;
+        case 'i':
+            editor_mode = MODE_INSERT;
             break;
         case 'j':
             main_buffer.cur_line += 1;
@@ -171,7 +200,10 @@ void handle_input_normal(int c) {
         case 'l':
             main_buffer.cur_character += 1;
             break;
-        case 'i':
+        case 'o':
+            tb_insert_line_after(&main_buffer, main_buffer.cur_line);
+            ++main_buffer.cur_line;
+            main_buffer.cur_character = 0;
             editor_mode = MODE_INSERT;
             break;
         case 4:
@@ -297,7 +329,7 @@ int main(int argc, char **argv) {
     assert(main_buffer.num_lines > 0);
 
     print_buf = malloc(GAP_BUFFER_SIZE);
-    main_buffer.cur_line = main_buffer.num_lines - 1;
+    main_buffer.cur_line = 0;
     main_buffer.cur_character = 0;
 
     draw();
@@ -317,7 +349,7 @@ int main(int argc, char **argv) {
                     handle_input_insert(c);
                     break;
             }
-            tb_constrain_line_char(&main_buffer);
+            tb_constrain_line_char(&main_buffer, win_size.ws_row - PAD_TOP - PAD_BOT, win_size.ws_col - PAD_LFT - PAD_RGT);
         }
 
         if (should_draw) {

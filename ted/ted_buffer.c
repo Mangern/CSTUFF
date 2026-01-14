@@ -34,13 +34,24 @@ void tb_delete_line(ted_buffer_t* tb, int line) {
     --tb->num_lines;
 }
 
-void tb_constrain_line_char(ted_buffer_t* tb) {
+void tb_constrain_line_char(ted_buffer_t* tb, int num_rows, int num_cols) {
     assert(tb->num_lines > 0);
     if (tb->cur_line < 0) tb->cur_line = 0;
+    if (tb->cur_line < tb->scroll) {
+        tb->scroll = tb->cur_line;
+    }
     if (tb->cur_line >= tb->num_lines) tb->cur_line = tb->num_lines - 1;
+    if (tb->cur_line >= tb->scroll + num_rows) {
+        int diff = tb->cur_line - tb->scroll - num_rows + 1;
+        tb->scroll += diff;
+        if (tb->scroll > tb->num_lines) {
+            tb->scroll = tb->num_lines - 1;
+        }
+    }
     if (tb->cur_character < 0) {
         tb->cur_character = 0;
     }
+    // TODO: horizontal scroll
     int count = gap_buffer_count(tb->line_bufs[tb->cur_line]);
     if (tb->cur_character > count)tb->cur_character = count;
 }
