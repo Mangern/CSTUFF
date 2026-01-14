@@ -114,14 +114,34 @@ void draw() {
 }
 
 void handle_input_normal(int c) {
-    if (c == 'i') {
-        editor_mode = MODE_INSERT;
-        return;
-    }
-    if (c == 4) {
-        // TODO: :q
-        should_quit = true;
-        return;
+    switch (c) {
+        case 'A':
+            main_buffer.cur_character = gap_buffer_count(main_buffer.line_bufs[main_buffer.cur_line]);
+            editor_mode = MODE_INSERT;
+            break;
+        case 'I':
+            main_buffer.cur_character = 0;
+            editor_mode = MODE_INSERT;
+            break;
+        case 'h':
+            main_buffer.cur_character -= 1;
+            break;
+        case 'j':
+            main_buffer.cur_line += 1;
+            break;
+        case 'k':
+            main_buffer.cur_line -= 1;
+            break;
+        case 'l':
+            main_buffer.cur_character += 1;
+            break;
+        case 'i':
+            editor_mode = MODE_INSERT;
+            break;
+        case 4:
+            // TODO: :q
+            should_quit = true;
+            break;
     }
 }
 
