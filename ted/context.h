@@ -39,6 +39,9 @@ typedef struct context_t {
 
 void ctx_init(context_t *ctx);
 
+// Create a new buffer and set cur_buf to that buffer.
+void ctx_open_empty(context_t *ctx);
+
 void ctx_log(context_t *ctx, char *message);
 void ctx_logf(context_t *ctx, char *message, ...);
 

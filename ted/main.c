@@ -353,42 +353,15 @@ int main(int argc, char **argv) {
         debug_keyboard();
         return 0;
     }
-    //
-    // if (optind >= argc) {
-    //     fprintf(stderr, "Usage: %s <file>\n", argv[0]);
-    //     exit(EXIT_FAILURE);
-    // }
-    //
-    // const char* file_name = argv[optind];
-    // ++optind; // hmm,
-    //
-    // FILE * read_file = fopen(file_name, "r");
-    //
-    // if (!read_file) {
-    //     fprintf(stderr, "ERROR: Failed to read file %s\n", file_name);
-    //     exit(-1);
-    // }
-    //
-    // {
-    //     const size_t CHUNK = 1024;
-    //     size_t cap = CHUNK;
-    //     size_t size = 0;
-    //     char* str = malloc(cap);
-    //
-    //     for (;;) {
-    //         long nread = fread(str+size, 1, cap - size, read_file);
-    //         if (nread == 0) break;
-    //         size += nread;
-    //
-    //         if (size == cap) {
-    //             cap = cap * 3 / 2;
-    //             str = realloc(str, cap);
-    //         }
-    //     }
-    //     tb_fill_from_string(&ctx.main_buffer, str, size);
-    //     fclose(read_file);
-    //     free(str);
-    // }
+    
+     if (optind < argc) {
+         char* file_name = argv[optind];
+         ++optind; // hmm,
+
+         cmd_edit_file(&ctx, file_name);
+     }
+    
+    
 
     print_buf = malloc(GAP_BUFFER_SIZE);
 
@@ -422,7 +395,7 @@ int main(int argc, char **argv) {
         // Do other work here
         usleep(50);
     }
-    // Go home
-    printf("\x1B[H");
+    // move home, erase until end
+    printf("\x1B[H\x1B[0J");
     return 0;
 }

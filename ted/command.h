@@ -12,4 +12,10 @@ struct cmd_result_t {
 
 struct cmd_result_t parse_execute_command(context_t *ctx, char* cmd, int len);
 
+struct cmd_result_t cmd_write_file(context_t *ctx);
+
+// If cur_buf has a filename or it has content, create a new buffer. Otherwise, replace cur_buf with the opened file.
+// The buffer takes ownership of file_name!
+struct cmd_result_t cmd_edit_file(context_t *ctx, char* file_name);
+
 #endif // COMMAND_H

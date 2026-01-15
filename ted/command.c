@@ -43,8 +43,6 @@ static void skip_ws(lex_t *lex);
 static int match_id(lex_t *lex);
 static char* lex_strdup(lex_t *lex);
 
-static cmd_result_t cmd_write_file(context_t *ctx);
-
 struct cmd_result_t parse_execute_command(context_t *ctx, char* cmd, int len) {
     lex_t lex = {
         .content = cmd,
@@ -98,7 +96,31 @@ struct cmd_result_t parse_execute_command(context_t *ctx, char* cmd, int len) {
         return cmd_write_file(ctx);
     }
 
-    return ERR("Unknown command");
+    if (strncmp(&lex.content[token.beg], "e", token.end - token.beg) == 0) {
+        advance(&lex);
+        token = peek(&lex);
+        switch (token.type) {
+            case TOK_ERR:
+                return ERR("Unexpected token");
+            case TOK_END:
+                return ERR("Missing file name");
+            case TOK_ID:
+                {
+                    char *filename = lex_strdup(&lex);
+                    return cmd_edit_file(ctx, filename);
+                }
+                break;
+            default:
+                assert(false && "Not implemented");
+        }
+    }
+
+    if (strncmp(&lex.content[token.beg], "log", token.end - token.beg) == 0) {
+        ctx->cur_buf = ctx->log_buf;
+        return OK;
+    }
+
+    return ERRF("Unknown command: %*s", token.end - token.beg, &lex.content[token.beg]);
 }
 
 static token_t peek(lex_t *lex) {
@@ -160,7 +182,7 @@ static char* lex_strdup(lex_t *lex) {
 
 // ==== Commands ====
 
-static cmd_result_t cmd_write_file(context_t *ctx) {
+cmd_result_t cmd_write_file(context_t *ctx) {
     char print_buf[GAP_BUFFER_SIZE];
 
     assert(ctx->cur_buf->file_name != 0);
@@ -189,5 +211,52 @@ static cmd_result_t cmd_write_file(context_t *ctx) {
     }
 
     ctx_logf(ctx, "\"%s\" %dL, %ldB written", ctx->cur_buf->file_name, buf->num_lines, num_write);
+    return OK;
+}
+
+cmd_result_t cmd_edit_file(context_t *ctx, char* file_name) {
+    // TODO: check if we have it open
+    bool open_new = ctx->cur_buf->file_name != 0 
+        || ctx->cur_buf->buf.num_lines > 0 
+        || gap_buffer_count(ctx->cur_buf->buf.line_bufs[0]) > 0;
+
+    if (open_new) {
+        ctx_open_empty(ctx);
+    }
+
+    // A bit ugly, just to remove 1 empty line in most cases
+    while (ctx->cur_buf->buf.num_lines > 0) {
+        tb_delete_line(&ctx->cur_buf->buf, ctx->cur_buf->buf.num_lines - 1);
+    }
+
+    FILE * read_file = fopen(file_name, "r");
+    
+    if (!read_file) {
+        return ERRF("ERROR: Failed to read file %s\n", file_name);
+    }
+    
+    {
+        const size_t CHUNK = 1024;
+        size_t cap = CHUNK;
+        size_t size = 0;
+        char* str = malloc(cap);
+    
+        for (;;) {
+            long nread = fread(str+size, 1, cap - size, read_file);
+            if (nread == 0) break;
+            size += nread;
+    
+            if (size == cap) {
+                cap = cap * 3 / 2;
+                str = realloc(str, cap);
+            }
+        }
+        tb_fill_from_string(&ctx->cur_buf->buf, str, size);
+        fclose(read_file);
+        free(str);
+    }
+
+    ctx->cur_buf->file_name = file_name;
+
     return OK;
 }

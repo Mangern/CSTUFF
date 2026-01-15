@@ -31,6 +31,10 @@ void ctx_init(context_t *ctx) {
     ctx->cur_buf = ctx_buf_push(ctx);
 }
 
+void ctx_open_empty(context_t *ctx) {
+    ctx->cur_buf = ctx_buf_push(ctx);
+}
+
 void ctx_log(context_t *ctx, char *message) {
     struct ted_buffer_t *buf = &ctx->log_buf->buf;
     tb_insert_line_after(buf, buf->num_lines - 1);
