@@ -14,16 +14,27 @@ typedef enum {
 
 extern const char* EDITOR_MODE_STR[];
 
+// linked list of buffers
+struct bufentry_t {
+    struct bufentry_t*  nxt;
+    struct bufentry_t*  prv;
+    struct ted_buffer_t buf;
+};
+
 // state
 typedef struct context_t {
-    int tabsize;
-    struct ted_buffer_t main_buffer;
-    struct ted_buffer_t cmd_buffer;
-    editor_mode_t editor_mode;
     bool should_draw;
     bool should_resize;
     bool should_quit;
+    int tabsize;
+    editor_mode_t editor_mode;
     struct winsize win_size;
+    struct bufentry_t *bufhead;
+    struct bufentry_t *buftail;
+    struct bufentry_t *cmd_buf;
+    struct bufentry_t *cur_buf; // active buffer
 } context_t;
+
+void ctx_init(context_t *ctx);
 
 #endif // CONTEXT_H
