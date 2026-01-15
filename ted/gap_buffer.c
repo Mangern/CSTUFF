@@ -28,6 +28,9 @@ void gap_buffer_collapse(struct gap_buffer_t *gb) {
  * Note: idx should not care about a gap existing
  */
 void gap_buffer_gap_at(struct gap_buffer_t *gb, size_t idx) {
+    if (gb->gap_start == idx && gb->gap_size > 0) {
+        return;
+    }
     /*
      * gap_at(3)
      *

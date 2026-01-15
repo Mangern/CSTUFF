@@ -35,6 +35,7 @@ void tb_delete_line(ted_buffer_t* tb, int line) {
 }
 
 void tb_constrain_line_char(ted_buffer_t* tb, int num_rows, int num_cols) {
+    (void)num_cols;
     assert(tb->num_lines > 0);
     if (tb->cur_line < 0) tb->cur_line = 0;
     if (tb->cur_line < tb->scroll) {

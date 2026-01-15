@@ -33,9 +33,13 @@ typedef struct context_t {
     struct bufentry_t *bufhead;
     struct bufentry_t *buftail;
     struct bufentry_t *cmd_buf;
+    struct bufentry_t *log_buf;
     struct bufentry_t *cur_buf; // active buffer
 } context_t;
 
 void ctx_init(context_t *ctx);
+
+void ctx_log(context_t *ctx, char *message);
+void ctx_logf(context_t *ctx, char *message, ...);
 
 #endif // CONTEXT_H

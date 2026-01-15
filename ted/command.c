@@ -27,15 +27,25 @@ typedef struct lex_t {
     token_t cur_tok;
 } lex_t;
 
+typedef struct cmd_result_t cmd_result_t;
+
+#define EMSG_SIZE 8192
+char emsg_buf[EMSG_SIZE];
+
+#define OK ((cmd_result_t){.err=false})
+#define ERR(msg) ((cmd_result_t){.err=true,.emsg=(msg)})
+#define ERRF(fmt, ...) ((cmd_result_t){.err=snprintf(emsg_buf, EMSG_SIZE, (fmt) __VA_OPT__(,) __VA_ARGS__),.emsg=emsg_buf})
+
+
 static token_t peek(lex_t *lex);
 static void advance(lex_t *lex);
 static void skip_ws(lex_t *lex);
 static int match_id(lex_t *lex);
 static char* lex_strdup(lex_t *lex);
 
-static void cmd_write_file(context_t *ctx);
+static cmd_result_t cmd_write_file(context_t *ctx);
 
-void parse_execute_command(context_t *ctx, char* cmd, int len) {
+struct cmd_result_t parse_execute_command(context_t *ctx, char* cmd, int len) {
     lex_t lex = {
         .content = cmd,
         .ptr = 0,
@@ -48,15 +58,16 @@ void parse_execute_command(context_t *ctx, char* cmd, int len) {
     token_t token = peek(&lex);
 
     // TODO
-    if (token.type == TOK_ERR) return;
+    if (token.type == TOK_ERR) return ERR("Unexpected token");
 
-    if (token.type == TOK_END) return;
+    // 
+    if (token.type == TOK_END) return OK;
 
     assert((token.type == TOK_ID) && "Not implemented");
 
     if (strncmp(&lex.content[token.beg], "q", token.end - token.beg) == 0) {
         ctx->should_quit = true;
-        return;
+        return OK;
     }
 
     if (strncmp(&lex.content[token.beg], "w", token.end - token.beg) == 0) {
@@ -66,11 +77,10 @@ void parse_execute_command(context_t *ctx, char* cmd, int len) {
         // TODO
         switch (token.type) {
             case TOK_ERR:
-                return;
+                return ERR("Unexpected token");
             case TOK_END:
                 if (ctx->cur_buf->file_name == 0) {
-                    // TODO: Error: no file name provided
-                    return;
+                    return ERR("Missing file name");
                 }
                 break;
             case TOK_ID:
@@ -85,11 +95,10 @@ void parse_execute_command(context_t *ctx, char* cmd, int len) {
             default:
                 assert(false && "Not implemented");
         }
-        cmd_write_file(ctx);
-        return;
+        return cmd_write_file(ctx);
     }
 
-    // TODO: error: unknown command
+    return ERR("Unknown command");
 }
 
 static token_t peek(lex_t *lex) {
@@ -151,7 +160,7 @@ static char* lex_strdup(lex_t *lex) {
 
 // ==== Commands ====
 
-static void cmd_write_file(context_t *ctx) {
+static cmd_result_t cmd_write_file(context_t *ctx) {
     char print_buf[GAP_BUFFER_SIZE];
 
     assert(ctx->cur_buf->file_name != 0);
@@ -161,22 +170,24 @@ static void cmd_write_file(context_t *ctx) {
         // TODO: error
         // fprintf(stderr, "Failed to write to %s\n", file_name);
         // exit(EXIT_FAILURE);
-        return;
+        return ERRF("Cannot open %s for writing", ctx->cur_buf->file_name);
     }
 
     struct ted_buffer_t *buf = &ctx->cur_buf->buf;
+
+    long num_write = 0;
     
     for (int i = 0; i < buf->num_lines; ++i) {
         size_t count = gap_buffer_count(buf->line_bufs[i]);
         gap_buffer_str(buf->line_bufs[i], print_buf);
-        fprintf(write_file, "%.*s\n", (int)count, print_buf);
+        num_write += fprintf(write_file, "%.*s\n", (int)count, print_buf);
         // deinit
     }
     
     if (fclose(write_file)) {
-        //fprintf(stderr, "Failed to close file %s\n", file_name);
-        //exit(EXIT_FAILURE);
+        return ERRF("Failed to close %s", ctx->cur_buf->file_name);
     }
 
-    // TODO: log message
+    ctx_logf(ctx, "\"%s\" %dL, %ldB written", ctx->cur_buf->file_name, buf->num_lines, num_write);
+    return OK;
 }

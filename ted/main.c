@@ -113,7 +113,7 @@ bool buffer_char(int c) {
 void draw(context_t* ctx) {
     ted_buffer_t *main_buf = &ctx->cur_buf->buf;
     ted_buffer_t *cmd_buf = &ctx->cmd_buf->buf;
-
+    ted_buffer_t *log_buf = &ctx->log_buf->buf;
     ctx->should_draw = false;
 
     if (ctx->should_resize) {
@@ -149,6 +149,12 @@ void draw(context_t* ctx) {
     printf("%8s \"%s\"", EDITOR_MODE_STR[ctx->editor_mode], fn_str);
 
     if (ctx->editor_mode == MODE_NORMAL || ctx->editor_mode == MODE_INSERT) {
+        // last line of log
+        int count = gap_buffer_count(log_buf->line_bufs[log_buf->cur_line]);
+        gap_buffer_str(log_buf->line_bufs[log_buf->cur_line], print_buf);
+
+        printf("\x1B[%d;%dH%.*s", ctx->win_size.ws_row, 1, count, print_buf);
+
         // move to current location
         printf("\x1B[%d;%dH", PAD_TOP + main_buf->cur_line - main_buf->scroll + 1, PAD_LFT + main_buf->cur_character + 1);
     } else if (ctx->editor_mode == MODE_COMMAND) {
@@ -185,6 +191,7 @@ void handle_input_normal(context_t* ctx, int c) {
         case 'O':
             tb_insert_line_after(buf, buf->cur_line - 1);
             buf->cur_character = 0;
+            ctx->editor_mode = MODE_INSERT;
             break;
         case 'h':
             buf->cur_character -= 1;
@@ -296,7 +303,11 @@ void handle_input_command(context_t *ctx, int c) {
                 char* cmd_str = malloc(size+1);
                 gap_buffer_str(buf->line_bufs[buf->cur_line], cmd_str);
                 cmd_str[size] = 0;
-                parse_execute_command(ctx, cmd_str, size);
+                struct cmd_result_t res = parse_execute_command(ctx, cmd_str, size);
+
+                if (res.err) {
+                    ctx_log(ctx, res.emsg);
+                }
 
                 // clear and back to normal
                 ctx->editor_mode = MODE_NORMAL;
@@ -411,6 +422,7 @@ int main(int argc, char **argv) {
         // Do other work here
         usleep(50);
     }
-
+    // Go home
+    printf("\x1B[H");
     return 0;
 }
