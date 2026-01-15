@@ -11,6 +11,8 @@
  * - Cursor line
  * - Cursor character
  * - Scroll: Think of it as the index of the first line that is drawn.
+ *
+ * A line buffer never includes \n character.
  */
 struct ted_buffer_t {
     struct gap_buffer_t** line_bufs;

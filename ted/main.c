@@ -10,6 +10,7 @@
 #include <termios.h>
 #include <unistd.h>
 
+#include "context.h"
 #include "gap_buffer.h"
 #include "ted_buffer.h"
 
@@ -32,30 +33,8 @@ static const int PAD_LFT = 7;
 static const int PAD_RGT = 0;
 static const int PAD_BOT = 2;
 
-static int tabsize = 4;
-
-typedef enum {
-    MODE_NORMAL,
-    MODE_INSERT,
-    MODE_COMMAND
-} editor_mode_t;
-
-const char* EDITOR_MODE_STR[] = {
-    "NORMAL",
-    "INSERT",
-    "CMD"
-};
-
-// state
-// buffer does not contain trailing newline
-ted_buffer_t main_buffer;
-ted_buffer_t cmd_buffer;
+context_t ctx;
 char* print_buf;
-editor_mode_t editor_mode = MODE_NORMAL;
-bool should_draw = true;
-bool should_resize = true;
-bool should_quit = false;
-struct winsize win_size;
 
 // Save original terminal settings
 void reset_terminal_mode() {
@@ -101,13 +80,13 @@ void debug_keyboard() {
 }
 
 void get_window_size() {
-    ioctl(STDOUT_FILENO, TIOCGWINSZ, &win_size);
+    ioctl(STDOUT_FILENO, TIOCGWINSZ, &ctx.win_size);
 }
 
 void handler_sigwinch(int signo) {
     (void)signo;
-    should_resize = true;
-    should_draw = true;
+    ctx.should_resize = true;
+    ctx.should_draw = true;
 }
 
 void setup_resize() {
@@ -130,22 +109,22 @@ bool buffer_char(int c) {
     return isascii(c) && isprint(c);
 }
 
-void draw() {
-    should_draw = false;
+void draw(context_t* ctx) {
+    ctx->should_draw = false;
 
-    if (should_resize) {
+    if (ctx->should_resize) {
         get_window_size();
-        should_resize = false;
+        ctx->should_resize = false;
     }
     printf("\x1B[?25l"); // hide cursor
     // move home, erase until end
     printf("\x1B[H\x1B[0J");
-    int num_draw = win_size.ws_row - PAD_TOP - PAD_BOT;
-    if (main_buffer.num_lines - main_buffer.scroll < num_draw) {
-        num_draw = main_buffer.num_lines - main_buffer.scroll;
+    int num_draw = ctx->win_size.ws_row - PAD_TOP - PAD_BOT;
+    if (ctx->main_buffer.num_lines - ctx->main_buffer.scroll < num_draw) {
+        num_draw = ctx->main_buffer.num_lines - ctx->main_buffer.scroll;
     }
     for (int i = 0; i < num_draw; ++i) {
-        gap_buffer_t* cur_line = main_buffer.line_bufs[main_buffer.scroll + i];
+        gap_buffer_t* cur_line = ctx->main_buffer.line_bufs[ctx->main_buffer.scroll + i];
         size_t count = gap_buffer_count(cur_line);
         gap_buffer_str(cur_line, print_buf);
         // move to correct spot
@@ -154,172 +133,172 @@ void draw() {
         printf("\x1B[%d;%dH", row, col);
         // print line. TODO: pad right? 
         // -2 for ' '
-        printf("\x1B[38;5;241m%*d \x1B[38;5;255m%.*s\n", PAD_LFT - 1, main_buffer.scroll + i + 1, (int)count, print_buf);
+        printf("\x1B[38;5;241m%*d \x1B[0m%.*s\n", PAD_LFT - 1, ctx->main_buffer.scroll + i + 1, (int)count, print_buf);
     }
 
     // Write status field
-    printf("\x1B[%d;%dH", win_size.ws_row - 1, 1);
-    printf("%s", EDITOR_MODE_STR[editor_mode]);
+    printf("\x1B[%d;%dH", ctx->win_size.ws_row - 1, 1);
+    printf("%s", EDITOR_MODE_STR[ctx->editor_mode]);
 
-    if (editor_mode == MODE_NORMAL || editor_mode == MODE_INSERT) {
+    if (ctx->editor_mode == MODE_NORMAL || ctx->editor_mode == MODE_INSERT) {
         // move to current location
-        printf("\x1B[%d;%dH", PAD_TOP + main_buffer.cur_line - main_buffer.scroll + 1, PAD_LFT + main_buffer.cur_character + 1);
-    } else if (editor_mode == MODE_COMMAND) {
-        int count = gap_buffer_count(cmd_buffer.line_bufs[cmd_buffer.cur_line]);
-        gap_buffer_str(cmd_buffer.line_bufs[cmd_buffer.cur_line], print_buf);
-        printf("\x1B[%d;%dH:%.*s", win_size.ws_row, 1, count, print_buf);
-        printf("\x1B[%d;%dH", win_size.ws_row, cmd_buffer.cur_character + 2);
+        printf("\x1B[%d;%dH", PAD_TOP + ctx->main_buffer.cur_line - ctx->main_buffer.scroll + 1, PAD_LFT + ctx->main_buffer.cur_character + 1);
+    } else if (ctx->editor_mode == MODE_COMMAND) {
+        int count = gap_buffer_count(ctx->cmd_buffer.line_bufs[ctx->cmd_buffer.cur_line]);
+        gap_buffer_str(ctx->cmd_buffer.line_bufs[ctx->cmd_buffer.cur_line], print_buf);
+        printf("\x1B[%d;%dH:%.*s", ctx->win_size.ws_row, 1, count, print_buf);
+        printf("\x1B[%d;%dH", ctx->win_size.ws_row, ctx->cmd_buffer.cur_character + 2);
     }
     printf("\x1B[?25h"); // show cursor
 
     fflush(stdout);
 }
 
-void handle_input_normal(int c) {
+void handle_input_normal(context_t* ctx, int c) {
     switch (c) {
         case '$':
-            main_buffer.cur_character = gap_buffer_count(main_buffer.line_bufs[main_buffer.cur_line]) - 1;
+            ctx->main_buffer.cur_character = gap_buffer_count(ctx->main_buffer.line_bufs[ctx->main_buffer.cur_line]) - 1;
             break;
         case ':':
-            editor_mode = MODE_COMMAND;
+            ctx->editor_mode = MODE_COMMAND;
             break;
         case '0':
-            main_buffer.cur_character = 0;
+            ctx->main_buffer.cur_character = 0;
             break;
         case 'A':
-            main_buffer.cur_character = gap_buffer_count(main_buffer.line_bufs[main_buffer.cur_line]);
-            editor_mode = MODE_INSERT;
+            ctx->main_buffer.cur_character = gap_buffer_count(ctx->main_buffer.line_bufs[ctx->main_buffer.cur_line]);
+            ctx->editor_mode = MODE_INSERT;
             break;
         case 'I':
-            main_buffer.cur_character = 0;
-            editor_mode = MODE_INSERT;
+            ctx->main_buffer.cur_character = 0;
+            ctx->editor_mode = MODE_INSERT;
             break;
         case 'O':
-            tb_insert_line_after(&main_buffer, main_buffer.cur_line - 1);
-            main_buffer.cur_character = 0;
+            tb_insert_line_after(&ctx->main_buffer, ctx->main_buffer.cur_line - 1);
+            ctx->main_buffer.cur_character = 0;
             break;
         case 'h':
-            main_buffer.cur_character -= 1;
+            ctx->main_buffer.cur_character -= 1;
             break;
         case 'i':
-            editor_mode = MODE_INSERT;
+            ctx->editor_mode = MODE_INSERT;
             break;
         case 'j':
-            main_buffer.cur_line += 1;
+            ctx->main_buffer.cur_line += 1;
             break;
         case 'k':
-            main_buffer.cur_line -= 1;
+            ctx->main_buffer.cur_line -= 1;
             break;
         case 'l':
-            main_buffer.cur_character += 1;
+            ctx->main_buffer.cur_character += 1;
             break;
         case 'o':
-            tb_insert_line_after(&main_buffer, main_buffer.cur_line);
-            ++main_buffer.cur_line;
-            main_buffer.cur_character = 0;
-            editor_mode = MODE_INSERT;
+            tb_insert_line_after(&ctx->main_buffer, ctx->main_buffer.cur_line);
+            ++ctx->main_buffer.cur_line;
+            ctx->main_buffer.cur_character = 0;
+            ctx->editor_mode = MODE_INSERT;
             break;
         case 4:
             // TODO: :q
-            should_quit = true;
+            ctx->should_quit = true;
             break;
     }
 }
 
-void handle_input_insert(int c) {
+void handle_input_insert(context_t *ctx, int c) {
     if (buffer_char(c)) {
-        gap_buffer_gap_at(main_buffer.line_bufs[main_buffer.cur_line], main_buffer.cur_character);
-        gap_buffer_gap_insert(main_buffer.line_bufs[main_buffer.cur_line], c);
-        main_buffer.cur_character += 1;
+        gap_buffer_gap_at(ctx->main_buffer.line_bufs[ctx->main_buffer.cur_line], ctx->main_buffer.cur_character);
+        gap_buffer_gap_insert(ctx->main_buffer.line_bufs[ctx->main_buffer.cur_line], c);
+        ctx->main_buffer.cur_character += 1;
         return;
     } 
 
     switch (c) {
         case '\n': 
             {
-                tb_insert_line_after(&main_buffer, main_buffer.cur_line);
+                tb_insert_line_after(&ctx->main_buffer, ctx->main_buffer.cur_line);
                 gap_buffer_concat(
-                    main_buffer.line_bufs[main_buffer.cur_line+1], 
-                    main_buffer.line_bufs[main_buffer.cur_line], 
-                    main_buffer.cur_character
+                    ctx->main_buffer.line_bufs[ctx->main_buffer.cur_line+1], 
+                    ctx->main_buffer.line_bufs[ctx->main_buffer.cur_line], 
+                    ctx->main_buffer.cur_character
                 );
-                gap_buffer_chop_rest(main_buffer.line_bufs[main_buffer.cur_line]);
-                ++main_buffer.cur_line;
-                main_buffer.cur_character = 0;
+                gap_buffer_chop_rest(ctx->main_buffer.line_bufs[ctx->main_buffer.cur_line]);
+                ++ctx->main_buffer.cur_line;
+                ctx->main_buffer.cur_character = 0;
             }
             break;
         case KEY_BACKSPACE: 
             {
-                if (main_buffer.cur_character > 0) {
-                    gap_buffer_gap_at(main_buffer.line_bufs[main_buffer.cur_line], main_buffer.cur_character);
-                    gap_buffer_gap_delete(main_buffer.line_bufs[main_buffer.cur_line]);
-                    --main_buffer.cur_character;
-                } else if (main_buffer.cur_line > 0) {
-                    main_buffer.cur_character = gap_buffer_count(main_buffer.line_bufs[main_buffer.cur_line - 1]);
+                if (ctx->main_buffer.cur_character > 0) {
+                    gap_buffer_gap_at(ctx->main_buffer.line_bufs[ctx->main_buffer.cur_line], ctx->main_buffer.cur_character);
+                    gap_buffer_gap_delete(ctx->main_buffer.line_bufs[ctx->main_buffer.cur_line]);
+                    --ctx->main_buffer.cur_character;
+                } else if (ctx->main_buffer.cur_line > 0) {
+                    ctx->main_buffer.cur_character = gap_buffer_count(ctx->main_buffer.line_bufs[ctx->main_buffer.cur_line - 1]);
 
-                    gap_buffer_concat(main_buffer.line_bufs[main_buffer.cur_line - 1], main_buffer.line_bufs[main_buffer.cur_line], 0);
-                    tb_delete_line(&main_buffer, main_buffer.cur_line);
+                    gap_buffer_concat(ctx->main_buffer.line_bufs[ctx->main_buffer.cur_line - 1], ctx->main_buffer.line_bufs[ctx->main_buffer.cur_line], 0);
+                    tb_delete_line(&ctx->main_buffer, ctx->main_buffer.cur_line);
 
-                    --main_buffer.cur_line;
+                    --ctx->main_buffer.cur_line;
                 }
             }
             break;
         case KEY_TAB: 
             {
-                gap_buffer_gap_at(main_buffer.line_bufs[main_buffer.cur_line], main_buffer.cur_character);
-                for (int i = 0; i < tabsize; ++i) {
-                    gap_buffer_gap_insert(main_buffer.line_bufs[main_buffer.cur_line], ' ');
-                    main_buffer.cur_character += 1;
+                gap_buffer_gap_at(ctx->main_buffer.line_bufs[ctx->main_buffer.cur_line], ctx->main_buffer.cur_character);
+                for (int i = 0; i < ctx->tabsize; ++i) {
+                    gap_buffer_gap_insert(ctx->main_buffer.line_bufs[ctx->main_buffer.cur_line], ' ');
+                    ctx->main_buffer.cur_character += 1;
                 }
             }
             break;
         case KEY_UP: 
-            --main_buffer.cur_line;
+            --ctx->main_buffer.cur_line;
             break;
         case KEY_DOWN:
-            ++main_buffer.cur_line;
+            ++ctx->main_buffer.cur_line;
             break;
         case KEY_LEFT:
-            --main_buffer.cur_character;
+            --ctx->main_buffer.cur_character;
             break;
         case KEY_RIGHT:
-            ++main_buffer.cur_character;
+            ++ctx->main_buffer.cur_character;
             break;
         case KEY_ESC:
-            editor_mode = MODE_NORMAL;
+            ctx->editor_mode = MODE_NORMAL;
             break;
     }
 }
 
-void handle_input_command(int c) {
+void handle_input_command(context_t *ctx, int c) {
     if (buffer_char(c)) {
-        gap_buffer_gap_at(cmd_buffer.line_bufs[cmd_buffer.cur_line], cmd_buffer.cur_character);
-        gap_buffer_gap_insert(cmd_buffer.line_bufs[cmd_buffer.cur_line], c);
-        cmd_buffer.cur_character += 1;
+        gap_buffer_gap_at(ctx->cmd_buffer.line_bufs[ctx->cmd_buffer.cur_line], ctx->cmd_buffer.cur_character);
+        gap_buffer_gap_insert(ctx->cmd_buffer.line_bufs[ctx->cmd_buffer.cur_line], c);
+        ctx->cmd_buffer.cur_character += 1;
         return;
     }
 
     switch (c) {
         case KEY_ESC:
-            editor_mode = MODE_NORMAL;
-            gap_buffer_gap_at(cmd_buffer.line_bufs[cmd_buffer.cur_line], 0);
-            gap_buffer_chop_rest(cmd_buffer.line_bufs[cmd_buffer.cur_line]);
-            cmd_buffer.cur_character = 0;
+            ctx->editor_mode = MODE_NORMAL;
+            gap_buffer_gap_at(ctx->cmd_buffer.line_bufs[ctx->cmd_buffer.cur_line], 0);
+            gap_buffer_chop_rest(ctx->cmd_buffer.line_bufs[ctx->cmd_buffer.cur_line]);
+            ctx->cmd_buffer.cur_character = 0;
             break;
         case KEY_BACKSPACE: 
             {
-                if (cmd_buffer.cur_character > 0) {
-                    gap_buffer_gap_at(cmd_buffer.line_bufs[cmd_buffer.cur_line], cmd_buffer.cur_character);
-                    gap_buffer_gap_delete(cmd_buffer.line_bufs[cmd_buffer.cur_line]);
-                    --cmd_buffer.cur_character;
+                if (ctx->cmd_buffer.cur_character > 0) {
+                    gap_buffer_gap_at(ctx->cmd_buffer.line_bufs[ctx->cmd_buffer.cur_line], ctx->cmd_buffer.cur_character);
+                    gap_buffer_gap_delete(ctx->cmd_buffer.line_bufs[ctx->cmd_buffer.cur_line]);
+                    --ctx->cmd_buffer.cur_character;
                 }
             }
             break;
         case KEY_LEFT:
-            --cmd_buffer.cur_character;
+            --ctx->cmd_buffer.cur_character;
             break;
         case KEY_RIGHT:
-            ++cmd_buffer.cur_character;
+            ++ctx->cmd_buffer.cur_character;
             break;
     }
 }
@@ -330,6 +309,11 @@ int main(int argc, char **argv) {
     set_conio_terminal_mode();
 
     setup_resize();
+
+    ctx.should_draw = 1;
+    ctx.should_resize = 1;
+    ctx.editor_mode = MODE_NORMAL;
+    ctx.tabsize = 4;
 
     if (opt_debug) {
         debug_keyboard();
@@ -367,44 +351,44 @@ int main(int argc, char **argv) {
                 str = realloc(str, cap);
             }
         }
-        tb_fill_from_string(&main_buffer, str, size);
+        tb_fill_from_string(&ctx.main_buffer, str, size);
         fclose(read_file);
         free(str);
     }
 
-    assert(main_buffer.num_lines > 0);
+    assert(ctx.main_buffer.num_lines > 0);
 
-    tb_fill_from_string(&cmd_buffer, "", 0);
+    tb_fill_from_string(&ctx.cmd_buffer, "", 0);
 
     print_buf = malloc(GAP_BUFFER_SIZE);
-    main_buffer.cur_line = 0;
-    main_buffer.cur_character = 0;
+    ctx.main_buffer.cur_line = 0;
+    ctx.main_buffer.cur_character = 0;
 
-    draw();
+    draw(&ctx);
 
-    while (!should_quit) {
+    while (!ctx.should_quit) {
         if (kbhit()) {
-            should_draw = true; // since we had keyboard action
+            ctx.should_draw = true; // since we had keyboard action
             int c = 0;
             int n = read(0, &c, 4);
             if (n == 0) continue;
 
-            switch (editor_mode) {
+            switch (ctx.editor_mode) {
                 case MODE_NORMAL:
-                    handle_input_normal(c);
+                    handle_input_normal(&ctx, c);
                     break;
                 case MODE_INSERT:
-                    handle_input_insert(c);
+                    handle_input_insert(&ctx, c);
                     break;
                 case MODE_COMMAND:
-                    handle_input_command(c);
+                    handle_input_command(&ctx, c);
                     break;
             }
-            tb_constrain_line_char(&main_buffer, win_size.ws_row - PAD_TOP - PAD_BOT, win_size.ws_col - PAD_LFT - PAD_RGT);
+            tb_constrain_line_char(&ctx.main_buffer, ctx.win_size.ws_row - PAD_TOP - PAD_BOT, ctx.win_size.ws_col - PAD_LFT - PAD_RGT);
         }
 
-        if (should_draw) {
-            draw();
+        if (ctx.should_draw) {
+            draw(&ctx);
         }
 
         // Do other work here
@@ -417,14 +401,14 @@ int main(int argc, char **argv) {
         exit(EXIT_FAILURE);
     }
 
-    for (int i = 0; i < main_buffer.num_lines; ++i) {
-        size_t count = gap_buffer_count(main_buffer.line_bufs[i]);
-        gap_buffer_str(main_buffer.line_bufs[i], print_buf);
+    for (int i = 0; i < ctx.main_buffer.num_lines; ++i) {
+        size_t count = gap_buffer_count(ctx.main_buffer.line_bufs[i]);
+        gap_buffer_str(ctx.main_buffer.line_bufs[i], print_buf);
         fprintf(write_file, "%.*s\n", (int)count, print_buf);
         // deinit
     }
 
-    tb_deinit(&main_buffer);
+    tb_deinit(&ctx.main_buffer);
 
     if (fclose(write_file)) {
         fprintf(stderr, "Failed to close file %s\n", file_name);
