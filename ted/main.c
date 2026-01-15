@@ -142,7 +142,11 @@ void draw(context_t* ctx) {
 
     // Write status field
     printf("\x1B[%d;%dH", ctx->win_size.ws_row - 1, 1);
-    printf("%s", EDITOR_MODE_STR[ctx->editor_mode]);
+    char *fn_str = ctx->cur_buf->file_name;
+    if (fn_str == 0) {
+        fn_str = "[No name]";
+    }
+    printf("%8s \"%s\"", EDITOR_MODE_STR[ctx->editor_mode], fn_str);
 
     if (ctx->editor_mode == MODE_NORMAL || ctx->editor_mode == MODE_INSERT) {
         // move to current location
@@ -408,25 +412,5 @@ int main(int argc, char **argv) {
         usleep(50);
     }
 
-    // FILE * write_file = fopen(file_name, "w");
-    // if (!write_file) {
-    //     fprintf(stderr, "Failed to write to %s\n", file_name);
-    //     exit(EXIT_FAILURE);
-    // }
-    //
-    // for (int i = 0; i < ctx.main_buffer.num_lines; ++i) {
-    //     size_t count = gap_buffer_count(ctx.main_buffer.line_bufs[i]);
-    //     gap_buffer_str(ctx.main_buffer.line_bufs[i], print_buf);
-    //     fprintf(write_file, "%.*s\n", (int)count, print_buf);
-    //     // deinit
-    // }
-    //
-    // tb_deinit(&ctx.main_buffer);
-    //
-    // if (fclose(write_file)) {
-    //     fprintf(stderr, "Failed to close file %s\n", file_name);
-    //     exit(EXIT_FAILURE);
-    // }
-    //
     return 0;
 }

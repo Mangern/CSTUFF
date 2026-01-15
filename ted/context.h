@@ -19,6 +19,7 @@ struct bufentry_t {
     struct bufentry_t*  nxt;
     struct bufentry_t*  prv;
     struct ted_buffer_t buf;
+    char *file_name;
 };
 
 // state
