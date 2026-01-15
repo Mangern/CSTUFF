@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <ctype.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -78,7 +79,7 @@ struct cmd_result_t parse_execute_command(context_t *ctx, char* cmd, int len) {
                 return ERR("Unexpected token");
             case TOK_END:
                 if (ctx->cur_buf->file_name == 0) {
-                    return ERR("Missing file name");
+                    return ERR("No file name");
                 }
                 break;
             case TOK_ID:
@@ -94,6 +95,16 @@ struct cmd_result_t parse_execute_command(context_t *ctx, char* cmd, int len) {
                 assert(false && "Not implemented");
         }
         return cmd_write_file(ctx);
+    }
+    
+    if (strncmp(&lex.content[token.beg], "wq", token.end - token.beg) == 0) {
+        if (ctx->cur_buf->file_name == 0) {
+            return ERR("No file name");
+        }
+        cmd_result_t res = cmd_write_file(ctx);
+        if (res.err) return res;
+        ctx->should_quit = true;
+        return OK;
     }
 
     if (strncmp(&lex.content[token.beg], "e", token.end - token.beg) == 0) {
@@ -224,37 +235,41 @@ cmd_result_t cmd_edit_file(context_t *ctx, char* file_name) {
         ctx_open_empty(ctx);
     }
 
-    // A bit ugly, just to remove 1 empty line in most cases
-    while (ctx->cur_buf->buf.num_lines > 0) {
-        tb_delete_line(&ctx->cur_buf->buf, ctx->cur_buf->buf.num_lines - 1);
-    }
 
     FILE * read_file = fopen(file_name, "r");
     
     if (!read_file) {
-        return ERRF("ERROR: Failed to read file %s\n", file_name);
-    }
-    
-    {
-        const size_t CHUNK = 1024;
-        size_t cap = CHUNK;
-        size_t size = 0;
-        char* str = malloc(cap);
-    
-        for (;;) {
-            long nread = fread(str+size, 1, cap - size, read_file);
-            if (nread == 0) break;
-            size += nread;
-    
-            if (size == cap) {
-                cap = cap * 3 / 2;
-                str = realloc(str, cap);
-            }
+        if (errno == ENOENT) {
+            // File did not exist.
+            ctx->cur_buf->file_name = file_name;
+            return OK;
         }
-        tb_fill_from_string(&ctx->cur_buf->buf, str, size);
-        fclose(read_file);
-        free(str);
+        return ERRF("ERROR: Failed to read file %s.", file_name);
     }
+
+    // A bit ugly, just to remove 1 empty line in most cases
+    while (ctx->cur_buf->buf.num_lines > 0) {
+        tb_delete_line(&ctx->cur_buf->buf, ctx->cur_buf->buf.num_lines - 1);
+    }
+    
+    const size_t CHUNK = 1024;
+    size_t cap = CHUNK;
+    size_t size = 0;
+    char* str = malloc(cap);
+
+    for (;;) {
+        long nread = fread(str+size, 1, cap - size, read_file);
+        if (nread == 0) break;
+        size += nread;
+
+        if (size == cap) {
+            cap = cap * 3 / 2;
+            str = realloc(str, cap);
+        }
+    }
+    tb_fill_from_string(&ctx->cur_buf->buf, str, size);
+    fclose(read_file);
+    free(str);
 
     ctx->cur_buf->file_name = file_name;
 
