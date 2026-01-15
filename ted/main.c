@@ -11,6 +11,7 @@
 #include <unistd.h>
 
 #include "context.h"
+#include "command.h"
 #include "gap_buffer.h"
 #include "ted_buffer.h"
 
@@ -279,6 +280,21 @@ void handle_input_command(context_t *ctx, int c) {
     }
 
     switch (c) {
+        case '\n':
+            {
+                int size = gap_buffer_count(ctx->cmd_buffer.line_bufs[ctx->cmd_buffer.cur_line]);
+                char* cmd_str = malloc(size+1);
+                gap_buffer_str(ctx->cmd_buffer.line_bufs[ctx->cmd_buffer.cur_line], cmd_str);
+                cmd_str[size] = 0;
+                parse_execute_command(ctx, cmd_str, size);
+
+                // clear and back to normal
+                ctx->editor_mode = MODE_NORMAL;
+                gap_buffer_gap_at(ctx->cmd_buffer.line_bufs[ctx->cmd_buffer.cur_line], 0);
+                gap_buffer_chop_rest(ctx->cmd_buffer.line_bufs[ctx->cmd_buffer.cur_line]);
+                ctx->cmd_buffer.cur_character = 0;
+            }
+            break;
         case KEY_ESC:
             ctx->editor_mode = MODE_NORMAL;
             gap_buffer_gap_at(ctx->cmd_buffer.line_bufs[ctx->cmd_buffer.cur_line], 0);
