@@ -79,6 +79,7 @@ void tb_deinit(struct ted_buffer_t* tb) {
         gap_buffer_deinit(tb->line_bufs[i]);
         free(tb->line_bufs[i]);
     }
+    free(tb->line_bufs);
 }
 
 // Internal
@@ -93,4 +94,5 @@ void tb_grow(ted_buffer_t* tb) {
     }
 
     tb->line_bufs = reallocarray(tb->line_bufs, new_cap, sizeof(struct gap_buffer_t*));
+    tb->capacity = new_cap;
 }

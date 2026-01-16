@@ -1,4 +1,4 @@
-CFLAGS := -g -O2 -Wall -Wextra -I../da/
+CFLAGS := -g -O1 -Wall -Wextra -I../da/
 OBJS   := gap_buffer.o ted_buffer.o command.o context.o
 
 ted: $(OBJS) main.o

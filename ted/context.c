@@ -61,10 +61,24 @@ void ctx_logf(context_t *ctx, char *message, ...) {
     ctx_log(ctx, LOG_BUF);
 }
 
+void ctx_deinit(context_t *ctx) {
+    bufentry_t *entry = ctx->bufhead;
+    for (;;) {
+        tb_deinit(&entry->buf);
+        bufentry_t *nxt = entry->nxt;
+        if (entry->file_name) 
+            free(entry->file_name);
+        free(entry);
+        if (entry == ctx->buftail) break;
+        entry = nxt;
+    }
+}
+
 // ========== Internal ==========
 
 static bufentry_t* ctx_buf_push(context_t *ctx) {
     ctx->buftail->nxt = calloc(1, sizeof(bufentry_t));
+    ctx->buftail->nxt->prv = ctx->buftail;
     tb_fill_from_string(&ctx->buftail->nxt->buf, "", 0);
     ctx->buftail = ctx->buftail->nxt;
     return ctx->buftail;

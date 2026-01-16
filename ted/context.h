@@ -45,4 +45,6 @@ void ctx_open_empty(context_t *ctx);
 void ctx_log(context_t *ctx, char *message);
 void ctx_logf(context_t *ctx, char *message, ...);
 
+void ctx_deinit(context_t *ctx);
+
 #endif // CONTEXT_H

@@ -308,6 +308,7 @@ void handle_input_command(context_t *ctx, int c) {
                 gap_buffer_str(buf->line_bufs[buf->cur_line], cmd_str);
                 cmd_str[size] = 0;
                 struct cmd_result_t res = parse_execute_command(ctx, cmd_str, size);
+                free(cmd_str);
 
                 if (res.err) {
                     ctx_log(ctx, res.emsg);
@@ -358,15 +359,13 @@ int main(int argc, char **argv) {
         return 0;
     }
     
-     if (optind < argc) {
-         char* file_name = argv[optind];
-         ++optind; // hmm,
+    if (optind < argc) {
+        char* file_name = argv[optind];
+        ++optind; // hmm,
 
-         cmd_edit_file(&ctx, file_name);
-     }
+        cmd_edit_file(&ctx, file_name);
+    }
     
-    
-
     print_buf = malloc(GAP_BUFFER_SIZE);
 
     draw(&ctx);
@@ -401,5 +400,10 @@ int main(int argc, char **argv) {
     }
     // move home, erase until end
     printf("\x1B[H\x1B[0J");
+
+    // clear memory for fun
+    ctx_deinit(&ctx);
+    free(print_buf);
+
     return 0;
 }
