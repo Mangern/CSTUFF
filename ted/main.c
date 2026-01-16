@@ -137,7 +137,11 @@ void draw(context_t* ctx) {
         printf("\x1B[%d;%dH", row, col);
         // print line. TODO: pad right? 
         // -2 for ' '
-        printf("\x1B[38;5;241m%*d \x1B[0m%.*s\n", PAD_LFT - 1, main_buf->scroll + i + 1, (int)count, print_buf);
+        int relnum = abs(main_buf->scroll + i - main_buf->cur_line);
+        if (relnum == 0) {
+            relnum = main_buf->scroll + i + 1;
+        }
+        printf("\x1B[38;5;241m%*d \x1B[0m%.*s\n", PAD_LFT - 1, relnum, (int)count, print_buf);
     }
 
     // Write status field
