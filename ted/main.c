@@ -24,14 +24,6 @@ typedef struct ted_buffer_t ted_buffer_t;
 static struct termios orig_termios;
 static bool opt_debug = 0;
 
-static const int KEY_LEFT      = 0x445b1b;
-static const int KEY_UP        = 0x415b1b;
-static const int KEY_DOWN      = 0x425b1b;
-static const int KEY_RIGHT     = 0x435b1b;
-static const int KEY_BACKSPACE = 0x7f;
-static const int KEY_ESC       = 0x1b;
-static const int KEY_TAB       = 0x9;
-
 static const int PAD_TOP = 2;
 static const int PAD_LFT = 7;
 static const int PAD_RGT = 0;
@@ -107,10 +99,6 @@ void options(int argc, char **argv) {
                 return;
         }
     }
-}
-
-bool buffer_char(int c) {
-    return isascii(c) && isprint(c);
 }
 
 void draw(context_t* ctx) {
@@ -202,126 +190,6 @@ void draw(context_t* ctx) {
     printf("\x1B[?25h"); // show cursor
 
     fflush(stdout);
-}
-
-void handle_input_insert(context_t *ctx, int c) {
-    ted_buffer_t *buf = &ctx->cur_buf->buf;
-    if (buffer_char(c)) {
-        gap_buffer_gap_at(buf->line_bufs[buf->cur_line], buf->cur_character);
-        gap_buffer_gap_insert(buf->line_bufs[buf->cur_line], c);
-        buf->cur_character += 1;
-        return;
-    } 
-
-    switch (c) {
-        case '\n': 
-            {
-                tb_insert_line_after(buf, buf->cur_line);
-                gap_buffer_concat(
-                    buf->line_bufs[buf->cur_line+1], 
-                    buf->line_bufs[buf->cur_line], 
-                    buf->cur_character
-                );
-                gap_buffer_chop_rest(buf->line_bufs[buf->cur_line]);
-                ++buf->cur_line;
-                buf->cur_character = 0;
-            }
-            break;
-        case KEY_BACKSPACE: 
-            {
-                if (buf->cur_character > 0) {
-                    gap_buffer_gap_at(buf->line_bufs[buf->cur_line], buf->cur_character);
-                    gap_buffer_gap_delete(buf->line_bufs[buf->cur_line]);
-                    --buf->cur_character;
-                } else if (buf->cur_line > 0) {
-                    buf->cur_character = gap_buffer_count(buf->line_bufs[buf->cur_line - 1]);
-
-                    gap_buffer_concat(buf->line_bufs[buf->cur_line - 1], buf->line_bufs[buf->cur_line], 0);
-                    tb_delete_line(buf, buf->cur_line);
-
-                    --buf->cur_line;
-                }
-            }
-            break;
-        case KEY_TAB: 
-            {
-                gap_buffer_gap_at(buf->line_bufs[buf->cur_line], buf->cur_character);
-                for (int i = 0; i < ctx->tabsize; ++i) {
-                    gap_buffer_gap_insert(buf->line_bufs[buf->cur_line], ' ');
-                    buf->cur_character += 1;
-                }
-            }
-            break;
-        case KEY_UP: 
-            --buf->cur_line;
-            break;
-        case KEY_DOWN:
-            ++buf->cur_line;
-            break;
-        case KEY_LEFT:
-            --buf->cur_character;
-            break;
-        case KEY_RIGHT:
-            ++buf->cur_character;
-            break;
-        case KEY_ESC:
-            ctx->editor_mode = MODE_NORMAL;
-            break;
-    }
-}
-
-void handle_input_command(context_t *ctx, int c) {
-    ted_buffer_t *buf = &ctx->cmd_buf->buf;
-    if (buffer_char(c)) {
-        gap_buffer_gap_at(buf->line_bufs[buf->cur_line], buf->cur_character);
-        gap_buffer_gap_insert(buf->line_bufs[buf->cur_line], c);
-        buf->cur_character += 1;
-        return;
-    }
-
-    switch (c) {
-        case '\n':
-            {
-                int size = gap_buffer_count(buf->line_bufs[buf->cur_line]);
-                char* cmd_str = malloc(size+1);
-                gap_buffer_str(buf->line_bufs[buf->cur_line], cmd_str);
-                cmd_str[size] = 0;
-                struct cmd_result_t res = parse_execute_command(ctx, cmd_str, size);
-                free(cmd_str);
-
-                if (res.err) {
-                    ctx_log(ctx, res.emsg);
-                }
-
-                // clear and back to normal
-                ctx->editor_mode = MODE_NORMAL;
-                gap_buffer_gap_at(buf->line_bufs[buf->cur_line], 0);
-                gap_buffer_chop_rest(buf->line_bufs[buf->cur_line]);
-                buf->cur_character = 0;
-            }
-            break;
-        case KEY_ESC:
-            ctx->editor_mode = MODE_NORMAL;
-            gap_buffer_gap_at(buf->line_bufs[buf->cur_line], 0);
-            gap_buffer_chop_rest(buf->line_bufs[buf->cur_line]);
-            buf->cur_character = 0;
-            break;
-        case KEY_BACKSPACE: 
-            {
-                if (buf->cur_character > 0) {
-                    gap_buffer_gap_at(buf->line_bufs[buf->cur_line], buf->cur_character);
-                    gap_buffer_gap_delete(buf->line_bufs[buf->cur_line]);
-                    --buf->cur_character;
-                }
-            }
-            break;
-        case KEY_LEFT:
-            --buf->cur_character;
-            break;
-        case KEY_RIGHT:
-            ++buf->cur_character;
-            break;
-    }
 }
 
 int main(int argc, char **argv) {

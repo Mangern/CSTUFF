@@ -39,4 +39,8 @@ void init_inputs();
 
 void handle_input_normal(context_t* ctx, int c);
 
+void handle_input_insert(context_t *ctx, int c);
+
+void handle_input_command(context_t *ctx, int c);
+
 #endif // INPUT_H
