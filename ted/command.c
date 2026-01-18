@@ -1,4 +1,5 @@
 #include "command.h"
+#include "context.h"
 #include "gap_buffer.h"
 #include "ted_buffer.h"
 
@@ -228,7 +229,7 @@ cmd_result_t cmd_write_file(context_t *ctx) {
 cmd_result_t cmd_edit_file(context_t *ctx, char* file_name) {
     // TODO: check if we have it open
     bool open_new = ctx->cur_buf->file_name != 0 
-        || ctx->cur_buf->buf.num_lines > 0 
+        || ctx->cur_buf->buf.num_lines > 1 
         || gap_buffer_count(ctx->cur_buf->buf.line_bufs[0]) > 0;
 
     if (open_new) {

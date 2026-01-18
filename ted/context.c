@@ -35,6 +35,19 @@ void ctx_open_empty(context_t *ctx) {
     ctx->cur_buf = ctx_buf_push(ctx);
 }
 
+bufentry_t* ctx_get_editor_buf(context_t *ctx, int index) {
+    bufentry_t *it = ctx->bufhead;
+    int i = 0;
+    for (;;) {
+        if (it != ctx->cmd_buf && it != ctx->log_buf) {
+            if (i++ == index) return it;
+        }
+        if (it == ctx->buftail) break;
+        it = it->nxt;
+    }
+    return 0;
+}
+
 void ctx_log(context_t *ctx, char *message) {
     struct ted_buffer_t *buf = &ctx->log_buf->buf;
     tb_insert_line_after(buf, buf->num_lines - 1);

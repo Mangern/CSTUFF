@@ -25,6 +25,7 @@ void gap_buffer_gap_at(struct gap_buffer_t *gap_buffer, size_t idx);
 /* Blindly assumes gap exists and inserts a character there */
 void gap_buffer_gap_insert(struct gap_buffer_t *gap_buffer, char c);
 
+/* Delete one character to the left of the gap */
 void gap_buffer_gap_delete(struct gap_buffer_t *gap_buffer);
 
 /* Delete all characters after the gap */

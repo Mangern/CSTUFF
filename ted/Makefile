@@ -1,5 +1,5 @@
-CFLAGS := -g -O1 -Wall -Wextra -I../da/
-OBJS   := gap_buffer.o ted_buffer.o command.o context.o
+CFLAGS := -g -O2 -Wall -Wextra -I../da/
+OBJS   := gap_buffer.o ted_buffer.o command.o context.o dfa.o input.o
 
 ted: $(OBJS) main.o
 	gcc $(CFLAGS) -o ted $(OBJS) main.o

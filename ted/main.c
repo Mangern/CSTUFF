@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/ioctl.h>
 #include <sys/select.h>
 #include <termios.h>
@@ -12,7 +13,9 @@
 
 #include "context.h"
 #include "command.h"
+#include "dfa.h"
 #include "gap_buffer.h"
+#include "input.h"
 #include "ted_buffer.h"
 
 typedef struct gap_buffer_t gap_buffer_t;
@@ -29,7 +32,7 @@ static const int KEY_BACKSPACE = 0x7f;
 static const int KEY_ESC       = 0x1b;
 static const int KEY_TAB       = 0x9;
 
-static const int PAD_TOP = 0;
+static const int PAD_TOP = 2;
 static const int PAD_LFT = 7;
 static const int PAD_RGT = 0;
 static const int PAD_BOT = 2;
@@ -127,6 +130,35 @@ void draw(context_t* ctx) {
     if (main_buf->num_lines - main_buf->scroll < num_draw) {
         num_draw = main_buf->num_lines - main_buf->scroll;
     }
+
+    // Draw top line
+    {
+        struct bufentry_t *entry = ctx->bufhead;
+        printf("\x1B[%d;%dH", 1, PAD_LFT);
+        for (;;) {
+            if (entry != ctx->cmd_buf && entry != ctx->log_buf) {
+                if (entry == ctx->cur_buf) {
+                    printf("\x1B[48;5;241m");
+                }
+
+                printf(" %s ", entry->file_name ? entry->file_name : "[No name]");
+
+                if (entry == ctx->cur_buf) {
+                    printf("\x1B[0m");
+                }
+            }
+            if (entry == ctx->buftail) break;
+            entry = entry->nxt;
+        }
+
+        printf("\x1B[%d;%dH", 2, 1);
+        printf("\x1B[38;5;241m");
+        for (int i = 0; i < ctx->win_size.ws_col; ++i) {
+            printf("─");
+        }
+        printf("\x1B[0m");
+    }
+
     for (int i = 0; i < num_draw; ++i) {
         gap_buffer_t* cur_line = main_buf->line_bufs[main_buf->scroll + i];
         size_t count = gap_buffer_count(cur_line);
@@ -170,59 +202,6 @@ void draw(context_t* ctx) {
     printf("\x1B[?25h"); // show cursor
 
     fflush(stdout);
-}
-
-void handle_input_normal(context_t* ctx, int c) {
-    ted_buffer_t *buf = &ctx->cur_buf->buf;
-    switch (c) {
-        case '$':
-            buf->cur_character = gap_buffer_count(buf->line_bufs[buf->cur_line]) - 1;
-            break;
-        case ':':
-            ctx->editor_mode = MODE_COMMAND;
-            break;
-        case '0':
-            buf->cur_character = 0;
-            break;
-        case 'A':
-            buf->cur_character = gap_buffer_count(buf->line_bufs[buf->cur_line]);
-            ctx->editor_mode = MODE_INSERT;
-            break;
-        case 'I':
-            buf->cur_character = 0;
-            ctx->editor_mode = MODE_INSERT;
-            break;
-        case 'O':
-            tb_insert_line_after(buf, buf->cur_line - 1);
-            buf->cur_character = 0;
-            ctx->editor_mode = MODE_INSERT;
-            break;
-        case 'h':
-            buf->cur_character -= 1;
-            break;
-        case 'i':
-            ctx->editor_mode = MODE_INSERT;
-            break;
-        case 'j':
-            buf->cur_line += 1;
-            break;
-        case 'k':
-            buf->cur_line -= 1;
-            break;
-        case 'l':
-            buf->cur_character += 1;
-            break;
-        case 'o':
-            tb_insert_line_after(buf, buf->cur_line);
-            ++buf->cur_line;
-            buf->cur_character = 0;
-            ctx->editor_mode = MODE_INSERT;
-            break;
-        case 4:
-            // TODO: :q
-            ctx->should_quit = true;
-            break;
-    }
 }
 
 void handle_input_insert(context_t *ctx, int c) {
@@ -354,6 +333,8 @@ int main(int argc, char **argv) {
 
     ctx_init(&ctx);
 
+    init_inputs();
+
     if (opt_debug) {
         debug_keyboard();
         return 0;
@@ -363,7 +344,7 @@ int main(int argc, char **argv) {
         char* file_name = argv[optind];
         ++optind; // hmm,
 
-        cmd_edit_file(&ctx, file_name);
+        cmd_edit_file(&ctx, strdup(file_name));
     }
     
     print_buf = malloc(GAP_BUFFER_SIZE);
