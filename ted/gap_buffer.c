@@ -87,6 +87,29 @@ void gap_buffer_str(struct gap_buffer_t *gb, char *dst) {
     memmove(dst + gb->gap_start, gb->buffer + gap_end, gb->end - gap_end);
 }
 
+// yikes
+int gap_buffer_substr(struct gap_buffer_t *gb, char *dst, int index, int length) {
+    if (length == 0) return 0;
+
+    int dst_ptr = 0;
+    if ((size_t)index < gb->gap_start) {
+        int until_gap = gb->gap_start - index;
+        if (length < until_gap) until_gap = length;
+        memmove(dst, gb->buffer + index, until_gap);
+        dst_ptr += until_gap;
+        length -= until_gap;
+    }
+
+    if (length == 0) return dst_ptr;
+
+    size_t gap_end = gb->gap_start + gb->gap_size;
+    if (gb->end == gap_end) return dst_ptr;
+    int num_left = gb->end - gap_end;
+    if (length < num_left) num_left = length;
+    memmove(dst + dst_ptr, gb->buffer + gap_end, num_left);
+    return dst_ptr + num_left;
+}
+
 void gap_buffer_concat(struct gap_buffer_t *gb, struct gap_buffer_t *other, size_t start) {
     gap_buffer_gap_at(gb, gap_buffer_count(gb));
     gap_buffer_gap_at(other, start);
@@ -103,6 +126,6 @@ void gap_buffer_deinit(struct gap_buffer_t *gb) {
     }
 }
 
-size_t gap_buffer_count(struct gap_buffer_t *gb) {
+int gap_buffer_count(struct gap_buffer_t *gb) {
     return gb->gap_start + gb->end - (gb->gap_start + gb->gap_size);
 }

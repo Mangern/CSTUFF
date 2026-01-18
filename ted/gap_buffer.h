@@ -33,11 +33,13 @@ void gap_buffer_chop_rest(struct gap_buffer_t *gap_buffer);
 
 void gap_buffer_str(struct gap_buffer_t *gap_buffer, char *dst);
 
+int gap_buffer_substr(struct gap_buffer_t *gap_buffer, char *dst, int index, int length);
+
 void gap_buffer_concat(struct gap_buffer_t *gap_buffer, struct gap_buffer_t *other, size_t start);
 
 void gap_buffer_deinit(struct gap_buffer_t *gap_buffer);
 
 /* How many useful elements are there? */
-size_t gap_buffer_count(struct gap_buffer_t *gap_buffer);
+int gap_buffer_count(struct gap_buffer_t *gap_buffer);
 
 #endif // GAP_BUFFER_H

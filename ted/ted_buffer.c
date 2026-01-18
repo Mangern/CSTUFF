@@ -45,16 +45,27 @@ void tb_constrain_line_char(ted_buffer_t* tb, int num_rows, int num_cols) {
     if (tb->cur_line >= tb->scroll + num_rows) {
         int diff = tb->cur_line - tb->scroll - num_rows + 1;
         tb->scroll += diff;
-        if (tb->scroll > tb->num_lines) {
-            tb->scroll = tb->num_lines - 1;
-        }
+    }
+    if (tb->scroll > tb->num_lines) {
+        tb->scroll = tb->num_lines - 1;
     }
     if (tb->cur_character < 0) {
         tb->cur_character = 0;
     }
-    // TODO: horizontal scroll
     int count = gap_buffer_count(tb->line_bufs[tb->cur_line]);
     if (tb->cur_character > count)tb->cur_character = count;
+
+    if (tb->cur_character < tb->hscroll) {
+        tb->hscroll = tb->cur_character;
+    }
+
+    if (tb->cur_character >= tb->hscroll + num_cols) {
+        int diff = tb->cur_character - tb->hscroll - num_cols + 1;
+        tb->hscroll += diff;
+    }
+    if (tb->hscroll > count) {
+        tb->hscroll = count - 1;
+    }
 }
 
 void tb_fill_from_string(struct ted_buffer_t* tb, char* str, size_t len) {

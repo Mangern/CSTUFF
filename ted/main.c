@@ -149,8 +149,9 @@ void draw(context_t* ctx) {
 
     for (int i = 0; i < num_draw; ++i) {
         gap_buffer_t* cur_line = main_buf->line_bufs[main_buf->scroll + i];
-        size_t count = gap_buffer_count(cur_line);
-        gap_buffer_str(cur_line, print_buf);
+        //int count = gap_buffer_count(cur_line) - main_buf->hscroll;
+        //gap_buffer_str(cur_line, print_buf);
+        int count = gap_buffer_substr(cur_line, print_buf, main_buf->hscroll, ctx->win_size.ws_col - PAD_LFT - PAD_RGT);
         // move to correct spot
         int row = PAD_TOP + i + 1;
         int col = 1;
@@ -180,7 +181,10 @@ void draw(context_t* ctx) {
         printf("\x1B[%d;%dH%.*s", ctx->win_size.ws_row, 1, count, print_buf);
 
         // move to current location
-        printf("\x1B[%d;%dH", PAD_TOP + main_buf->cur_line - main_buf->scroll + 1, PAD_LFT + main_buf->cur_character + 1);
+        printf("\x1B[%d;%dH", 
+            PAD_TOP + main_buf->cur_line - main_buf->scroll + 1, 
+            PAD_LFT + main_buf->cur_character - main_buf->hscroll + 1
+        );
     } else if (ctx->editor_mode == MODE_COMMAND) {
         int count = gap_buffer_count(cmd_buf->line_bufs[cmd_buf->cur_line]);
         gap_buffer_str(cmd_buf->line_bufs[cmd_buf->cur_line], print_buf);

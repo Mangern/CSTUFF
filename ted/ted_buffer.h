@@ -21,6 +21,7 @@ struct ted_buffer_t {
     int cur_line;
     int cur_character;
     int scroll;
+    int hscroll;
 };
 
 void tb_insert_line_after(struct ted_buffer_t* tb, int line);
