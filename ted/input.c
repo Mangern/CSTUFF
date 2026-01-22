@@ -8,13 +8,17 @@
 
 #define BUFFER_CHAR(c) (isascii(c) && isprint(c))
 
-static const int KEY_LEFT      = 0x445b1b;
+static const int KEY_CTRL_D    = 0x04;
+static const int KEY_CTRL_E    = 0x05;
+static const int KEY_CTRL_U    = 0x15;
+static const int KEY_CTRL_Y    = 0x19;
+static const int KEY_TAB       = 0x9;
+static const int KEY_ESC       = 0x1b;
+static const int KEY_BACKSPACE = 0x7f;
 static const int KEY_UP        = 0x415b1b;
 static const int KEY_DOWN      = 0x425b1b;
 static const int KEY_RIGHT     = 0x435b1b;
-static const int KEY_BACKSPACE = 0x7f;
-static const int KEY_ESC       = 0x1b;
-static const int KEY_TAB       = 0x9;
+static const int KEY_LEFT      = 0x445b1b;
 
 
 typedef struct ted_buffer_t ted_buffer_t;
@@ -31,17 +35,26 @@ void init_inputs() {
     dfa_add_transition(dfa_normal.root, 'l', NORMAL_NAV_RGT);
     dfa_add_transition(dfa_normal.root, 'j', NORMAL_NAV_DOWN);
     dfa_add_transition(dfa_normal.root, 'k', NORMAL_NAV_UP);
+    dfa_add_transition(dfa_normal.root, 'G', NORMAL_NAV_FILEEND);
     dfa_add_transition(dfa_normal.root, ':', NORMAL_ENTER_CMD);
     dfa_add_transition(dfa_normal.root, 'i', NORMAL_ENTER_INSERT);
     dfa_add_transition(dfa_normal.root, 'A', NORMAL_ENTER_INSERT_END);
     dfa_add_transition(dfa_normal.root, 'I', NORMAL_ENTER_INSERT_HOME);
     dfa_add_transition(dfa_normal.root, 'o', NORMAL_ENTER_INSERT_DOWN);
     dfa_add_transition(dfa_normal.root, 'O', NORMAL_ENTER_INSERT_UP);
+    dfa_add_transition(dfa_normal.root, KEY_CTRL_E, NORMAL_SCROLL_DOWN);
+    dfa_add_transition(dfa_normal.root, KEY_CTRL_Y, NORMAL_SCROLL_UP);
+    dfa_add_transition(dfa_normal.root, KEY_CTRL_D, NORMAL_PAGE_DOWN);
+    dfa_add_transition(dfa_normal.root, KEY_CTRL_U, NORMAL_PAGE_UP);
 
-    dfa_node_t *delete = dfa_add_transition(dfa_normal.root, 'd', NORMAL_DELETE);
+    dfa_node_t *delete = dfa_add_transition(dfa_normal.root, 'd', NORMAL_D);
     delete->final = false;
 
-    dfa_add_transition(delete, 'd', NORMAL_DELETE_LINE);
+    dfa_add_transition(delete, 'd', NORMAL_D_LINE);
+
+    dfa_node_t *go = dfa_add_transition(dfa_normal.root, 'g', NORMAL_G);
+    go->final = false;
+    dfa_add_transition(go, 'g', NORMAL_G_HOME);
 
     dfa_node_t *leader = dfa_add_transition(dfa_normal.root, ' ', NORMAL_LEADER);
     leader->final = false;
@@ -88,6 +101,9 @@ void handle_input_normal(context_t* ctx, int c) {
         case NORMAL_NAV_LFT:
             buf->cur_character -= 1;
             break;
+        case NORMAL_NAV_FILEEND:
+            buf->cur_line = buf->num_lines - 1;
+            break;
         case NORMAL_ENTER_INSERT:
             ctx->editor_mode = MODE_INSERT;
             break;
@@ -106,8 +122,44 @@ void handle_input_normal(context_t* ctx, int c) {
             buf->cur_character = 0;
             ctx->editor_mode = MODE_INSERT;
             break;
-
-        case NORMAL_DELETE_LINE:
+        case NORMAL_SCROLL_UP:
+            {
+                if (buf->scroll > 0) {
+                    buf->scroll -= 1;
+                }
+            }
+            break;
+        case NORMAL_SCROLL_DOWN:
+            {
+                if (buf->scroll + 1 < buf->num_lines) {
+                    buf->scroll += 1;
+                    if (buf->cur_line < buf->scroll) {
+                        buf->cur_line = buf->scroll;
+                    }
+                }
+            }
+            break;
+        case NORMAL_PAGE_UP:
+            {
+                int njmp = ctx->win_size.ws_row / 2;
+                buf->scroll -= njmp;
+                buf->cur_line -= njmp;
+                if (buf->scroll < 0)
+                    buf->scroll = 0;
+            }
+            break;
+        case NORMAL_PAGE_DOWN:
+            {
+                int njmp = ctx->win_size.ws_row / 2;
+                buf->scroll += njmp;
+                if (buf->scroll >= buf->num_lines)
+                    buf->scroll = buf->num_lines - 1;
+                if (buf->cur_line < buf->scroll) {
+                    buf->cur_line = buf->scroll;
+                }
+            }
+            break;
+        case NORMAL_D_LINE:
             {
                 if (buf->num_lines == 1) {
                     gap_buffer_gap_at(buf->line_bufs[0], 0);
@@ -116,6 +168,10 @@ void handle_input_normal(context_t* ctx, int c) {
                     tb_delete_line(buf, buf->cur_line);
                 }
             }
+            break;
+
+        case NORMAL_G_HOME:
+            buf->cur_line = 0;
             break;
 
         // Probably a bit risky to do it like this but...

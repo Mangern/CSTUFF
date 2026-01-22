@@ -12,14 +12,22 @@ typedef enum INPUT_STATE {
     NORMAL_NAV_RGT, // l
     NORMAL_NAV_UP,  // k
     NORMAL_NAV_DOWN, // j
+    NORMAL_NAV_FILEEND, // G
     NORMAL_ENTER_CMD, // :
-    NORMAL_ENTER_INSERT, // i
-    NORMAL_ENTER_INSERT_END, // A
+    NORMAL_ENTER_INSERT,      // i
+    NORMAL_ENTER_INSERT_END,  // A
     NORMAL_ENTER_INSERT_HOME, // I
     NORMAL_ENTER_INSERT_DOWN, // o
-    NORMAL_ENTER_INSERT_UP, // O
-    NORMAL_DELETE, // 'd'
-    NORMAL_DELETE_LINE, // 'dd'
+    NORMAL_ENTER_INSERT_UP,   // O
+    NORMAL_SCROLL_UP,         // Ctrl+y
+    NORMAL_SCROLL_DOWN,       // Ctrl+e
+    NORMAL_PAGE_DOWN,         // Ctrl+d
+    NORMAL_PAGE_UP,           // Ctrl+u
+    NORMAL_D, // 'd'
+    NORMAL_D_LINE, // 'dd'
+
+    NORMAL_G, // 'g'
+    NORMAL_G_HOME, // 'gg'
 
     NORMAL_LEADER, // ' '
     NORMAL_EDIT_1,
