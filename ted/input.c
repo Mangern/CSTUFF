@@ -19,6 +19,7 @@ static const int KEY_UP        = 0x415b1b;
 static const int KEY_DOWN      = 0x425b1b;
 static const int KEY_RIGHT     = 0x435b1b;
 static const int KEY_LEFT      = 0x445b1b;
+static const int KEY_SHIFT_TAB = 0x5a5b1b;
 
 
 typedef struct ted_buffer_t ted_buffer_t;
@@ -68,6 +69,9 @@ void init_inputs() {
     dfa_add_transition(leader, '7', NORMAL_EDIT_7);
     dfa_add_transition(leader, '8', NORMAL_EDIT_8);
     dfa_add_transition(leader, '9', NORMAL_EDIT_9);
+
+    dfa_add_transition(leader, KEY_TAB, NORMAL_OPEN_TREE);
+    dfa_add_transition(leader, KEY_SHIFT_TAB, NORMAL_CLOSE_TREE);
 }
 
 void handle_input_normal(context_t* ctx, int c) {
@@ -191,6 +195,23 @@ void handle_input_normal(context_t* ctx, int c) {
                     ctx_log(ctx, "No such buffer!");
                 } else {
                     ctx->cur_buf = entry;
+                }
+            }
+            break;
+
+        case NORMAL_OPEN_TREE:
+            {
+                struct cmd_result_t result = cmd_expand_tree(ctx);
+                if (result.err) {
+                    ctx_log(ctx, result.emsg);
+                }
+            }
+            break;
+        case NORMAL_CLOSE_TREE:
+            {
+                struct cmd_result_t result = cmd_collapse_tree(ctx);
+                if (result.err) {
+                    ctx_log(ctx, result.emsg);
                 }
             }
             break;

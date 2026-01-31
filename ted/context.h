@@ -27,6 +27,7 @@ typedef struct context_t {
     bool should_draw;
     bool should_resize;
     bool should_quit;
+    bool tree_expanded;
     int tabsize;
     editor_mode_t editor_mode;
     struct winsize win_size;
@@ -34,6 +35,7 @@ typedef struct context_t {
     struct bufentry_t *buftail;
     struct bufentry_t *cmd_buf;
     struct bufentry_t *log_buf;
+    struct bufentry_t *tre_buf;
     struct bufentry_t *cur_buf; // active buffer
 } context_t;
 

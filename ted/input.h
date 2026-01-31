@@ -39,6 +39,9 @@ typedef enum INPUT_STATE {
     NORMAL_EDIT_7,
     NORMAL_EDIT_8,
     NORMAL_EDIT_9,
+
+    NORMAL_OPEN_TREE,
+    NORMAL_CLOSE_TREE,
 } INPUT_STATE;
 
 extern dfa_t dfa_normal;

@@ -18,4 +18,8 @@ struct cmd_result_t cmd_write_file(context_t *ctx);
 // The buffer takes ownership of file_name!
 struct cmd_result_t cmd_edit_file(context_t *ctx, char* file_name);
 
+struct cmd_result_t cmd_expand_tree(context_t *ctx);
+
+struct cmd_result_t cmd_collapse_tree(context_t *ctx);
+
 #endif // COMMAND_H

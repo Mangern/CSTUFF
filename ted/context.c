@@ -28,6 +28,7 @@ void ctx_init(context_t *ctx) {
     ctx->cmd_buf = ctx->bufhead;
 
     ctx->log_buf = ctx_buf_push(ctx);
+    ctx->tre_buf = ctx_buf_push(ctx);
     ctx->cur_buf = ctx_buf_push(ctx);
 }
 

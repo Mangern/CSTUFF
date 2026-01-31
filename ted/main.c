@@ -29,6 +29,8 @@ static const int PAD_LFT = 7;
 static const int PAD_RGT = 0;
 static const int PAD_BOT = 2;
 
+static const int TREE_SIZE = 20;
+
 context_t ctx;
 char* print_buf;
 
@@ -105,6 +107,7 @@ void draw(context_t* ctx) {
     ted_buffer_t *main_buf = &ctx->cur_buf->buf;
     ted_buffer_t *cmd_buf = &ctx->cmd_buf->buf;
     ted_buffer_t *log_buf = &ctx->log_buf->buf;
+    ted_buffer_t *tre_buf = &ctx->tre_buf->buf;
     ctx->should_draw = false;
 
     if (ctx->should_resize) {
@@ -119,12 +122,19 @@ void draw(context_t* ctx) {
         num_draw = main_buf->num_lines - main_buf->scroll;
     }
 
+    int main_col_start = PAD_LFT + 1;
+
+    if (ctx->tree_expanded) {
+        main_col_start += TREE_SIZE;
+    }
+
     // Draw top line
     {
         struct bufentry_t *entry = ctx->bufhead;
-        printf("\x1B[%d;%dH", 1, PAD_LFT);
+        printf("\x1B[%d;%dH", 1, main_col_start);
+        // Draw filenames
         for (;;) {
-            if (entry != ctx->cmd_buf && entry != ctx->log_buf) {
+            if (entry != ctx->cmd_buf && entry != ctx->log_buf && entry != ctx->tre_buf) {
                 if (entry == ctx->cur_buf) {
                     printf("\x1B[48;5;241m");
                 }
@@ -139,6 +149,8 @@ void draw(context_t* ctx) {
             entry = entry->nxt;
         }
 
+        // hmm
+
         printf("\x1B[%d;%dH", 2, 1);
         printf("\x1B[38;5;241m");
         for (int i = 0; i < ctx->win_size.ws_col; ++i) {
@@ -151,10 +163,10 @@ void draw(context_t* ctx) {
         gap_buffer_t* cur_line = main_buf->line_bufs[main_buf->scroll + i];
         //int count = gap_buffer_count(cur_line) - main_buf->hscroll;
         //gap_buffer_str(cur_line, print_buf);
-        int count = gap_buffer_substr(cur_line, print_buf, main_buf->hscroll, ctx->win_size.ws_col - PAD_LFT - PAD_RGT);
+        int count = gap_buffer_substr(cur_line, print_buf, main_buf->hscroll, ctx->win_size.ws_col - main_col_start - PAD_RGT);
         // move to correct spot
         int row = PAD_TOP + i + 1;
-        int col = 1;
+        int col = main_col_start - PAD_LFT;
         printf("\x1B[%d;%dH", row, col);
         // print line. TODO: pad right? 
         // -2 for ' '
@@ -162,7 +174,38 @@ void draw(context_t* ctx) {
         if (relnum == 0) {
             relnum = main_buf->scroll + i + 1;
         }
-        printf("\x1B[38;5;241m%*d \x1B[0m%.*s\n", PAD_LFT - 1, relnum, (int)count, print_buf);
+        printf("\x1B[38;5;241m%*d \x1B[0m%.*s\n", PAD_LFT, relnum, (int)count, print_buf);
+    }
+
+    if (ctx->tree_expanded) {
+        printf("\x1B[38;5;241m");
+        for (int i = 0; i < ctx->win_size.ws_row; ++i) {
+            printf("\x1B[%d;%dH", 
+                1 + i, 
+                TREE_SIZE
+            );
+            if (i == 1) {
+                printf("┼");
+            } else {
+                printf("│");
+            }
+        }
+        printf("\x1B[0m");
+
+        
+        int tree_draw = ctx->win_size.ws_row - PAD_TOP - PAD_BOT;
+        if (tre_buf->num_lines - tre_buf->scroll < tree_draw) {
+            tree_draw = tre_buf->num_lines - tre_buf->scroll;
+        }
+
+        for (int i = 0; i < tree_draw; ++i) {
+            gap_buffer_t* cur_line = tre_buf->line_bufs[tre_buf->scroll + i];
+            int count = gap_buffer_substr(cur_line, print_buf, tre_buf->hscroll, TREE_SIZE - 1);
+            int row = PAD_TOP + i + 1;
+            int col = 1;
+            printf("\x1B[%d;%dH", row, col);
+            printf("%.*s", count, print_buf);
+        }
     }
 
     // Write status field
@@ -183,7 +226,7 @@ void draw(context_t* ctx) {
         // move to current location
         printf("\x1B[%d;%dH", 
             PAD_TOP + main_buf->cur_line - main_buf->scroll + 1, 
-            PAD_LFT + main_buf->cur_character - main_buf->hscroll + 1
+            main_col_start + main_buf->cur_character - main_buf->hscroll + 1
         );
     } else if (ctx->editor_mode == MODE_COMMAND) {
         int count = gap_buffer_count(cmd_buf->line_bufs[cmd_buf->cur_line]);
@@ -241,7 +284,10 @@ int main(int argc, char **argv) {
                     handle_input_command(&ctx, c);
                     break;
             }
-            tb_constrain_line_char(&ctx.cur_buf->buf, ctx.win_size.ws_row - PAD_TOP - PAD_BOT, ctx.win_size.ws_col - PAD_LFT - PAD_RGT);
+            tb_constrain_line_char(
+                &ctx.cur_buf->buf, 
+                ctx.win_size.ws_row - PAD_TOP - PAD_BOT, 
+                ctx.win_size.ws_col - PAD_LFT - PAD_RGT - (ctx.tree_expanded ? TREE_SIZE : 0));
         }
 
         if (ctx.should_draw) {

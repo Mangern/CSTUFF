@@ -276,3 +276,25 @@ cmd_result_t cmd_edit_file(context_t *ctx, char* file_name) {
 
     return OK;
 }
+
+cmd_result_t cmd_expand_tree(context_t *ctx) {
+    // decide if we need to repopulate 
+    if (ctx->tre_buf->file_name == 0) {
+        // populate that shit
+        // A bit ugly, just to remove 1 empty line in most cases
+        while (ctx->tre_buf->buf.num_lines > 0) {
+            tb_delete_line(&ctx->tre_buf->buf, ctx->tre_buf->buf.num_lines - 1);
+        }
+        char *test =  "hello\nthis\nis\nthe\ntree\n";
+        tb_fill_from_string(&ctx->tre_buf->buf, test, strlen(test));
+        ctx->tre_buf->file_name = strdup("tree");
+    }
+
+    ctx->tree_expanded = true;
+    return OK;
+}
+
+cmd_result_t cmd_collapse_tree(context_t *ctx) {
+    ctx->tree_expanded = false;
+    return OK;
+}
